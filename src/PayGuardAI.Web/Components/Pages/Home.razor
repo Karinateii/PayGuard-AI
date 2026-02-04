@@ -1,7 +1,203 @@
 ﻿@page "/"
+@inject ITransactionService TransactionService
+@inject IReviewService ReviewService
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Dashboard - PayGuard AI</PageTitle>
 
-<h1>Hello, world!</h1>
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.Dashboard" Class="mr-2" />
+    Risk Monitoring Dashboard
+</MudText>
 
-Welcome to your new app.
+@if (_loading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else
+{
+    <!-- Stats Cards -->
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.SwapHoriz" Color="Color.Primary" Size="Size.Large" />
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.caption" Color="Color.Primary">Total Transactions</MudText>
+                        <MudText Typo="Typo.h4">@_stats.TotalTransactions</MudText>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.PendingActions" Color="Color.Warning" Size="Size.Large" />
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.caption" Color="Color.Warning">Pending Reviews</MudText>
+                        <MudText Typo="Typo.h4">@_stats.PendingReviews</MudText>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" Size="Size.Large" />
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.caption" Color="Color.Error">High Risk</MudText>
+                        <MudText Typo="Typo.h4">@_stats.HighRiskCount</MudText>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Info" Size="Size.Large" />
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.caption" Color="Color.Info">Avg Risk Score</MudText>
+                        <MudText Typo="Typo.h4">@_stats.AverageRiskScore.ToString("F1")</MudText>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Today's Activity -->
+    <MudGrid Class="mt-4">
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-3">Today's Activity</MudText>
+                <MudStack Row="true" Justify="Justify.SpaceAround">
+                    <MudStack AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" />
+                        <MudText Typo="Typo.h5">@_stats.ApprovedToday</MudText>
+                        <MudText Typo="Typo.caption">Approved</MudText>
+                    </MudStack>
+                    <MudStack AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" Size="Size.Large" />
+                        <MudText Typo="Typo.h5">@_stats.RejectedToday</MudText>
+                        <MudText Typo="Typo.caption">Rejected</MudText>
+                    </MudStack>
+                    <MudStack AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Color="Color.Info" Size="Size.Large" />
+                        <MudText Typo="Typo.h5">@_stats.TotalVolumeToday.ToString("C0")</MudText>
+                        <MudText Typo="Typo.caption">Volume</MudText>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-3">Quick Actions</MudText>
+                <MudStack Row="true" Spacing="3">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                               StartIcon="@Icons.Material.Filled.RateReview" Href="/reviews">
+                        Review Queue (@_stats.PendingReviews)
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
+                               StartIcon="@Icons.Material.Filled.Assessment" Href="/reports">
+                        Generate Report
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Recent High-Risk Transactions -->
+    <MudPaper Class="pa-4 mt-4" Elevation="2">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Class="mr-2" />
+                Recent High-Risk Transactions
+            </MudText>
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/transactions">View All</MudButton>
+        </MudStack>
+
+        @if (_recentHighRisk.Any())
+        {
+            <MudTable Items="@_recentHighRisk" Hover="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>ID</MudTh>
+                    <MudTh>Amount</MudTh>
+                    <MudTh>Corridor</MudTh>
+                    <MudTh>Risk Score</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Time</MudTh>
+                    <MudTh>Action</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.ExternalId[..8]...</MudTd>
+                    <MudTd>@context.Amount.ToString("C2") @context.SourceCurrency</MudTd>
+                    <MudTd>@context.SourceCountry → @context.DestinationCountry</MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Color="@GetRiskColor(context.RiskAnalysis?.RiskLevel)">
+                            @(context.RiskAnalysis?.RiskScore ?? 0)
+                        </MudChip>
+                    </MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.RiskAnalysis?.ReviewStatus)">
+                            @(context.RiskAnalysis?.ReviewStatus.ToString() ?? "N/A")
+                        </MudChip>
+                    </MudTd>
+                    <MudTd>@context.ReceivedAt.ToString("HH:mm:ss")</MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
+                                       Size="Size.Small" Color="Color.Primary"
+                                       Href="@($"/transactions/{context.Id}")" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info">No high-risk transactions detected recently.</MudAlert>
+        }
+    </MudPaper>
+}
+
+@code {
+    private bool _loading = true;
+    private DashboardStats _stats = new();
+    private List<Transaction> _recentHighRisk = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _stats = await TransactionService.GetDashboardStatsAsync();
+            
+            var transactions = await TransactionService.GetTransactionsAsync(
+                pageNumber: 1, 
+                pageSize: 5, 
+                riskLevel: RiskLevel.High);
+            _recentHighRisk = transactions.ToList();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private Color GetRiskColor(RiskLevel? level) => level switch
+    {
+        RiskLevel.Low => Color.Success,
+        RiskLevel.Medium => Color.Warning,
+        RiskLevel.High => Color.Error,
+        RiskLevel.Critical => Color.Dark,
+        _ => Color.Default
+    };
+
+    private Color GetStatusColor(ReviewStatus? status) => status switch
+    {
+        ReviewStatus.Pending => Color.Warning,
+        ReviewStatus.Approved or ReviewStatus.AutoApproved => Color.Success,
+        ReviewStatus.Rejected => Color.Error,
+        ReviewStatus.Escalated => Color.Info,
+        _ => Color.Default
+    };
+}

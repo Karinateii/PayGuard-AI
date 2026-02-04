@@ -1,0 +1,193 @@
+@page "/reviews"
+@inject IReviewService ReviewService
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+
+<PageTitle>Pending Reviews - PayGuard AI</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.RateReview" Class="mr-2" />
+    Pending Reviews (Human-in-the-Loop)
+</MudText>
+
+<MudAlert Severity="Severity.Info" Class="mb-4">
+    <MudText>
+        <strong>HITL Workflow:</strong> Transactions flagged by the AI require human review before processing. 
+        Review each transaction's risk factors and make an informed decision.
+    </MudText>
+</MudAlert>
+
+<MudPaper Class="pa-4" Elevation="2">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+        <MudStack Row="true" Spacing="3">
+            <MudSelect T="RiskLevel?" Label="Min Risk Level" Value="@_minRiskLevel" 
+                       ValueChanged="@OnFilterChanged" Dense="true" Style="width: 150px">
+                <MudSelectItem T="RiskLevel?" Value="@((RiskLevel?)null)">All</MudSelectItem>
+                <MudSelectItem T="RiskLevel?" Value="RiskLevel.Medium">Medium+</MudSelectItem>
+                <MudSelectItem T="RiskLevel?" Value="RiskLevel.High">High+</MudSelectItem>
+                <MudSelectItem T="RiskLevel?" Value="RiskLevel.Critical">Critical Only</MudSelectItem>
+            </MudSelect>
+        </MudStack>
+        <MudStack Row="true" Spacing="2">
+            <MudChip T="string" Color="Color.Warning">@_reviews.Count Pending</MudChip>
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" 
+                       OnClick="@LoadReviews">Refresh</MudButton>
+        </MudStack>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+    }
+    else if (!_reviews.Any())
+    {
+        <MudAlert Severity="Severity.Success" Class="mt-4">
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-2" />
+            No pending reviews! All caught up.
+        </MudAlert>
+    }
+    else
+    {
+        @foreach (var review in _reviews)
+        {
+            <MudCard Class="mb-3" Elevation="1">
+                <MudCardContent>
+                    <MudGrid>
+                        <MudItem xs="12" md="3">
+                            <MudStack>
+                                <MudText Typo="Typo.caption">Transaction ID</MudText>
+                                <MudText>@(review.Transaction.ExternalId.Length > 16 ? review.Transaction.ExternalId[..16] + "..." : review.Transaction.ExternalId)</MudText>
+                                <MudText Typo="Typo.caption" Class="mt-2">Amount</MudText>
+                                <MudText Typo="Typo.h6">@review.Transaction.Amount.ToString("C2") @review.Transaction.SourceCurrency</MudText>
+                            </MudStack>
+                        </MudItem>
+                        <MudItem xs="12" md="2">
+                            <MudStack AlignItems="AlignItems.Center">
+                                <MudText Typo="Typo.caption">Risk Score</MudText>
+                                <MudProgressCircular Color="@GetRiskColor(review.RiskLevel)" 
+                                                     Size="Size.Medium" Value="@review.RiskScore">
+                                    <MudText Typo="Typo.body2">@review.RiskScore</MudText>
+                                </MudProgressCircular>
+                                <MudChip T="string" Color="@GetRiskColor(review.RiskLevel)" Size="Size.Small">
+                                    @review.RiskLevel
+                                </MudChip>
+                            </MudStack>
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudText Typo="Typo.caption">Risk Summary</MudText>
+                            <MudText Typo="Typo.body2" Style="max-height: 60px; overflow: hidden;">
+                                @review.Explanation
+                            </MudText>
+                            <MudText Typo="Typo.caption" Class="mt-2">
+                                @review.RiskFactors.Count risk factor(s) detected
+                            </MudText>
+                        </MudItem>
+                        <MudItem xs="12" md="3">
+                            <MudStack>
+                                <MudButton Variant="Variant.Filled" Color="Color.Success" 
+                                           FullWidth="true" Size="Size.Small"
+                                           StartIcon="@Icons.Material.Filled.CheckCircle"
+                                           OnClick="@(() => ApproveReview(review))"
+                                           Disabled="@_processing">
+                                    Approve
+                                </MudButton>
+                                <MudButton Variant="Variant.Filled" Color="Color.Error" 
+                                           FullWidth="true" Size="Size.Small"
+                                           StartIcon="@Icons.Material.Filled.Cancel"
+                                           OnClick="@(() => RejectReview(review))"
+                                           Disabled="@_processing">
+                                    Reject
+                                </MudButton>
+                                <MudButton Variant="Variant.Outlined" Color="Color.Primary" 
+                                           FullWidth="true" Size="Size.Small"
+                                           StartIcon="@Icons.Material.Filled.Visibility"
+                                           Href="@($"/transactions/{review.TransactionId}")">
+                                    View Details
+                                </MudButton>
+                            </MudStack>
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+        }
+    }
+</MudPaper>
+
+@code {
+    private bool _loading = true;
+    private bool _processing = false;
+    private List<RiskAnalysis> _reviews = new();
+    private RiskLevel? _minRiskLevel;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReviews();
+    }
+
+    private async Task LoadReviews()
+    {
+        _loading = true;
+        try
+        {
+            var reviews = await ReviewService.GetPendingReviewsAsync(_minRiskLevel);
+            _reviews = reviews.ToList();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OnFilterChanged(RiskLevel? value)
+    {
+        _minRiskLevel = value;
+        await LoadReviews();
+    }
+
+    private async Task ApproveReview(RiskAnalysis review)
+    {
+        _processing = true;
+        try
+        {
+            await ReviewService.ApproveAsync(review.Id, "compliance_officer");
+            Snackbar.Add($"Transaction approved", Severity.Success);
+            _reviews.Remove(review);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+    private async Task RejectReview(RiskAnalysis review)
+    {
+        _processing = true;
+        try
+        {
+            await ReviewService.RejectAsync(review.Id, "compliance_officer");
+            Snackbar.Add($"Transaction rejected", Severity.Warning);
+            _reviews.Remove(review);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+    private Color GetRiskColor(RiskLevel level) => level switch
+    {
+        RiskLevel.Low => Color.Success,
+        RiskLevel.Medium => Color.Warning,
+        RiskLevel.High => Color.Error,
+        RiskLevel.Critical => Color.Dark,
+        _ => Color.Default
+    };
+}

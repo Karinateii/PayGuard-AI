@@ -1,0 +1,388 @@
+@page "/transactions"
+@page "/transactions/{TransactionId:guid}"
+@inject ITransactionService TransactionService
+@inject IReviewService ReviewService
+@inject ISnackbar Snackbar
+
+<PageTitle>Transactions - PayGuard AI</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2" />
+    Transaction Monitor
+</MudText>
+
+@if (TransactionId.HasValue && _selectedTransaction != null)
+{
+    <!-- Transaction Detail View -->
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" 
+               OnClick="@(() => NavigateToList())" Class="mb-3">
+        Back to List
+    </MudButton>
+
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-3">Transaction Details</MudText>
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption">External ID</MudText>
+                        <MudText>@_selectedTransaction.ExternalId</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption">Type</MudText>
+                        <MudText>@_selectedTransaction.Type</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption">Amount</MudText>
+                        <MudText Typo="Typo.h5">@_selectedTransaction.Amount.ToString("C2") @_selectedTransaction.SourceCurrency</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption">Corridor</MudText>
+                        <MudText>@_selectedTransaction.SourceCountry → @_selectedTransaction.DestinationCountry</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption">Sender ID</MudText>
+                        <MudText>@_selectedTransaction.SenderId</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption">Received At</MudText>
+                        <MudText>@_selectedTransaction.ReceivedAt.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            <!-- Risk Factors (XAI) -->
+            @if (_selectedTransaction.RiskAnalysis?.RiskFactors.Any() == true)
+            {
+                <MudPaper Class="pa-4 mt-4" Elevation="2">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Psychology" Class="mr-2" />
+                        Risk Factors (Explainable AI)
+                    </MudText>
+                    <MudText Typo="Typo.body2" Class="mb-3" Color="Color.Primary">
+                        @_selectedTransaction.RiskAnalysis.Explanation
+                    </MudText>
+                    <MudTable Items="@_selectedTransaction.RiskAnalysis.RiskFactors" Dense="true">
+                        <HeaderContent>
+                            <MudTh>Category</MudTh>
+                            <MudTh>Rule</MudTh>
+                            <MudTh>Description</MudTh>
+                            <MudTh>Score Impact</MudTh>
+                            <MudTh>Severity</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.Category</MudTd>
+                            <MudTd>@context.RuleName</MudTd>
+                            <MudTd>@context.Description</MudTd>
+                            <MudTd>+@context.ScoreContribution</MudTd>
+                            <MudTd>
+                                <MudChip T="string" Size="Size.Small" Color="@GetSeverityColor(context.Severity)">
+                                    @context.Severity
+                                </MudChip>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudPaper>
+            }
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <!-- Risk Analysis Summary -->
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-3">Risk Analysis</MudText>
+                @if (_selectedTransaction.RiskAnalysis != null)
+                {
+                    <MudStack AlignItems="AlignItems.Center" Class="mb-4">
+                        <MudProgressCircular Color="@GetRiskColor(_selectedTransaction.RiskAnalysis.RiskLevel)" 
+                                             Size="Size.Large" Value="@_selectedTransaction.RiskAnalysis.RiskScore">
+                            <MudText Typo="Typo.h4">@_selectedTransaction.RiskAnalysis.RiskScore</MudText>
+                        </MudProgressCircular>
+                        <MudChip T="string" Color="@GetRiskColor(_selectedTransaction.RiskAnalysis.RiskLevel)" Size="Size.Medium">
+                            @_selectedTransaction.RiskAnalysis.RiskLevel Risk
+                        </MudChip>
+                    </MudStack>
+
+                    <MudDivider Class="mb-3" />
+
+                    <MudText Typo="Typo.caption">Review Status</MudText>
+                    <MudChip T="string" Color="@GetStatusColor(_selectedTransaction.RiskAnalysis.ReviewStatus)" Class="mb-3">
+                        @_selectedTransaction.RiskAnalysis.ReviewStatus
+                    </MudChip>
+
+                    @if (_selectedTransaction.RiskAnalysis.ReviewStatus == ReviewStatus.Pending ||
+                         _selectedTransaction.RiskAnalysis.ReviewStatus == ReviewStatus.Escalated)
+                    {
+                        <MudDivider Class="mb-3" />
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Human-in-the-Loop Review</MudText>
+                        <MudStack Spacing="2">
+                            <MudButton Variant="Variant.Filled" Color="Color.Success" FullWidth="true"
+                                       StartIcon="@Icons.Material.Filled.CheckCircle"
+                                       OnClick="@(() => ApproveTransaction())" Disabled="@_processing">
+                                Approve
+                            </MudButton>
+                            <MudButton Variant="Variant.Filled" Color="Color.Error" FullWidth="true"
+                                       StartIcon="@Icons.Material.Filled.Cancel"
+                                       OnClick="@(() => RejectTransaction())" Disabled="@_processing">
+                                Reject
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Warning" FullWidth="true"
+                                       StartIcon="@Icons.Material.Filled.Escalator"
+                                       OnClick="@(() => EscalateTransaction())" Disabled="@_processing">
+                                Escalate
+                            </MudButton>
+                        </MudStack>
+                    }
+                    else if (_selectedTransaction.RiskAnalysis.ReviewedAt.HasValue)
+                    {
+                        <MudDivider Class="mb-3" />
+                        <MudText Typo="Typo.caption">Reviewed By</MudText>
+                        <MudText>@_selectedTransaction.RiskAnalysis.ReviewedBy</MudText>
+                        <MudText Typo="Typo.caption" Class="mt-2">Reviewed At</MudText>
+                        <MudText>@_selectedTransaction.RiskAnalysis.ReviewedAt?.ToString("yyyy-MM-dd HH:mm")</MudText>
+                        @if (!string.IsNullOrEmpty(_selectedTransaction.RiskAnalysis.ReviewNotes))
+                        {
+                            <MudText Typo="Typo.caption" Class="mt-2">Notes</MudText>
+                            <MudText>@_selectedTransaction.RiskAnalysis.ReviewNotes</MudText>
+                        }
+                    }
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info">No risk analysis available</MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+else
+{
+    <!-- Transaction List View -->
+    <MudPaper Class="pa-4" Elevation="2">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+            <MudStack Row="true" Spacing="3">
+                <MudSelect T="RiskLevel?" Label="Risk Level" Value="@_filterRiskLevel" 
+                           ValueChanged="@OnRiskLevelFilterChanged" Dense="true" Style="width: 150px">
+                    <MudSelectItem T="RiskLevel?" Value="@((RiskLevel?)null)">All</MudSelectItem>
+                    <MudSelectItem T="RiskLevel?" Value="RiskLevel.Low">Low</MudSelectItem>
+                    <MudSelectItem T="RiskLevel?" Value="RiskLevel.Medium">Medium</MudSelectItem>
+                    <MudSelectItem T="RiskLevel?" Value="RiskLevel.High">High</MudSelectItem>
+                    <MudSelectItem T="RiskLevel?" Value="RiskLevel.Critical">Critical</MudSelectItem>
+                </MudSelect>
+                <MudSelect T="ReviewStatus?" Label="Status" Value="@_filterStatus" 
+                           ValueChanged="@OnStatusFilterChanged" Dense="true" Style="width: 150px">
+                    <MudSelectItem T="ReviewStatus?" Value="@((ReviewStatus?)null)">All</MudSelectItem>
+                    <MudSelectItem T="ReviewStatus?" Value="ReviewStatus.Pending">Pending</MudSelectItem>
+                    <MudSelectItem T="ReviewStatus?" Value="ReviewStatus.Approved">Approved</MudSelectItem>
+                    <MudSelectItem T="ReviewStatus?" Value="ReviewStatus.Rejected">Rejected</MudSelectItem>
+                    <MudSelectItem T="ReviewStatus?" Value="ReviewStatus.Escalated">Escalated</MudSelectItem>
+                    <MudSelectItem T="ReviewStatus?" Value="ReviewStatus.AutoApproved">Auto-Approved</MudSelectItem>
+                </MudSelect>
+            </MudStack>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" 
+                       StartIcon="@Icons.Material.Filled.Refresh" OnClick="@LoadTransactions">
+                Refresh
+            </MudButton>
+        </MudStack>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+        }
+        else
+        {
+            <MudTable Items="@_transactions" Hover="true" Dense="true" OnRowClick="@OnRowClick" T="Transaction">
+                <HeaderContent>
+                    <MudTh>External ID</MudTh>
+                    <MudTh>Type</MudTh>
+                    <MudTh>Amount</MudTh>
+                    <MudTh>Corridor</MudTh>
+                    <MudTh>Risk Score</MudTh>
+                    <MudTh>Risk Level</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Received</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@(context.ExternalId.Length > 12 ? context.ExternalId[..12] + "..." : context.ExternalId)</MudTd>
+                    <MudTd>@context.Type</MudTd>
+                    <MudTd>@context.Amount.ToString("C2") @context.SourceCurrency</MudTd>
+                    <MudTd>@context.SourceCountry → @context.DestinationCountry</MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Color="@GetRiskColor(context.RiskAnalysis?.RiskLevel)">
+                            @(context.RiskAnalysis?.RiskScore ?? 0)
+                        </MudChip>
+                    </MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Color="@GetRiskColor(context.RiskAnalysis?.RiskLevel)">
+                            @(context.RiskAnalysis?.RiskLevel.ToString() ?? "N/A")
+                        </MudChip>
+                    </MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.RiskAnalysis?.ReviewStatus)">
+                            @(context.RiskAnalysis?.ReviewStatus.ToString() ?? "N/A")
+                        </MudChip>
+                    </MudTd>
+                    <MudTd>@context.ReceivedAt.ToString("MM/dd HH:mm")</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudPaper>
+}
+
+@code {
+    [Parameter]
+    public Guid? TransactionId { get; set; }
+
+    private bool _loading = true;
+    private bool _processing = false;
+    private List<Transaction> _transactions = new();
+    private Transaction? _selectedTransaction;
+    private RiskLevel? _filterRiskLevel;
+    private ReviewStatus? _filterStatus;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTransactions();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (TransactionId.HasValue)
+        {
+            _selectedTransaction = await TransactionService.GetByIdAsync(TransactionId.Value);
+        }
+        else
+        {
+            _selectedTransaction = null;
+        }
+    }
+
+    private async Task LoadTransactions()
+    {
+        _loading = true;
+        try
+        {
+            var transactions = await TransactionService.GetTransactionsAsync(
+                pageNumber: 1,
+                pageSize: 50,
+                riskLevel: _filterRiskLevel,
+                reviewStatus: _filterStatus);
+            _transactions = transactions.ToList();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OnRiskLevelFilterChanged(RiskLevel? value)
+    {
+        _filterRiskLevel = value;
+        await LoadTransactions();
+    }
+
+    private async Task OnStatusFilterChanged(ReviewStatus? value)
+    {
+        _filterStatus = value;
+        await LoadTransactions();
+    }
+
+    private void OnRowClick(TableRowClickEventArgs<Transaction> args)
+    {
+        NavigationManager.NavigateTo($"/transactions/{args.Item.Id}");
+    }
+
+    private void NavigateToList()
+    {
+        NavigationManager.NavigateTo("/transactions");
+    }
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = null!;
+
+    private async Task ApproveTransaction()
+    {
+        if (_selectedTransaction?.RiskAnalysis == null) return;
+        _processing = true;
+        try
+        {
+            await ReviewService.ApproveAsync(_selectedTransaction.RiskAnalysis.Id, "compliance_officer");
+            Snackbar.Add("Transaction approved successfully", Severity.Success);
+            _selectedTransaction = await TransactionService.GetByIdAsync(_selectedTransaction.Id);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+    private async Task RejectTransaction()
+    {
+        if (_selectedTransaction?.RiskAnalysis == null) return;
+        _processing = true;
+        try
+        {
+            await ReviewService.RejectAsync(_selectedTransaction.RiskAnalysis.Id, "compliance_officer");
+            Snackbar.Add("Transaction rejected", Severity.Warning);
+            _selectedTransaction = await TransactionService.GetByIdAsync(_selectedTransaction.Id);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+    private async Task EscalateTransaction()
+    {
+        if (_selectedTransaction?.RiskAnalysis == null) return;
+        _processing = true;
+        try
+        {
+            await ReviewService.EscalateAsync(_selectedTransaction.RiskAnalysis.Id, "compliance_officer");
+            Snackbar.Add("Transaction escalated for senior review", Severity.Info);
+            _selectedTransaction = await TransactionService.GetByIdAsync(_selectedTransaction.Id);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+    private Color GetRiskColor(RiskLevel? level) => level switch
+    {
+        RiskLevel.Low => Color.Success,
+        RiskLevel.Medium => Color.Warning,
+        RiskLevel.High => Color.Error,
+        RiskLevel.Critical => Color.Dark,
+        _ => Color.Default
+    };
+
+    private Color GetStatusColor(ReviewStatus? status) => status switch
+    {
+        ReviewStatus.Pending => Color.Warning,
+        ReviewStatus.Approved or ReviewStatus.AutoApproved => Color.Success,
+        ReviewStatus.Rejected => Color.Error,
+        ReviewStatus.Escalated => Color.Info,
+        _ => Color.Default
+    };
+
+    private Color GetSeverityColor(FactorSeverity severity) => severity switch
+    {
+        FactorSeverity.Info => Color.Info,
+        FactorSeverity.Warning => Color.Warning,
+        FactorSeverity.Alert => Color.Error,
+        FactorSeverity.Critical => Color.Dark,
+        _ => Color.Default
+    };
+}
