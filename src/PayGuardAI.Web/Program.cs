@@ -4,12 +4,16 @@ using PayGuardAI.Core.Services;
 using PayGuardAI.Data;
 using PayGuardAI.Data.Services;
 using PayGuardAI.Web.Components;
+using PayGuardAI.Web.Hubs;
 using PayGuardAI.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add MudBlazor services
 builder.Services.AddMudServices();
+
+// Add SignalR for real-time updates
+builder.Services.AddSignalR();
 
 // Add Entity Framework with SQLite
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -59,6 +63,7 @@ app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapControllers(); // Map API controllers
+app.MapHub<TransactionHub>("/hubs/transactions"); // SignalR hub
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

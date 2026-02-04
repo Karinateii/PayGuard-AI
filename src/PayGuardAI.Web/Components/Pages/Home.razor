@@ -1,12 +1,24 @@
 ﻿@page "/"
 @inject ITransactionService TransactionService
 @inject IReviewService ReviewService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@implements IAsyncDisposable
+@using Microsoft.AspNetCore.SignalR.Client
+@using PayGuardAI.Web.Hubs
 
 <PageTitle>Dashboard - PayGuard AI</PageTitle>
 
 <MudText Typo="Typo.h4" Class="mb-4">
     <MudIcon Icon="@Icons.Material.Filled.Dashboard" Class="mr-2" />
     Risk Monitoring Dashboard
+    @if (_hubConnection?.State == HubConnectionState.Connected)
+    {
+        <MudChip T="string" Size="Size.Small" Color="Color.Success" Class="ml-2">
+            <MudIcon Icon="@Icons.Material.Filled.Wifi" Size="Size.Small" Class="mr-1" />
+            Live
+        </MudChip>
+    }
 </MudText>
 
 @if (_loading)
@@ -164,6 +176,7 @@ else
     private bool _loading = true;
     private DashboardStats _stats = new();
     private List<Transaction> _recentHighRisk = new();
+    private HubConnection? _hubConnection;
 
     protected override async Task OnInitializedAsync()
     {
@@ -176,10 +189,62 @@ else
                 pageSize: 5, 
                 riskLevel: RiskLevel.High);
             _recentHighRisk = transactions.ToList();
+            
+            // Set up SignalR connection
+            await SetupSignalRConnection();
         }
         finally
         {
             _loading = false;
+        }
+    }
+    
+    private async Task SetupSignalRConnection()
+    {
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/hubs/transactions"))
+            .WithAutomaticReconnect()
+            .Build();
+        
+        _hubConnection.On<TransactionNotification>("NewTransaction", async (notification) =>
+        {
+            // Show snackbar notification
+            var severity = notification.RiskLevel switch
+            {
+                RiskLevel.Critical => Severity.Error,
+                RiskLevel.High => Severity.Warning,
+                _ => Severity.Info
+            };
+            
+            Snackbar.Add($"New {notification.RiskLevel} risk transaction: {notification.Amount:C0} ({notification.SourceCountry}→{notification.DestinationCountry})", 
+                severity, config => { config.VisibleStateDuration = 5000; });
+            
+            // Refresh stats and transactions
+            _stats = await TransactionService.GetDashboardStatsAsync();
+            var transactions = await TransactionService.GetTransactionsAsync(
+                pageNumber: 1, 
+                pageSize: 5, 
+                riskLevel: RiskLevel.High);
+            _recentHighRisk = transactions.ToList();
+            
+            await InvokeAsync(StateHasChanged);
+        });
+        
+        try
+        {
+            await _hubConnection.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SignalR connection failed: {ex.Message}");
+        }
+    }
+    
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection is not null)
+        {
+            await _hubConnection.DisposeAsync();
         }
     }
 

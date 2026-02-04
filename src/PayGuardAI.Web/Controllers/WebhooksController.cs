@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using PayGuardAI.Core.Services;
+using PayGuardAI.Web.Hubs;
 
 namespace PayGuardAI.Web.Controllers;
 
@@ -11,13 +13,16 @@ namespace PayGuardAI.Web.Controllers;
 public class WebhooksController : ControllerBase
 {
     private readonly ITransactionService _transactionService;
+    private readonly IHubContext<TransactionHub> _hubContext;
     private readonly ILogger<WebhooksController> _logger;
 
     public WebhooksController(
         ITransactionService transactionService,
+        IHubContext<TransactionHub> hubContext,
         ILogger<WebhooksController> logger)
     {
         _transactionService = transactionService;
+        _hubContext = hubContext;
         _logger = logger;
     }
 
@@ -42,6 +47,25 @@ public class WebhooksController : ControllerBase
 
             _logger.LogInformation("Transaction {TransactionId} processed with risk score {RiskScore}", 
                 transaction.Id, transaction.RiskAnalysis?.RiskScore ?? -1);
+
+            // Broadcast to all connected clients via SignalR
+            if (transaction.RiskAnalysis != null)
+            {
+                var notification = new TransactionNotification(
+                    transaction.Id,
+                    transaction.ExternalId,
+                    transaction.Amount,
+                    transaction.SourceCountry,
+                    transaction.DestinationCountry,
+                    transaction.RiskAnalysis.RiskScore,
+                    transaction.RiskAnalysis.RiskLevel,
+                    transaction.RiskAnalysis.ReviewStatus,
+                    transaction.RiskAnalysis.Explanation ?? "Risk analysis complete"
+                );
+                
+                await _hubContext.Clients.All.SendAsync("NewTransaction", notification, cancellationToken);
+                _logger.LogInformation("Broadcasted transaction {TransactionId} to SignalR clients", transaction.Id);
+            }
 
             return Ok(new 
             { 
