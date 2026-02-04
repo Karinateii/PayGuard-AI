@@ -211,12 +211,49 @@ public class TransactionService : ITransactionService
         }
         else
         {
-            // Handle simple format or fallback
-            transaction.ExternalId = root.TryGetProperty("id", out var id) 
-                ? id.GetString() ?? Guid.NewGuid().ToString() 
-                : Guid.NewGuid().ToString();
-            transaction.Type = "UNKNOWN";
-            transaction.Status = "UNKNOWN";
+            // Handle simple/flat format (direct fields, not wrapped in "data")
+            transaction.ExternalId = root.TryGetProperty("transactionId", out var txnId) 
+                ? txnId.GetString() ?? Guid.NewGuid().ToString()
+                : root.TryGetProperty("id", out var id) 
+                    ? id.GetString() ?? Guid.NewGuid().ToString() 
+                    : Guid.NewGuid().ToString();
+
+            transaction.Type = root.TryGetProperty("type", out var type) 
+                ? type.GetString() ?? "remittance" 
+                : "remittance";
+
+            transaction.Status = root.TryGetProperty("status", out var status) 
+                ? status.GetString() ?? "pending" 
+                : "pending";
+
+            transaction.Amount = root.TryGetProperty("amount", out var amount) 
+                ? amount.GetDecimal() 
+                : 0;
+
+            transaction.SourceCurrency = root.TryGetProperty("sourceCurrency", out var srcCur) 
+                ? srcCur.GetString() ?? "USD" 
+                : "USD";
+
+            transaction.DestinationCurrency = root.TryGetProperty("destinationCurrency", out var destCur) 
+                ? destCur.GetString() ?? "NGN" 
+                : "NGN";
+
+            transaction.SenderId = root.TryGetProperty("senderId", out var sender) 
+                ? sender.GetString() ?? "unknown" 
+                : "unknown";
+
+            transaction.ReceiverId = root.TryGetProperty("receiverId", out var receiver) 
+                ? receiver.GetString() 
+                : null;
+
+            transaction.SourceCountry = root.TryGetProperty("sourceCountry", out var srcCountry) 
+                ? srcCountry.GetString() ?? "US" 
+                : "US";
+
+            transaction.DestinationCountry = root.TryGetProperty("destinationCountry", out var destCountry) 
+                ? destCountry.GetString() ?? "NG" 
+                : "NG";
+
             transaction.CreatedAt = DateTime.UtcNow;
         }
 

@@ -1,4 +1,10 @@
 ﻿@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@implements IAsyncDisposable
+@using Microsoft.AspNetCore.SignalR.Client
+@using PayGuardAI.Web.Hubs
+@using PayGuardAI.Core.Entities
 
 <MudThemeProvider Theme="_theme" IsDarkMode="_isDarkMode" />
 <MudPopoverProvider />
@@ -14,12 +20,21 @@
         </MudText>
         <MudSpacer />
         <MudText Typo="Typo.body2" Class="mr-4 d-none d-md-flex">Cross-Border Fintech Hackathon 2026</MudText>
+        @if (_hubConnection?.State == HubConnectionState.Connected)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Success" Class="mr-2">
+                <MudIcon Icon="@Icons.Material.Filled.Wifi" Size="Size.Small" Class="mr-1" />
+                Live
+            </MudChip>
+        }
         <MudTooltip Text="@(_isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode")">
             <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" 
                            Color="Color.Inherit" 
                            OnClick="@ToggleTheme" />
         </MudTooltip>
-        <MudIconButton Icon="@Icons.Material.Filled.Notifications" Color="Color.Inherit" />
+        <MudBadge Content="@_notificationCount" Color="Color.Error" Overlap="true" Visible="@(_notificationCount > 0)">
+            <MudIconButton Icon="@Icons.Material.Filled.Notifications" Color="Color.Inherit" />
+        </MudBadge>
     </MudAppBar>
 
     <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
@@ -39,6 +54,67 @@
 @code {
     private bool _drawerOpen = true;
     private bool _isDarkMode = true;
+    private int _notificationCount = 0;
+    private HubConnection? _hubConnection;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SetupSignalRConnection();
+    }
+
+    private async Task SetupSignalRConnection()
+    {
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/hubs/transactions"))
+            .WithAutomaticReconnect()
+            .Build();
+        
+        _hubConnection.On<TransactionNotification>("NewTransaction", (notification) =>
+        {
+            _notificationCount++;
+            
+            var severity = notification.RiskLevel switch
+            {
+                RiskLevel.Critical => Severity.Error,
+                RiskLevel.High => Severity.Warning,
+                _ => Severity.Info
+            };
+            
+            var riskText = notification.RiskLevel >= RiskLevel.High ? $"⚠️ {notification.RiskLevel} Risk" : notification.RiskLevel.ToString();
+            
+            Snackbar.Add(
+                $"New Transaction: {notification.Amount:C0} ({notification.SourceCountry}→{notification.DestinationCountry}) - {riskText} (Score: {notification.RiskScore})", 
+                severity, 
+                config => { 
+                    config.VisibleStateDuration = 5000;
+                    config.ShowCloseIcon = true;
+                });
+            
+            InvokeAsync(StateHasChanged);
+        });
+        
+        _hubConnection.Reconnecting += (ex) =>
+        {
+            InvokeAsync(StateHasChanged);
+            return Task.CompletedTask;
+        };
+        
+        _hubConnection.Reconnected += (connectionId) =>
+        {
+            InvokeAsync(StateHasChanged);
+            return Task.CompletedTask;
+        };
+        
+        try
+        {
+            await _hubConnection.StartAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SignalR connection failed: {ex.Message}");
+        }
+    }
 
     private void ToggleDrawer()
     {
@@ -48,6 +124,14 @@
     private void ToggleTheme()
     {
         _isDarkMode = !_isDarkMode;
+    }
+    
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection is not null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
     }
 
     private readonly MudTheme _theme = new()
