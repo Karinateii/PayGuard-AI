@@ -74,100 +74,129 @@
             </MudPaper>
         </MudItem>
 
-        <!-- Risk Distribution -->
+        <!-- Risk Distribution Chart -->
         <MudItem xs="12" md="6">
             <MudPaper Class="pa-4" Elevation="2">
-                <MudText Typo="Typo.h6" Class="mb-3">Risk Level Distribution</MudText>
-                <MudSimpleTable Dense="true">
-                    <thead>
-                        <tr>
-                            <th>Risk Level</th>
-                            <th>Count</th>
-                            <th>Percentage</th>
-                            <th>Distribution</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var dist in _riskDistribution)
-                        {
-                            <tr>
-                                <td>
-                                    <MudChip T="string" Size="Size.Small" Color="@GetRiskColor(dist.Level)">
-                                        @dist.Level
-                                    </MudChip>
-                                </td>
-                                <td>@dist.Count</td>
-                                <td>@dist.Percentage.ToString("F1")%</td>
-                                <td>
-                                    <MudProgressLinear Color="@GetRiskColor(dist.Level)" 
-                                                       Value="@dist.Percentage" Max="100" />
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </MudSimpleTable>
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.PieChart" Class="mr-2" />
+                    Risk Level Distribution
+                </MudText>
+                <div style="height: 300px;">
+                    <MudChart ChartType="ChartType.Donut" 
+                              InputData="@_riskChartData" 
+                              InputLabels="@_riskChartLabels"
+                              Width="300px" Height="300px"
+                              ChartOptions="@_donutOptions" />
+                </div>
+                <MudStack Row="true" Justify="Justify.Center" Class="mt-3" Spacing="2">
+                    @foreach (var dist in _riskDistribution.Where(d => d.Count > 0))
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="@GetRiskColor(dist.Level)">
+                            @dist.Level: @dist.Count (@dist.Percentage.ToString("F0")%)
+                        </MudChip>
+                    }
+                </MudStack>
             </MudPaper>
         </MudItem>
 
-        <!-- Review Activity -->
+        <!-- Review Status Chart -->
         <MudItem xs="12" md="6">
             <MudPaper Class="pa-4" Elevation="2">
-                <MudText Typo="Typo.h6" Class="mb-3">Review Activity Summary</MudText>
-                <MudSimpleTable Dense="true">
-                    <thead>
-                        <tr>
-                            <th>Status</th>
-                            <th>Count</th>
-                            <th>Avg Response Time</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var activity in _reviewActivity)
-                        {
-                            <tr>
-                                <td>
-                                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(activity.Status)">
-                                        @activity.Status
-                                    </MudChip>
-                                </td>
-                                <td>@activity.Count</td>
-                                <td>@activity.AvgResponseTime</td>
-                            </tr>
-                        }
-                    </tbody>
-                </MudSimpleTable>
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.BarChart" Class="mr-2" />
+                    Review Status Breakdown
+                </MudText>
+                <div style="height: 300px;">
+                    <MudChart ChartType="ChartType.Bar" 
+                              InputData="@_reviewChartData" 
+                              InputLabels="@_reviewChartLabels"
+                              Width="100%" Height="250px"
+                              ChartOptions="@_barOptions" />
+                </div>
+                <MudDivider Class="my-3" />
+                <MudText Typo="Typo.subtitle2">Response Times</MudText>
+                <MudStack Row="true" Class="mt-2" Spacing="2">
+                    @foreach (var activity in _reviewActivity.Where(a => a.AvgResponseTime != "N/A"))
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(activity.Status)">
+                            @activity.Status: @activity.AvgResponseTime
+                        </MudChip>
+                    }
+                </MudStack>
             </MudPaper>
         </MudItem>
 
         <!-- Top Risk Factors -->
-        <MudItem xs="12">
+        <!-- Top Risk Factors Chart -->
+        <MudItem xs="12" md="6">
             <MudPaper Class="pa-4" Elevation="2">
-                <MudText Typo="Typo.h6" Class="mb-3">Top Triggered Risk Factors</MudText>
-                <MudSimpleTable Dense="true">
-                    <thead>
-                        <tr>
-                            <th>Rule Name</th>
-                            <th>Category</th>
-                            <th>Times Triggered</th>
-                            <th>Avg Score Impact</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var factor in _topRiskFactors)
-                        {
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Class="mr-2" />
+                    Top Risk Factors
+                </MudText>
+                @if (_topRiskFactors.Any())
+                {
+                    <div style="height: 280px;">
+                        <MudChart ChartType="ChartType.Bar" 
+                                  InputData="@_factorChartData" 
+                                  InputLabels="@_factorChartLabels"
+                                  Width="100%" Height="250px"
+                                  ChartOptions="@_barOptions" />
+                    </div>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info">No risk factors triggered in this period</MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+        
+        <!-- Top Corridors -->
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Flight" Class="mr-2" />
+                    Top Transaction Corridors
+                </MudText>
+                @if (_topCorridors.Any())
+                {
+                    <MudSimpleTable Dense="true">
+                        <thead>
                             <tr>
-                                <td>@factor.RuleName</td>
-                                <td>
-                                    <MudChip T="string" Size="Size.Small" Color="@GetCategoryColor(factor.Category)">
-                                        @factor.Category
-                                    </MudChip>
-                                </td>
-                                <td>@factor.TriggerCount</td>
-                                <td>+@factor.AvgScoreImpact</td>
+                                <th>Corridor</th>
+                                <th>Count</th>
+                                <th>Volume</th>
+                                <th>Avg Risk</th>
                             </tr>
-                        }
-                    </tbody>
-                </MudSimpleTable>
+                        </thead>
+                        <tbody>
+                            @foreach (var corridor in _topCorridors)
+                            {
+                                <tr>
+                                    <td>
+                                        <MudStack Row="true" AlignItems="AlignItems.Center">
+                                            <MudText>@corridor.Source</MudText>
+                                            <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
+                                            <MudText>@corridor.Destination</MudText>
+                                        </MudStack>
+                                    </td>
+                                    <td>@corridor.Count</td>
+                                    <td>@corridor.Volume.ToString("C0")</td>
+                                    <td>
+                                        <MudChip T="string" Size="Size.Small" 
+                                                 Color="@(corridor.AvgRisk > 50 ? Color.Error : corridor.AvgRisk > 25 ? Color.Warning : Color.Success)">
+                                            @corridor.AvgRisk.ToString("F0")
+                                        </MudChip>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info">No corridor data in this period</MudAlert>
+                }
             </MudPaper>
         </MudItem>
 
@@ -215,6 +244,18 @@
     private List<RiskDistribution> _riskDistribution = new();
     private List<ReviewActivity> _reviewActivity = new();
     private List<TopRiskFactor> _topRiskFactors = new();
+    private List<CorridorSummary> _topCorridors = new();
+    
+    // Chart data
+    private double[] _riskChartData = Array.Empty<double>();
+    private string[] _riskChartLabels = Array.Empty<string>();
+    private double[] _reviewChartData = Array.Empty<double>();
+    private string[] _reviewChartLabels = Array.Empty<string>();
+    private double[] _factorChartData = Array.Empty<double>();
+    private string[] _factorChartLabels = Array.Empty<string>();
+    
+    private ChartOptions _donutOptions = new();
+    private ChartOptions _barOptions = new() { YAxisTicks = 5 };
 
     private string GetPercentage(int count)
     {
@@ -266,6 +307,12 @@
             })
             .Where(a => a.Count > 0)
             .ToList();
+        
+        // Prepare chart data
+        _riskChartData = _riskDistribution.Select(d => (double)d.Count).ToArray();
+        _riskChartLabels = _riskDistribution.Select(d => d.Level.ToString()).ToArray();
+        _reviewChartData = _reviewActivity.Select(a => (double)a.Count).ToArray();
+        _reviewChartLabels = _reviewActivity.Select(a => a.Status.ToString()).ToArray();
 
         // Top risk factors
         var allFactors = analyses.SelectMany(a => a.RiskFactors).ToList();
@@ -280,6 +327,26 @@
             })
             .OrderByDescending(f => f.TriggerCount)
             .Take(6)
+            .ToList();
+        
+        // Factor chart data
+        _factorChartData = _topRiskFactors.Select(f => (double)f.TriggerCount).ToArray();
+        _factorChartLabels = _topRiskFactors.Select(f => f.RuleName.Length > 15 ? f.RuleName[..12] + "..." : f.RuleName).ToArray();
+        
+        // Top corridors
+        _topCorridors = analyses
+            .Where(a => a.Transaction != null)
+            .GroupBy(a => new { a.Transaction!.SourceCountry, a.Transaction.DestinationCountry })
+            .Select(g => new CorridorSummary
+            {
+                Source = g.Key.SourceCountry,
+                Destination = g.Key.DestinationCountry,
+                Count = g.Count(),
+                Volume = g.Sum(a => a.Transaction!.Amount),
+                AvgRisk = g.Average(a => a.RiskScore)
+            })
+            .OrderByDescending(c => c.Count)
+            .Take(5)
             .ToList();
 
         _reportGenerated = true;
@@ -347,5 +414,14 @@
         public string Category { get; set; } = "";
         public int TriggerCount { get; set; }
         public int AvgScoreImpact { get; set; }
+    }
+    
+    private class CorridorSummary
+    {
+        public string Source { get; set; } = "";
+        public string Destination { get; set; } = "";
+        public int Count { get; set; }
+        public decimal Volume { get; set; }
+        public double AvgRisk { get; set; }
     }
 }

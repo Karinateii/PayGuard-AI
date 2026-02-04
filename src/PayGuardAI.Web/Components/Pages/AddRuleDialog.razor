@@ -1,0 +1,87 @@
+@using PayGuardAI.Core.Entities
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_name" Label="Rule Name" Required="true" 
+                          Variant="Variant.Outlined" 
+                          Placeholder="e.g., High Value Transaction" />
+            
+            <MudTextField @bind-Value="_ruleCode" Label="Rule Code" Required="true"
+                          Variant="Variant.Outlined"
+                          Placeholder="e.g., CUSTOM_RULE_001" />
+            
+            <MudTextField @bind-Value="_description" Label="Description" 
+                          Variant="Variant.Outlined" Lines="2"
+                          Placeholder="Describe what this rule detects" />
+            
+            <MudSelect T="string" @bind-Value="_category" Label="Category" 
+                       Variant="Variant.Outlined" Required="true">
+                <MudSelectItem Value="@("Amount")">Amount</MudSelectItem>
+                <MudSelectItem Value="@("Velocity")">Velocity</MudSelectItem>
+                <MudSelectItem Value="@("Geography")">Geography</MudSelectItem>
+                <MudSelectItem Value="@("Pattern")">Pattern</MudSelectItem>
+            </MudSelect>
+            
+            <MudGrid>
+                <MudItem xs="6">
+                    <MudNumericField T="decimal" @bind-Value="_threshold" 
+                                     Label="Threshold" Variant="Variant.Outlined"
+                                     Min="0" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudNumericField T="int" @bind-Value="_scoreWeight" 
+                                     Label="Score Weight" Variant="Variant.Outlined"
+                                     Min="1" Max="50" />
+                </MudItem>
+            </MudGrid>
+            
+            <MudSwitch T="bool" @bind-Value="_isEnabled" Label="Enable Rule" Color="Color.Success" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" 
+                   OnClick="Submit" Disabled="@(!IsValid)">
+            Create Rule
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance? MudDialog { get; set; }
+
+    private string _name = "";
+    private string _ruleCode = "";
+    private string _description = "";
+    private string _category = "Amount";
+    private decimal _threshold = 1000;
+    private int _scoreWeight = 10;
+    private bool _isEnabled = true;
+
+    private bool IsValid => !string.IsNullOrWhiteSpace(_name) && 
+                            !string.IsNullOrWhiteSpace(_ruleCode) &&
+                            !string.IsNullOrWhiteSpace(_category);
+
+    private void Cancel() => MudDialog?.Cancel();
+
+    private void Submit()
+    {
+        var rule = new RiskRule
+        {
+            Id = Guid.NewGuid(),
+            Name = _name,
+            RuleCode = _ruleCode.ToUpperInvariant().Replace(" ", "_"),
+            Description = _description,
+            Category = _category,
+            Threshold = _threshold,
+            ScoreWeight = _scoreWeight,
+            IsEnabled = _isEnabled,
+            UpdatedAt = DateTime.UtcNow,
+            UpdatedBy = "compliance_officer"
+        };
+        
+        MudDialog?.Close(DialogResult.Ok(rule));
+    }
+}

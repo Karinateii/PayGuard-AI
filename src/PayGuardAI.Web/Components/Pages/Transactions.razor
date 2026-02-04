@@ -226,6 +226,120 @@ else
             </MudTable>
         }
     </MudPaper>
+    
+    <!-- Quick View Drawer -->
+    <MudDrawer @bind-Open="_drawerOpen" Anchor="Anchor.End" Elevation="4" Width="450px" Variant="DrawerVariant.Temporary">
+        @if (_selectedTransaction != null)
+        {
+            <MudDrawerHeader>
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Style="width: 100%;">
+                    <MudText Typo="Typo.h6">Quick View</MudText>
+                    <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="@CloseDrawer" />
+                </MudStack>
+            </MudDrawerHeader>
+            <MudDrawerContainer Class="pa-4">
+                <!-- Risk Score Circle -->
+                <MudStack AlignItems="AlignItems.Center" Class="mb-4">
+                    @if (_selectedTransaction.RiskAnalysis != null)
+                    {
+                        <MudProgressCircular Color="@GetRiskColor(_selectedTransaction.RiskAnalysis.RiskLevel)" 
+                                             Size="Size.Large" Value="@_selectedTransaction.RiskAnalysis.RiskScore">
+                            <MudText Typo="Typo.h4">@_selectedTransaction.RiskAnalysis.RiskScore</MudText>
+                        </MudProgressCircular>
+                        <MudChip T="string" Color="@GetRiskColor(_selectedTransaction.RiskAnalysis.RiskLevel)" Size="Size.Medium">
+                            @_selectedTransaction.RiskAnalysis.RiskLevel Risk
+                        </MudChip>
+                    }
+                </MudStack>
+                
+                <MudDivider Class="mb-3" />
+                
+                <!-- Transaction Info -->
+                <MudGrid Spacing="2">
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Primary">Amount</MudText>
+                        <MudText Typo="Typo.h6">@_selectedTransaction.Amount.ToString("C2")</MudText>
+                        <MudText Typo="Typo.caption">@_selectedTransaction.SourceCurrency → @_selectedTransaction.DestinationCurrency</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Primary">Corridor</MudText>
+                        <MudText Typo="Typo.h6">@_selectedTransaction.SourceCountry → @_selectedTransaction.DestinationCountry</MudText>
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.caption" Color="Color.Primary">Transaction ID</MudText>
+                        <MudText Typo="Typo.body2" Style="word-break: break-all;">@_selectedTransaction.ExternalId</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Primary">Type</MudText>
+                        <MudText>@_selectedTransaction.Type</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Primary">Received</MudText>
+                        <MudText>@_selectedTransaction.ReceivedAt.ToString("yyyy-MM-dd HH:mm")</MudText>
+                    </MudItem>
+                </MudGrid>
+                
+                @if (_selectedTransaction.RiskAnalysis?.RiskFactors.Any() == true)
+                {
+                    <MudDivider Class="my-4" />
+                    <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Small" Class="mr-1" />
+                        Risk Factors
+                    </MudText>
+                    <MudText Typo="Typo.body2" Class="mb-3" Color="Color.Secondary">
+                        @_selectedTransaction.RiskAnalysis.Explanation
+                    </MudText>
+                    <MudStack Spacing="2">
+                        @foreach (var factor in _selectedTransaction.RiskAnalysis.RiskFactors)
+                        {
+                            <MudPaper Class="pa-2" Outlined="true">
+                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                    <MudStack Spacing="0">
+                                        <MudText Typo="Typo.body2">@factor.RuleName</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@factor.Description</MudText>
+                                    </MudStack>
+                                    <MudChip T="string" Size="Size.Small" Color="@GetSeverityColor(factor.Severity)">
+                                        +@factor.ScoreContribution
+                                    </MudChip>
+                                </MudStack>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                }
+                
+                @if (_selectedTransaction.RiskAnalysis?.ReviewStatus == ReviewStatus.Pending ||
+                     _selectedTransaction.RiskAnalysis?.ReviewStatus == ReviewStatus.Escalated)
+                {
+                    <MudDivider Class="my-4" />
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Quick Actions</MudText>
+                    <MudStack Row="true" Spacing="2">
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.CheckCircle"
+                                   OnClick="@(() => ApproveFromDrawer())" Disabled="@_processing">
+                            Approve
+                        </MudButton>
+                        <MudButton Variant="Variant.Filled" Color="Color.Error" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Cancel"
+                                   OnClick="@(() => RejectFromDrawer())" Disabled="@_processing">
+                            Reject
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Warning" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Escalator"
+                                   OnClick="@(() => EscalateFromDrawer())" Disabled="@_processing">
+                            Escalate
+                        </MudButton>
+                    </MudStack>
+                }
+                
+                <MudDivider Class="my-4" />
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.OpenInNew"
+                           OnClick="@ViewFullDetails">
+                    View Full Details
+                </MudButton>
+            </MudDrawerContainer>
+        }
+    </MudDrawer>
 }
 
 @code {
@@ -234,6 +348,7 @@ else
 
     private bool _loading = true;
     private bool _processing = false;
+    private bool _drawerOpen = false;
     private List<Transaction> _transactions = new();
     private Transaction? _selectedTransaction;
     private RiskLevel? _filterRiskLevel;
@@ -288,7 +403,21 @@ else
 
     private void OnRowClick(TableRowClickEventArgs<Transaction> args)
     {
-        NavigationManager.NavigateTo($"/transactions/{args.Item.Id}");
+        _selectedTransaction = args.Item;
+        _drawerOpen = true;
+    }
+
+    private void CloseDrawer()
+    {
+        _drawerOpen = false;
+    }
+    
+    private void ViewFullDetails()
+    {
+        if (_selectedTransaction != null)
+        {
+            NavigationManager.NavigateTo($"/transactions/{_selectedTransaction.Id}");
+        }
     }
 
     private void NavigateToList()
@@ -357,6 +486,24 @@ else
         {
             _processing = false;
         }
+    }
+    
+    private async Task ApproveFromDrawer()
+    {
+        await ApproveTransaction();
+        await LoadTransactions();
+    }
+    
+    private async Task RejectFromDrawer()
+    {
+        await RejectTransaction();
+        await LoadTransactions();
+    }
+    
+    private async Task EscalateFromDrawer()
+    {
+        await EscalateTransaction();
+        await LoadTransactions();
     }
 
     private Color GetRiskColor(RiskLevel? level) => level switch

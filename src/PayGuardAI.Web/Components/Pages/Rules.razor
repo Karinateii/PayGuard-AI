@@ -1,14 +1,22 @@
 @page "/rules"
 @inject PayGuardAI.Data.ApplicationDbContext DbContext
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 @using Microsoft.EntityFrameworkCore
 
 <PageTitle>Risk Rules - PayGuard AI</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">
-    <MudIcon Icon="@Icons.Material.Filled.Rule" Class="mr-2" />
-    Risk Rule Configuration
-</MudText>
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">
+        <MudIcon Icon="@Icons.Material.Filled.Rule" Class="mr-2" />
+        Risk Rule Configuration
+    </MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="@OpenAddRuleDialog">
+        Add New Rule
+    </MudButton>
+</MudStack>
 
 <MudAlert Severity="Severity.Info" Class="mb-4">
     <MudText>
@@ -68,6 +76,12 @@ else
                             Code: @rule.RuleCode | Last updated: @rule.UpdatedAt.ToString("MM/dd HH:mm")
                         </MudText>
                     </MudCardContent>
+                    <MudCardActions>
+                        <MudSpacer />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                       Color="Color.Error" Size="Size.Small"
+                                       OnClick="@(() => DeleteRule(rule))" />
+                    </MudCardActions>
                 </MudCard>
             </MudItem>
         }
@@ -159,6 +173,38 @@ else
         rule.UpdatedBy = "compliance_officer";
         await DbContext.SaveChangesAsync();
         Snackbar.Add($"Weight updated for '{rule.Name}'", Severity.Info);
+    }
+    
+    private async Task OpenAddRuleDialog()
+    {
+        var parameters = new DialogParameters<AddRuleDialog>();
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<AddRuleDialog>("Add New Risk Rule", parameters, options);
+        var result = await dialog.Result;
+        
+        if (result is { Canceled: false, Data: RiskRule newRule })
+        {
+            DbContext.RiskRules.Add(newRule);
+            await DbContext.SaveChangesAsync();
+            Snackbar.Add($"Rule '{newRule.Name}' created successfully!", Severity.Success);
+            await LoadRules();
+        }
+    }
+    
+    private async Task DeleteRule(RiskRule rule)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Delete Rule",
+            $"Are you sure you want to delete '{rule.Name}'? This action cannot be undone.",
+            yesText: "Delete", cancelText: "Cancel");
+        
+        if (confirmed == true)
+        {
+            DbContext.RiskRules.Remove(rule);
+            await DbContext.SaveChangesAsync();
+            Snackbar.Add($"Rule '{rule.Name}' deleted", Severity.Warning);
+            await LoadRules();
+        }
     }
 
     private Color GetCategoryColor(string category) => category switch
