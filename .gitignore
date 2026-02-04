@@ -1,0 +1,77 @@
+# .NET
+bin/
+obj/
+*.user
+*.userosscache
+*.suo
+*.cache
+*.dll
+*.exe
+*.pdb
+
+# IDE
+.vs/
+.vscode/
+*.swp
+*~
+
+# User-specific files
+*.rsuser
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+project.lock.json
+project.fragment.lock.json
+
+# ASP.NET Scaffolding
+ScaffoldingReadMe.txt
+
+# Entity Framework
+migrations/
+
+# Secrets
+appsettings.Development.json
+appsettings.Local.json
+*.pfx
+*.p12
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Test results
+TestResults/
+coverage/
+
+# JetBrains Rider
+.idea/
+
+# Node (for any frontend tools)
+node_modules/
+
+# Environment files
+.env
+.env.local
+.env.*.local

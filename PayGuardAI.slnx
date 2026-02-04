@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PayGuardAI.Core/PayGuardAI.Core.csproj" />
+    <Project Path="src/PayGuardAI.Data/PayGuardAI.Data.csproj" />
+    <Project Path="src/PayGuardAI.Web/PayGuardAI.Web.csproj" />
+  </Folder>
+</Solution>
