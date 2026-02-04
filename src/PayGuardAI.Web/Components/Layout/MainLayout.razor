@@ -1,6 +1,6 @@
 ﻿@inherits LayoutComponentBase
 
-<MudThemeProvider Theme="_theme" IsDarkMode="true" />
+<MudThemeProvider Theme="_theme" IsDarkMode="_isDarkMode" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
@@ -13,7 +13,11 @@
             PayGuard AI
         </MudText>
         <MudSpacer />
-        <MudText Typo="Typo.body2" Class="mr-4">Cross-Border Fintech Hackathon 2026</MudText>
+        <MudText Typo="Typo.body2" Class="mr-4 d-none d-md-flex">Cross-Border Fintech Hackathon 2026</MudText>
+        <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" 
+                       Color="Color.Inherit" 
+                       OnClick="@ToggleTheme"
+                       Title="@(_isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode")" />
         <MudIconButton Icon="@Icons.Material.Filled.Notifications" Color="Color.Inherit" />
     </MudAppBar>
 
@@ -33,10 +37,16 @@
 
 @code {
     private bool _drawerOpen = true;
+    private bool _isDarkMode = true;
 
     private void ToggleDrawer()
     {
         _drawerOpen = !_drawerOpen;
+    }
+
+    private void ToggleTheme()
+    {
+        _isDarkMode = !_isDarkMode;
     }
 
     private readonly MudTheme _theme = new()
