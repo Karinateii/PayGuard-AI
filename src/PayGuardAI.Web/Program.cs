@@ -4,6 +4,7 @@ using PayGuardAI.Core.Services;
 using PayGuardAI.Data;
 using PayGuardAI.Data.Services;
 using PayGuardAI.Web.Components;
+using PayGuardAI.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +20,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddScoped<IRiskScoringService, RiskScoringService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
+builder.Services.AddScoped<DemoDataSeeder>();
 
 // Add controllers for API endpoints (webhooks)
 builder.Services.AddControllers();
@@ -29,11 +31,18 @@ builder.Services.AddRazorComponents()
 
 var app = builder.Build();
 
-// Ensure database is created and migrations applied
+// Ensure database is created and seed demo data
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     db.Database.EnsureCreated();
+    
+    // Seed demo data in development
+    if (app.Environment.IsDevelopment())
+    {
+        var seeder = scope.ServiceProvider.GetRequiredService<DemoDataSeeder>();
+        await seeder.SeedAsync(25);
+    }
 }
 
 // Configure the HTTP request pipeline.

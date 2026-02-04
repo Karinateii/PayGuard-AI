@@ -1,0 +1,124 @@
+@page "/audit"
+@inject PayGuardAI.Data.ApplicationDbContext DbContext
+@using Microsoft.EntityFrameworkCore
+
+<PageTitle>Audit Log - PayGuard AI</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.History" Class="mr-2" />
+    Audit Trail
+</MudText>
+
+<MudAlert Severity="Severity.Info" Class="mb-4">
+    Complete audit trail of all system actions for regulatory compliance and forensic analysis.
+</MudAlert>
+
+<MudPaper Class="pa-4" Elevation="2">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+        <MudStack Row="true" Spacing="3">
+            <MudTextField T="string" Label="Search" @bind-Value="_searchTerm" 
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 250px" />
+            <MudSelect T="string" Label="Action Type" @bind-Value="_actionFilter" 
+                       Margin="Margin.Dense" Style="width: 180px" Variant="Variant.Outlined">
+                <MudSelectItem T="string" Value="@((string)null!)">All Actions</MudSelectItem>
+                <MudSelectItem T="string" Value="@("TRANSACTION_ANALYZED")">Transaction Analyzed</MudSelectItem>
+                <MudSelectItem T="string" Value="@("REVIEW_APPROVED")">Review Approved</MudSelectItem>
+                <MudSelectItem T="string" Value="@("REVIEW_REJECTED")">Review Rejected</MudSelectItem>
+                <MudSelectItem T="string" Value="@("REVIEW_ESCALATED")">Review Escalated</MudSelectItem>
+                <MudSelectItem T="string" Value="@("RULE_UPDATED")">Rule Updated</MudSelectItem>
+            </MudSelect>
+        </MudStack>
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" 
+                   OnClick="@LoadAuditLogs">Refresh</MudButton>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+    }
+    else
+    {
+        <MudTable Items="@FilteredLogs" Hover="true" Dense="true">
+            <HeaderContent>
+                <MudTh>Timestamp</MudTh>
+                <MudTh>Action</MudTh>
+                <MudTh>Entity</MudTh>
+                <MudTh>Entity ID</MudTh>
+                <MudTh>Performed By</MudTh>
+                <MudTh>Notes</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="@GetActionColor(context.Action)">
+                        @context.Action
+                    </MudChip>
+                </MudTd>
+                <MudTd>@context.EntityType</MudTd>
+                <MudTd>
+                    <MudText Typo="Typo.body2" Style="font-family: monospace;">
+                        @(context.EntityId.Length > 12 ? context.EntityId[..12] + "..." : context.EntityId)
+                    </MudText>
+                </MudTd>
+                <MudTd>@context.PerformedBy</MudTd>
+                <MudTd>
+                    @if (!string.IsNullOrEmpty(context.Notes))
+                    {
+                        <MudTooltip Text="@context.Notes">
+                            <MudIcon Icon="@Icons.Material.Filled.Notes" Size="Size.Small" />
+                        </MudTooltip>
+                    }
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+            </PagerContent>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private bool _loading = true;
+    private List<AuditLog> _auditLogs = new();
+    private string? _searchTerm;
+    private string? _actionFilter;
+
+    private IEnumerable<AuditLog> FilteredLogs => _auditLogs
+        .Where(l => string.IsNullOrEmpty(_actionFilter) || l.Action == _actionFilter)
+        .Where(l => string.IsNullOrEmpty(_searchTerm) || 
+                    l.EntityId.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    l.PerformedBy.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    (l.Notes?.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ?? false));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAuditLogs();
+    }
+
+    private async Task LoadAuditLogs()
+    {
+        _loading = true;
+        try
+        {
+            _auditLogs = await DbContext.AuditLogs
+                .OrderByDescending(l => l.CreatedAt)
+                .Take(500)
+                .ToListAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private Color GetActionColor(string action) => action switch
+    {
+        "TRANSACTION_ANALYZED" => Color.Info,
+        "REVIEW_APPROVED" => Color.Success,
+        "REVIEW_REJECTED" => Color.Error,
+        "REVIEW_ESCALATED" => Color.Warning,
+        "RULE_UPDATED" => Color.Secondary,
+        _ => Color.Default
+    };
+}

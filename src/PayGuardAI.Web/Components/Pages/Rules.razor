@@ -1,0 +1,172 @@
+@page "/rules"
+@inject PayGuardAI.Data.ApplicationDbContext DbContext
+@inject ISnackbar Snackbar
+@using Microsoft.EntityFrameworkCore
+
+<PageTitle>Risk Rules - PayGuard AI</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.Rule" Class="mr-2" />
+    Risk Rule Configuration
+</MudText>
+
+<MudAlert Severity="Severity.Info" Class="mb-4">
+    <MudText>
+        Configure risk scoring thresholds and weights. Changes apply to new transactions immediately.
+        Existing transactions can be re-analyzed with updated rules.
+    </MudText>
+</MudAlert>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else
+{
+    <MudGrid>
+        @foreach (var rule in _rules)
+        {
+            <MudItem xs="12" md="6">
+                <MudCard Elevation="2">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                <MudStack>
+                                    <MudText Typo="Typo.h6">@rule.Name</MudText>
+                                    <MudChip T="string" Size="Size.Small" Color="@GetCategoryColor(rule.Category)">
+                                        @rule.Category
+                                    </MudChip>
+                                </MudStack>
+                                <MudSwitch T="bool" Value="@rule.IsEnabled" 
+                                           ValueChanged="@((val) => ToggleRule(rule, val))"
+                                           Color="Color.Success" />
+                            </MudStack>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudText Typo="Typo.body2" Class="mb-3">@rule.Description</MudText>
+                        
+                        <MudGrid>
+                            <MudItem xs="6">
+                                <MudNumericField T="decimal" Label="Threshold" 
+                                                 Value="@rule.Threshold"
+                                                 ValueChanged="@((val) => UpdateThreshold(rule, val))"
+                                                 Variant="Variant.Outlined" 
+                                                 Disabled="@(!rule.IsEnabled)" />
+                            </MudItem>
+                            <MudItem xs="6">
+                                <MudNumericField T="int" Label="Score Weight" 
+                                                 Value="@rule.ScoreWeight"
+                                                 ValueChanged="@((val) => UpdateWeight(rule, val))"
+                                                 Variant="Variant.Outlined"
+                                                 Min="0" Max="50"
+                                                 Disabled="@(!rule.IsEnabled)" />
+                            </MudItem>
+                        </MudGrid>
+                        
+                        <MudText Typo="Typo.caption" Class="mt-2">
+                            Code: @rule.RuleCode | Last updated: @rule.UpdatedAt.ToString("MM/dd HH:mm")
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+
+    <MudPaper Class="pa-4 mt-4" Elevation="2">
+        <MudText Typo="Typo.h6" Class="mb-3">Risk Level Thresholds</MudText>
+        <MudText Typo="Typo.body2" Class="mb-3">
+            These thresholds determine how the cumulative risk score maps to risk levels:
+        </MudText>
+        <MudGrid>
+            <MudItem xs="3">
+                <MudPaper Class="pa-3" Style="background-color: var(--mud-palette-success); color: white;">
+                    <MudText Typo="Typo.subtitle2">Low Risk</MudText>
+                    <MudText Typo="Typo.h5">0 - 25</MudText>
+                    <MudText Typo="Typo.caption">Auto-approved if ≤ 20</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="3">
+                <MudPaper Class="pa-3" Style="background-color: var(--mud-palette-warning); color: white;">
+                    <MudText Typo="Typo.subtitle2">Medium Risk</MudText>
+                    <MudText Typo="Typo.h5">26 - 50</MudText>
+                    <MudText Typo="Typo.caption">Requires review</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="3">
+                <MudPaper Class="pa-3" Style="background-color: var(--mud-palette-error); color: white;">
+                    <MudText Typo="Typo.subtitle2">High Risk</MudText>
+                    <MudText Typo="Typo.h5">51 - 75</MudText>
+                    <MudText Typo="Typo.caption">Priority review</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="3">
+                <MudPaper Class="pa-3" Style="background-color: var(--mud-palette-dark); color: white;">
+                    <MudText Typo="Typo.subtitle2">Critical</MudText>
+                    <MudText Typo="Typo.h5">76 - 100</MudText>
+                    <MudText Typo="Typo.caption">Immediate escalation</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+}
+
+@code {
+    private bool _loading = true;
+    private List<RiskRule> _rules = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRules();
+    }
+
+    private async Task LoadRules()
+    {
+        _loading = true;
+        try
+        {
+            _rules = await DbContext.RiskRules.OrderBy(r => r.Category).ThenBy(r => r.Name).ToListAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ToggleRule(RiskRule rule, bool enabled)
+    {
+        rule.IsEnabled = enabled;
+        rule.UpdatedAt = DateTime.UtcNow;
+        rule.UpdatedBy = "compliance_officer";
+        await DbContext.SaveChangesAsync();
+        Snackbar.Add($"Rule '{rule.Name}' {(enabled ? "enabled" : "disabled")}", 
+            enabled ? Severity.Success : Severity.Warning);
+    }
+
+    private async Task UpdateThreshold(RiskRule rule, decimal value)
+    {
+        rule.Threshold = value;
+        rule.UpdatedAt = DateTime.UtcNow;
+        rule.UpdatedBy = "compliance_officer";
+        await DbContext.SaveChangesAsync();
+        Snackbar.Add($"Threshold updated for '{rule.Name}'", Severity.Info);
+    }
+
+    private async Task UpdateWeight(RiskRule rule, int value)
+    {
+        rule.ScoreWeight = value;
+        rule.UpdatedAt = DateTime.UtcNow;
+        rule.UpdatedBy = "compliance_officer";
+        await DbContext.SaveChangesAsync();
+        Snackbar.Add($"Weight updated for '{rule.Name}'", Severity.Info);
+    }
+
+    private Color GetCategoryColor(string category) => category switch
+    {
+        "Amount" => Color.Primary,
+        "Velocity" => Color.Secondary,
+        "Geography" => Color.Error,
+        "Pattern" => Color.Info,
+        _ => Color.Default
+    };
+}
