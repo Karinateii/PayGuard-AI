@@ -183,9 +183,27 @@ public class AfriexApiService : IAfriexApiService
     {
         try
         {
-            var response = await _httpClient.GetFromJsonAsync<AfriexApiResponse<ExchangeRateResponse>>(
-                $"/api/v1/rate?from={fromCurrency}&to={toCurrency}&amount={amount}", JsonOptions);
-            return response?.Data;
+            // Use /v2/public/rates endpoint as per documentation
+            var response = await _httpClient.GetFromJsonAsync<ExchangeRateApiResponse>(
+                $"/v2/public/rates?base={fromCurrency}&symbols={toCurrency}", JsonOptions);
+            
+            if (response?.Rates != null && response.Rates.TryGetValue(fromCurrency, out var ratesForBase))
+            {
+                if (ratesForBase.TryGetValue(toCurrency, out var rateString) && decimal.TryParse(rateString, out var rate))
+                {
+                    return new ExchangeRateResponse
+                    {
+                        From = fromCurrency,
+                        To = toCurrency,
+                        Rate = rate,
+                        SourceAmount = amount,
+                        DestinationAmount = amount * rate
+                    };
+                }
+            }
+            
+            _logger.LogWarning("Rate not found for {From} -> {To}", fromCurrency, toCurrency);
+            return null;
         }
         catch (Exception ex)
         {
@@ -326,6 +344,13 @@ public class TransactionMeta
     public string? Narration { get; set; }
 }
 
+public class ExchangeRateApiResponse
+{
+    public Dictionary<string, Dictionary<string, string>> Rates { get; set; } = new();
+    public List<string> Base { get; set; } = new();
+    public long UpdatedAt { get; set; }
+}
+
 public class ExchangeRateResponse
 {
     public string From { get; set; } = "";
@@ -351,22 +376,30 @@ public class AfriexPaymentMethod
 {
     public string PaymentMethodId { get; set; } = "";
     public string CustomerId { get; set; } = "";
-    public string Type { get; set; } = "";
+    public string Channel { get; set; } = "";
     public string? AccountNumber { get; set; }
-    public string? BankCode { get; set; }
     public string? AccountName { get; set; }
-    public string Currency { get; set; } = "";
     public string CountryCode { get; set; } = "";
+    public InstitutionInfo? Institution { get; set; }
+    public Dictionary<string, object>? Meta { get; set; }
+}
+
+public class InstitutionInfo
+{
+    public string InstitutionName { get; set; } = "";
+    public string InstitutionCode { get; set; } = "";
+    public string? InstitutionId { get; set; }
+    public string? InstitutionAddress { get; set; }
 }
 
 public class CreatePaymentMethodRequest
 {
     public string CustomerId { get; set; } = "";
-    public string Type { get; set; } = "BANK_ACCOUNT";
+    public string Channel { get; set; } = "BANK_ACCOUNT";
+    public string AccountName { get; set; } = "";
     public string AccountNumber { get; set; } = "";
-    public string BankCode { get; set; } = "";
     public string CountryCode { get; set; } = "";
-    public string Currency { get; set; } = "";
+    public InstitutionInfo Institution { get; set; } = new();
 }
 
 #endregion
