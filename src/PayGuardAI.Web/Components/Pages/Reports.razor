@@ -106,13 +106,20 @@
                     <MudIcon Icon="@Icons.Material.Filled.BarChart" Class="mr-2" />
                     Review Status Breakdown
                 </MudText>
-                <div style="height: 300px;">
-                    <MudChart ChartType="ChartType.Bar" 
-                              InputData="@_reviewChartData" 
-                              InputLabels="@_reviewChartLabels"
-                              Width="100%" Height="250px"
-                              ChartOptions="@_barOptions" />
-                </div>
+                @if (_reviewChartSeries.Any() && _reviewChartLabels.Any())
+                {
+                    <div style="height: 280px;">
+                        <MudChart ChartType="ChartType.Bar" 
+                                  ChartSeries="@_reviewChartSeries"
+                                  XAxisLabels="@_reviewChartLabels"
+                                  Width="100%" Height="250px"
+                                  ChartOptions="@_barOptions" />
+                    </div>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info">No review data available</MudAlert>
+                }
                 <MudDivider Class="my-3" />
                 <MudText Typo="Typo.subtitle2">Response Times</MudText>
                 <MudStack Row="true" Class="mt-2" Spacing="2">
@@ -134,12 +141,12 @@
                     <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Class="mr-2" />
                     Top Risk Factors
                 </MudText>
-                @if (_topRiskFactors.Any())
+                @if (_factorChartSeries.Any() && _factorChartLabels.Any())
                 {
                     <div style="height: 280px;">
                         <MudChart ChartType="ChartType.Bar" 
-                                  InputData="@_factorChartData" 
-                                  InputLabels="@_factorChartLabels"
+                                  ChartSeries="@_factorChartSeries"
+                                  XAxisLabels="@_factorChartLabels"
                                   Width="100%" Height="250px"
                                   ChartOptions="@_barOptions" />
                     </div>
@@ -249,13 +256,13 @@
     // Chart data
     private double[] _riskChartData = Array.Empty<double>();
     private string[] _riskChartLabels = Array.Empty<string>();
-    private double[] _reviewChartData = Array.Empty<double>();
+    private List<ChartSeries> _reviewChartSeries = new();
     private string[] _reviewChartLabels = Array.Empty<string>();
-    private double[] _factorChartData = Array.Empty<double>();
+    private List<ChartSeries> _factorChartSeries = new();
     private string[] _factorChartLabels = Array.Empty<string>();
     
     private ChartOptions _donutOptions = new();
-    private ChartOptions _barOptions = new() { YAxisTicks = 5 };
+    private ChartOptions _barOptions = new() { YAxisTicks = 5, MaxNumYAxisTicks = 10 };
 
     private string GetPercentage(int count)
     {
@@ -311,8 +318,13 @@
         // Prepare chart data
         _riskChartData = _riskDistribution.Select(d => (double)d.Count).ToArray();
         _riskChartLabels = _riskDistribution.Select(d => d.Level.ToString()).ToArray();
-        _reviewChartData = _reviewActivity.Select(a => (double)a.Count).ToArray();
+        
+        // Review status bar chart
         _reviewChartLabels = _reviewActivity.Select(a => a.Status.ToString()).ToArray();
+        _reviewChartSeries = new List<ChartSeries>
+        {
+            new ChartSeries { Name = "Transactions", Data = _reviewActivity.Select(a => (double)a.Count).ToArray() }
+        };
 
         // Top risk factors
         var allFactors = analyses.SelectMany(a => a.RiskFactors).ToList();
@@ -330,8 +342,11 @@
             .ToList();
         
         // Factor chart data
-        _factorChartData = _topRiskFactors.Select(f => (double)f.TriggerCount).ToArray();
         _factorChartLabels = _topRiskFactors.Select(f => f.RuleName.Length > 15 ? f.RuleName[..12] + "..." : f.RuleName).ToArray();
+        _factorChartSeries = new List<ChartSeries>
+        {
+            new ChartSeries { Name = "Times Triggered", Data = _topRiskFactors.Select(f => (double)f.TriggerCount).ToArray() }
+        };
         
         // Top corridors
         _topCorridors = analyses
