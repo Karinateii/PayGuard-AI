@@ -17,6 +17,52 @@
     </MudText>
 </MudAlert>
 
+<!-- Approve Dialog using MudOverlay -->
+<MudOverlay Visible="_showApproveDialog" DarkBackground="true" AutoClose="false">
+    <MudPaper Class="pa-4" Style="min-width: 400px; max-width: 500px;">
+        <MudText Typo="Typo.h6" Class="mb-3">
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-2" Color="Color.Success" />
+            Approve Transaction
+        </MudText>
+        @if (_selectedReview != null)
+        {
+            <MudText Class="mb-3">
+                You are about to <strong>approve</strong> transaction <strong>@_selectedReview.Transaction.ExternalId</strong>
+            </MudText>
+            <MudTextField @bind-Value="_reviewNotes" Label="Approval Notes (Optional)" 
+                          Variant="Variant.Outlined" Lines="3" 
+                          Placeholder="Add any notes about your decision..." Class="mb-4" />
+        }
+        <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2">
+            <MudButton OnClick="@(() => _showApproveDialog = false)">Cancel</MudButton>
+            <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="@ApproveReview">Approve</MudButton>
+        </MudStack>
+    </MudPaper>
+</MudOverlay>
+
+<!-- Reject Dialog using MudOverlay -->
+<MudOverlay Visible="_showRejectDialog" DarkBackground="true" AutoClose="false">
+    <MudPaper Class="pa-4" Style="min-width: 400px; max-width: 500px;">
+        <MudText Typo="Typo.h6" Class="mb-3">
+            <MudIcon Icon="@Icons.Material.Filled.Cancel" Class="mr-2" Color="Color.Error" />
+            Reject Transaction
+        </MudText>
+        @if (_selectedReview != null)
+        {
+            <MudText Class="mb-3">
+                You are about to <strong>reject</strong> transaction <strong>@_selectedReview.Transaction.ExternalId</strong>
+            </MudText>
+            <MudTextField @bind-Value="_reviewNotes" Label="Rejection Reason (Optional)" 
+                          Variant="Variant.Outlined" Lines="3" 
+                          Placeholder="Explain why this transaction is being rejected..." Class="mb-4" />
+        }
+        <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2">
+            <MudButton OnClick="@(() => _showRejectDialog = false)">Cancel</MudButton>
+            <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="@RejectReview">Reject</MudButton>
+        </MudStack>
+    </MudPaper>
+</MudOverlay>
+
 <MudPaper Class="pa-4" Elevation="2">
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
         <MudStack Row="true" Spacing="3">
@@ -87,14 +133,14 @@
                                 <MudButton Variant="Variant.Filled" Color="Color.Success" 
                                            FullWidth="true" Size="Size.Small"
                                            StartIcon="@Icons.Material.Filled.CheckCircle"
-                                           OnClick="@(() => ApproveReview(review))"
+                                           OnClick="@(() => OpenApproveDialog(review))"
                                            Disabled="@_processing">
                                     Approve
                                 </MudButton>
                                 <MudButton Variant="Variant.Filled" Color="Color.Error" 
                                            FullWidth="true" Size="Size.Small"
                                            StartIcon="@Icons.Material.Filled.Cancel"
-                                           OnClick="@(() => RejectReview(review))"
+                                           OnClick="@(() => OpenRejectDialog(review))"
                                            Disabled="@_processing">
                                     Reject
                                 </MudButton>
@@ -118,6 +164,10 @@
     private bool _processing = false;
     private List<RiskAnalysis> _reviews = new();
     private RiskLevel? _minRiskLevel;
+    private RiskAnalysis? _selectedReview;
+    private string _reviewNotes = "";
+    private bool _showApproveDialog = false;
+    private bool _showRejectDialog = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -144,14 +194,33 @@
         await LoadReviews();
     }
 
-    private async Task ApproveReview(RiskAnalysis review)
+    private void OpenApproveDialog(RiskAnalysis review)
     {
+        _selectedReview = review;
+        _reviewNotes = "";
+        _showApproveDialog = true;
+    }
+
+    private void OpenRejectDialog(RiskAnalysis review)
+    {
+        _selectedReview = review;
+        _reviewNotes = "";
+        _showRejectDialog = true;
+    }
+
+    private async Task ApproveReview()
+    {
+        if (_selectedReview == null) return;
+        
         _processing = true;
+        _showApproveDialog = false;
         try
         {
-            await ReviewService.ApproveAsync(review.Id, "compliance_officer");
+            await ReviewService.ApproveAsync(_selectedReview.Id, "compliance_officer", 
+                string.IsNullOrWhiteSpace(_reviewNotes) ? null : _reviewNotes);
             Snackbar.Add($"Transaction approved", Severity.Success);
-            _reviews.Remove(review);
+            _reviews.Remove(_selectedReview);
+            _reviewNotes = "";
         }
         catch (Exception ex)
         {
@@ -163,14 +232,19 @@
         }
     }
 
-    private async Task RejectReview(RiskAnalysis review)
+    private async Task RejectReview()
     {
+        if (_selectedReview == null) return;
+        
         _processing = true;
+        _showRejectDialog = false;
         try
         {
-            await ReviewService.RejectAsync(review.Id, "compliance_officer");
+            await ReviewService.RejectAsync(_selectedReview.Id, "compliance_officer", 
+                string.IsNullOrWhiteSpace(_reviewNotes) ? null : _reviewNotes);
             Snackbar.Add($"Transaction rejected", Severity.Warning);
-            _reviews.Remove(review);
+            _reviews.Remove(_selectedReview);
+            _reviewNotes = "";
         }
         catch (Exception ex)
         {

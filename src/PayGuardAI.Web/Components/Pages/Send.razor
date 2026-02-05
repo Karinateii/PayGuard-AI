@@ -29,12 +29,14 @@
                 
                 <MudGrid>
                     <MudItem xs="6">
-                        <MudNumericField T="decimal" @bind-Value="_amount" Label="Amount"
-                                        Variant="Variant.Outlined" Min="1" />
+                        <MudNumericField T="decimal" Value="_amount" Label="Amount"
+                                        Variant="Variant.Outlined" Min="1"
+                                        ValueChanged="@(async (decimal val) => { _amount = val; await FetchRate(); })" />
                     </MudItem>
                     <MudItem xs="6">
-                        <MudSelect T="string" @bind-Value="_destinationCurrency" Label="To Currency"
-                                   Variant="Variant.Outlined">
+                        <MudSelect T="string" Value="_destinationCurrency" Label="To Currency"
+                                   Variant="Variant.Outlined"
+                                   ValueChanged="@(async (string val) => { _destinationCurrency = val; await FetchRate(); })">
                             <MudSelectItem Value="@("NGN")">🇳🇬 NGN (Nigeria)</MudSelectItem>
                             <MudSelectItem Value="@("GHS")">🇬🇭 GHS (Ghana)</MudSelectItem>
                             <MudSelectItem Value="@("KES")">🇰🇪 KES (Kenya)</MudSelectItem>
@@ -45,8 +47,9 @@
                     </MudItem>
                 </MudGrid>
                 
-                <MudSelect T="string" @bind-Value="_sourceCurrency" Label="From Currency"
-                           Variant="Variant.Outlined">
+                <MudSelect T="string" Value="_sourceCurrency" Label="From Currency"
+                           Variant="Variant.Outlined"
+                           ValueChanged="@(async (string val) => { _sourceCurrency = val; await FetchRate(); })">
                     <MudSelectItem Value="@("USD")">🇺🇸 USD (US Dollar)</MudSelectItem>
                     <MudSelectItem Value="@("GBP")">🇬🇧 GBP (British Pound)</MudSelectItem>
                     <MudSelectItem Value="@("EUR")">🇪🇺 EUR (Euro)</MudSelectItem>
@@ -101,10 +104,10 @@
                 <MudText Color="Color.Secondary">Enter amount to see exchange rate</MudText>
             }
             
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" 
-                       OnClick="@FetchRate" Class="mt-4">
-                Refresh Rate
-            </MudButton>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-4">
+                <MudIcon Icon="@Icons.Material.Filled.AutoMode" Size="Size.Small" /> 
+                Rate updates automatically
+            </MudText>
         </MudPaper>
         
         @if (_lastTransaction != null)

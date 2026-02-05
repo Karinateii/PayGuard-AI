@@ -85,8 +85,7 @@
                     <MudChart ChartType="ChartType.Donut" 
                               InputData="@_riskChartData" 
                               InputLabels="@_riskChartLabels"
-                              Width="300px" Height="300px"
-                              ChartOptions="@_donutOptions" />
+                              Width="300px" Height="300px" />
                 </div>
                 <MudStack Row="true" Justify="Justify.Center" Class="mt-3" Spacing="2">
                     @foreach (var dist in _riskDistribution.Where(d => d.Count > 0))
@@ -261,7 +260,6 @@
     private List<ChartSeries> _factorChartSeries = new();
     private string[] _factorChartLabels = Array.Empty<string>();
     
-    private ChartOptions _donutOptions = new();
     private ChartOptions _barOptions = new() { YAxisTicks = 5, MaxNumYAxisTicks = 10 };
 
     private string GetPercentage(int count)
