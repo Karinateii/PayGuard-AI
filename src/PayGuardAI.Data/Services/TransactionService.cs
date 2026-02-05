@@ -146,7 +146,7 @@ public class TransactionService : ITransactionService
     private Transaction ParseWebhookPayload(string payload)
     {
         // Parse the Afriex webhook payload format
-        // Based on the API documentation
+        // Supports both Afriex event format and direct transaction format
         using var doc = JsonDocument.Parse(payload);
         var root = doc.RootElement;
 
@@ -156,107 +156,111 @@ public class TransactionService : ITransactionService
             ReceivedAt = DateTime.UtcNow
         };
 
-        // Extract data from webhook - adapt to actual Afriex format
-        if (root.TryGetProperty("data", out var data))
+        // Check for Afriex event format: { "event": "TRANSACTION.CREATED", "data": {...} }
+        JsonElement data;
+        string eventType = "";
+        
+        if (root.TryGetProperty("event", out var eventProp))
         {
-            transaction.ExternalId = data.TryGetProperty("id", out var id) 
-                ? id.GetString() ?? Guid.NewGuid().ToString() 
-                : Guid.NewGuid().ToString();
-
-            transaction.Type = data.TryGetProperty("type", out var type) 
-                ? type.GetString() ?? "UNKNOWN" 
-                : "UNKNOWN";
-
-            transaction.Status = data.TryGetProperty("status", out var status) 
-                ? status.GetString() ?? "UNKNOWN" 
-                : "UNKNOWN";
-
-            transaction.Amount = data.TryGetProperty("amount", out var amount) 
-                ? amount.GetDecimal() 
-                : 0;
-
-            transaction.SourceCurrency = data.TryGetProperty("sourceCurrency", out var srcCur) 
-                ? srcCur.GetString() ?? "USD" 
-                : "USD";
-
-            transaction.DestinationCurrency = data.TryGetProperty("destinationCurrency", out var destCur) 
-                ? destCur.GetString() ?? "USD" 
-                : "USD";
-
-            transaction.SenderId = data.TryGetProperty("senderId", out var sender) 
-                ? sender.GetString() ?? "unknown" 
-                : "unknown";
-
-            transaction.ReceiverId = data.TryGetProperty("receiverId", out var receiver) 
-                ? receiver.GetString() 
-                : null;
-
-            transaction.SourceCountry = data.TryGetProperty("sourceCountry", out var srcCountry) 
-                ? srcCountry.GetString() ?? "US" 
-                : "US";
-
-            transaction.DestinationCountry = data.TryGetProperty("destinationCountry", out var destCountry) 
-                ? destCountry.GetString() ?? "NG" 
-                : "NG";
-
-            if (data.TryGetProperty("createdAt", out var createdAt) && 
-                DateTime.TryParse(createdAt.GetString(), out var parsedDate))
+            eventType = eventProp.GetString() ?? "";
+            _logger.LogInformation("Processing Afriex event: {EventType}", eventType);
+            
+            if (!root.TryGetProperty("data", out data))
             {
-                transaction.CreatedAt = parsedDate;
+                _logger.LogWarning("Afriex event has no data property");
+                data = root;
             }
-            else
-            {
-                transaction.CreatedAt = DateTime.UtcNow;
-            }
+        }
+        else if (root.TryGetProperty("data", out data))
+        {
+            // Wrapped format without event field
+            _logger.LogInformation("Processing wrapped webhook format");
         }
         else
         {
-            // Handle simple/flat format (direct fields, not wrapped in "data")
-            transaction.ExternalId = root.TryGetProperty("transactionId", out var txnId) 
-                ? txnId.GetString() ?? Guid.NewGuid().ToString()
-                : root.TryGetProperty("id", out var id) 
-                    ? id.GetString() ?? Guid.NewGuid().ToString() 
-                    : Guid.NewGuid().ToString();
+            // Direct/flat format
+            data = root;
+            _logger.LogInformation("Processing flat webhook format");
+        }
 
-            transaction.Type = root.TryGetProperty("type", out var type) 
-                ? type.GetString() ?? "remittance" 
-                : "remittance";
-
-            transaction.Status = root.TryGetProperty("status", out var status) 
-                ? status.GetString() ?? "pending" 
-                : "pending";
-
-            transaction.Amount = root.TryGetProperty("amount", out var amount) 
-                ? amount.GetDecimal() 
-                : 0;
-
-            transaction.SourceCurrency = root.TryGetProperty("sourceCurrency", out var srcCur) 
-                ? srcCur.GetString() ?? "USD" 
-                : "USD";
-
-            transaction.DestinationCurrency = root.TryGetProperty("destinationCurrency", out var destCur) 
-                ? destCur.GetString() ?? "NGN" 
-                : "NGN";
-
-            transaction.SenderId = root.TryGetProperty("senderId", out var sender) 
-                ? sender.GetString() ?? "unknown" 
-                : "unknown";
-
-            transaction.ReceiverId = root.TryGetProperty("receiverId", out var receiver) 
-                ? receiver.GetString() 
-                : null;
-
-            transaction.SourceCountry = root.TryGetProperty("sourceCountry", out var srcCountry) 
-                ? srcCountry.GetString() ?? "US" 
-                : "US";
-
-            transaction.DestinationCountry = root.TryGetProperty("destinationCountry", out var destCountry) 
-                ? destCountry.GetString() ?? "NG" 
-                : "NG";
-
+        // Parse transaction from data element
+        // Afriex uses transactionId, customerId, etc.
+        transaction.ExternalId = GetStringValue(data, "transactionId", "id") ?? Guid.NewGuid().ToString();
+        transaction.Type = GetStringValue(data, "type") ?? "WITHDRAWAL";
+        transaction.Status = GetStringValue(data, "status") ?? "PENDING";
+        
+        // Amount handling - Afriex sends amounts as strings
+        var sourceAmount = GetStringValue(data, "sourceAmount", "amount");
+        transaction.Amount = decimal.TryParse(sourceAmount, out var amt) ? amt : 0;
+        
+        // If destinationAmount is present, might want to use that for display
+        var destAmount = GetStringValue(data, "destinationAmount");
+        if (destAmount != null && decimal.TryParse(destAmount, out var destAmt) && destAmt > 0)
+        {
+            // Store the larger amount for risk assessment
+            transaction.Amount = Math.Max(transaction.Amount, destAmt);
+        }
+        
+        transaction.SourceCurrency = GetStringValue(data, "sourceCurrency") ?? "USD";
+        transaction.DestinationCurrency = GetStringValue(data, "destinationCurrency") ?? "NGN";
+        
+        // Afriex uses customerId instead of senderId
+        transaction.SenderId = GetStringValue(data, "customerId", "senderId") ?? "unknown";
+        transaction.ReceiverId = GetStringValue(data, "destinationId", "receiverId");
+        
+        // Country codes from currencies if not specified
+        transaction.SourceCountry = GetStringValue(data, "sourceCountry") ?? GetCountryFromCurrency(transaction.SourceCurrency);
+        transaction.DestinationCountry = GetStringValue(data, "destinationCountry") ?? GetCountryFromCurrency(transaction.DestinationCurrency);
+        
+        // Parse dates
+        var createdAtStr = GetStringValue(data, "createdAt");
+        if (!string.IsNullOrEmpty(createdAtStr) && DateTime.TryParse(createdAtStr, out var parsedDate))
+        {
+            transaction.CreatedAt = parsedDate;
+        }
+        else
+        {
             transaction.CreatedAt = DateTime.UtcNow;
         }
 
         return transaction;
+    }
+    
+    private static string? GetStringValue(JsonElement element, params string[] propertyNames)
+    {
+        foreach (var name in propertyNames)
+        {
+            if (element.TryGetProperty(name, out var prop))
+            {
+                return prop.ValueKind switch
+                {
+                    JsonValueKind.String => prop.GetString(),
+                    JsonValueKind.Number => prop.GetRawText(),
+                    _ => null
+                };
+            }
+        }
+        return null;
+    }
+    
+    private static string GetCountryFromCurrency(string currency)
+    {
+        return currency.ToUpperInvariant() switch
+        {
+            "USD" => "US",
+            "NGN" => "NG",
+            "GHS" => "GH",
+            "KES" => "KE",
+            "ZAR" => "ZA",
+            "GBP" => "GB",
+            "EUR" => "EU",
+            "CAD" => "CA",
+            "TZS" => "TZ",
+            "UGX" => "UG",
+            "RWF" => "RW",
+            "XOF" => "SN", // West African CFA
+            "XAF" => "CM", // Central African CFA
+            _ => "XX"
+        };
     }
 }

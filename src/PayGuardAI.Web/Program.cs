@@ -26,6 +26,10 @@ builder.Services.AddScoped<IReviewService, ReviewService>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<DemoDataSeeder>();
 
+// Register Afriex API services
+builder.Services.AddHttpClient<IAfriexApiService, AfriexApiService>();
+builder.Services.AddSingleton<IWebhookSignatureService, WebhookSignatureService>();
+
 // Add controllers for API endpoints (webhooks)
 builder.Services.AddControllers();
 

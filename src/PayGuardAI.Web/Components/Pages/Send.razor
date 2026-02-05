@@ -1,0 +1,313 @@
+@page "/send"
+@inject PayGuardAI.Data.Services.IAfriexApiService AfriexApi
+@inject ISnackbar Snackbar
+
+<PageTitle>Send Transaction - PayGuard AI</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.Send" Class="mr-2" />
+    Send Test Transaction
+</MudText>
+
+<MudAlert Severity="Severity.Info" Class="mb-4">
+    <MudText>
+        Send a test transaction through the Afriex API. This will trigger a webhook back to PayGuard AI
+        for real-time risk analysis.
+    </MudText>
+</MudAlert>
+
+<MudGrid>
+    <!-- Transaction Form -->
+    <MudItem xs="12" md="6">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-4">Transaction Details</MudText>
+            
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="_customerId" Label="Customer ID" 
+                              Variant="Variant.Outlined" Required="true"
+                              HelperText="Enter an Afriex customer ID or create one" />
+                
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudNumericField T="decimal" @bind-Value="_amount" Label="Amount"
+                                        Variant="Variant.Outlined" Min="1" />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudSelect T="string" @bind-Value="_destinationCurrency" Label="To Currency"
+                                   Variant="Variant.Outlined">
+                            <MudSelectItem Value="@("NGN")">🇳🇬 NGN (Nigeria)</MudSelectItem>
+                            <MudSelectItem Value="@("GHS")">🇬🇭 GHS (Ghana)</MudSelectItem>
+                            <MudSelectItem Value="@("KES")">🇰🇪 KES (Kenya)</MudSelectItem>
+                            <MudSelectItem Value="@("ZAR")">🇿🇦 ZAR (South Africa)</MudSelectItem>
+                            <MudSelectItem Value="@("TZS")">🇹🇿 TZS (Tanzania)</MudSelectItem>
+                            <MudSelectItem Value="@("UGX")">🇺🇬 UGX (Uganda)</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+                
+                <MudSelect T="string" @bind-Value="_sourceCurrency" Label="From Currency"
+                           Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("USD")">🇺🇸 USD (US Dollar)</MudSelectItem>
+                    <MudSelectItem Value="@("GBP")">🇬🇧 GBP (British Pound)</MudSelectItem>
+                    <MudSelectItem Value="@("EUR")">🇪🇺 EUR (Euro)</MudSelectItem>
+                    <MudSelectItem Value="@("CAD")">🇨🇦 CAD (Canadian Dollar)</MudSelectItem>
+                </MudSelect>
+                
+                <MudTextField @bind-Value="_destinationId" Label="Payment Method ID" 
+                              Variant="Variant.Outlined" Required="true"
+                              HelperText="Recipient's bank account or mobile money ID" />
+                
+                <MudTextField @bind-Value="_narration" Label="Narration (Optional)" 
+                              Variant="Variant.Outlined" />
+                
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.Send"
+                           OnClick="@SendTransaction" Disabled="@(_sending || !IsValid)">
+                    @if (_sending)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Sending...</span>
+                    }
+                    else
+                    {
+                        <span>Send Transaction</span>
+                    }
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+    
+    <!-- API Response / Exchange Rate -->
+    <MudItem xs="12" md="6">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.CurrencyExchange" Class="mr-2" />
+                Exchange Rate
+            </MudText>
+            
+            @if (_rate != null)
+            {
+                <MudStack AlignItems="AlignItems.Center" Class="my-4">
+                    <MudText Typo="Typo.h4" Color="Color.Primary">
+                        1 @_sourceCurrency = @_rate.Rate.ToString("N4") @_destinationCurrency
+                    </MudText>
+                    <MudText>
+                        @_amount.ToString("C2") @_sourceCurrency ≈ @((_amount * _rate.Rate).ToString("N2")) @_destinationCurrency
+                    </MudText>
+                </MudStack>
+            }
+            else
+            {
+                <MudText Color="Color.Secondary">Enter amount to see exchange rate</MudText>
+            }
+            
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" 
+                       OnClick="@FetchRate" Class="mt-4">
+                Refresh Rate
+            </MudButton>
+        </MudPaper>
+        
+        @if (_lastTransaction != null)
+        {
+            <MudPaper Class="pa-4 mt-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-3" Color="Color.Success">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-2" />
+                    Transaction Sent!
+                </MudText>
+                
+                <MudSimpleTable Dense="true">
+                    <tbody>
+                        <tr>
+                            <td><strong>Transaction ID</strong></td>
+                            <td>@_lastTransaction.TransactionId</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Status</strong></td>
+                            <td>
+                                <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(_lastTransaction.Status)">
+                                    @_lastTransaction.Status
+                                </MudChip>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Amount</strong></td>
+                            <td>@_lastTransaction.SourceAmount @_lastTransaction.SourceCurrency → @_lastTransaction.DestinationAmount @_lastTransaction.DestinationCurrency</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Created</strong></td>
+                            <td>@_lastTransaction.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        </tr>
+                    </tbody>
+                </MudSimpleTable>
+                
+                <MudAlert Severity="Severity.Info" Class="mt-3">
+                    This transaction will trigger a webhook to PayGuard AI for risk analysis.
+                    Check the <MudLink Href="/transactions">Transactions page</MudLink> to see the result.
+                </MudAlert>
+            </MudPaper>
+        }
+    </MudItem>
+    
+    <!-- Quick Customer Creation -->
+    <MudItem xs="12">
+        <MudExpansionPanels>
+            <MudExpansionPanel Text="Create Test Customer">
+                <MudGrid>
+                    <MudItem xs="12" md="3">
+                        <MudTextField @bind-Value="_newCustomerName" Label="Full Name" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" md="3">
+                        <MudTextField @bind-Value="_newCustomerEmail" Label="Email" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" md="2">
+                        <MudTextField @bind-Value="_newCustomerPhone" Label="Phone" Variant="Variant.Outlined" 
+                                      Placeholder="+2348..." />
+                    </MudItem>
+                    <MudItem xs="12" md="2">
+                        <MudSelect T="string" @bind-Value="_newCustomerCountry" Label="Country" Variant="Variant.Outlined">
+                            <MudSelectItem Value="@("NG")">🇳🇬 Nigeria</MudSelectItem>
+                            <MudSelectItem Value="@("GH")">🇬🇭 Ghana</MudSelectItem>
+                            <MudSelectItem Value="@("KE")">🇰🇪 Kenya</MudSelectItem>
+                            <MudSelectItem Value="@("US")">🇺🇸 USA</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="2" Class="d-flex align-center">
+                        <MudButton Variant="Variant.Filled" Color="Color.Secondary" 
+                                   OnClick="@CreateCustomer" Disabled="@_creatingCustomer">
+                            Create Customer
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private string _customerId = "";
+    private string _destinationId = "";
+    private decimal _amount = 100;
+    private string _sourceCurrency = "USD";
+    private string _destinationCurrency = "NGN";
+    private string _narration = "";
+    
+    private bool _sending = false;
+    private PayGuardAI.Data.Services.AfriexTransaction? _lastTransaction;
+    private PayGuardAI.Data.Services.ExchangeRateResponse? _rate;
+    
+    // New customer fields
+    private string _newCustomerName = "Test User";
+    private string _newCustomerEmail = "test@example.com";
+    private string _newCustomerPhone = "+2348123456789";
+    private string _newCustomerCountry = "NG";
+    private bool _creatingCustomer = false;
+    
+    private bool IsValid => !string.IsNullOrEmpty(_customerId) && 
+                            !string.IsNullOrEmpty(_destinationId) &&
+                            _amount > 0;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await FetchRate();
+    }
+    
+    private async Task FetchRate()
+    {
+        try
+        {
+            _rate = await AfriexApi.GetExchangeRateAsync(_sourceCurrency, _destinationCurrency, _amount);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Could not fetch rate: {ex.Message}", Severity.Warning);
+        }
+    }
+    
+    private async Task SendTransaction()
+    {
+        _sending = true;
+        StateHasChanged();
+        
+        try
+        {
+            var request = new PayGuardAI.Data.Services.CreateTransactionRequest
+            {
+                CustomerId = _customerId,
+                DestinationAmount = _amount.ToString("F2"),
+                DestinationCurrency = _destinationCurrency,
+                SourceCurrency = _sourceCurrency,
+                DestinationId = _destinationId,
+                Meta = new PayGuardAI.Data.Services.TransactionMeta
+                {
+                    MerchantId = "payguard_ai_demo",
+                    IdempotencyKey = Guid.NewGuid().ToString(),
+                    Narration = string.IsNullOrEmpty(_narration) ? "PayGuard AI Test Transaction" : _narration
+                }
+            };
+            
+            _lastTransaction = await AfriexApi.CreateTransactionAsync(request);
+            
+            if (_lastTransaction != null)
+            {
+                Snackbar.Add($"Transaction {_lastTransaction.TransactionId} created!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Failed to create transaction. Check API key configuration.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _sending = false;
+        }
+    }
+    
+    private async Task CreateCustomer()
+    {
+        _creatingCustomer = true;
+        StateHasChanged();
+        
+        try
+        {
+            var request = new PayGuardAI.Data.Services.CreateCustomerRequest
+            {
+                FullName = _newCustomerName,
+                Email = _newCustomerEmail,
+                Phone = _newCustomerPhone,
+                CountryCode = _newCustomerCountry
+            };
+            
+            var customer = await AfriexApi.CreateCustomerAsync(request);
+            
+            if (customer != null)
+            {
+                _customerId = customer.CustomerId;
+                Snackbar.Add($"Customer created! ID: {customer.CustomerId}", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Failed to create customer. Check API key configuration.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _creatingCustomer = false;
+        }
+    }
+    
+    private Color GetStatusColor(string status) => status.ToUpperInvariant() switch
+    {
+        "COMPLETED" => Color.Success,
+        "PENDING" => Color.Warning,
+        "FAILED" => Color.Error,
+        _ => Color.Default
+    };
+}

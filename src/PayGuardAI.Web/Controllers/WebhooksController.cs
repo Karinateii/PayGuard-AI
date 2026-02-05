@@ -1,12 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using PayGuardAI.Core.Services;
+using PayGuardAI.Data.Services;
 using PayGuardAI.Web.Hubs;
 
 namespace PayGuardAI.Web.Controllers;
 
 /// <summary>
 /// Webhook controller for receiving Afriex transaction events.
+/// Supports both direct webhooks and Afriex event format.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
@@ -14,20 +16,24 @@ public class WebhooksController : ControllerBase
 {
     private readonly ITransactionService _transactionService;
     private readonly IHubContext<TransactionHub> _hubContext;
+    private readonly IWebhookSignatureService _signatureService;
     private readonly ILogger<WebhooksController> _logger;
 
     public WebhooksController(
         ITransactionService transactionService,
         IHubContext<TransactionHub> hubContext,
+        IWebhookSignatureService signatureService,
         ILogger<WebhooksController> logger)
     {
         _transactionService = transactionService;
         _hubContext = hubContext;
+        _signatureService = signatureService;
         _logger = logger;
     }
 
     /// <summary>
     /// Receives transaction webhooks from Afriex.
+    /// Supports both TRANSACTION.CREATED and TRANSACTION.UPDATED events.
     /// Endpoint: POST /api/webhooks/transaction
     /// </summary>
     [HttpPost("transaction")]
@@ -41,6 +47,18 @@ public class WebhooksController : ControllerBase
 
             _logger.LogInformation("Received webhook: {PayloadPreview}...", 
                 payload.Length > 100 ? payload[..100] : payload);
+            
+            // Verify signature if present
+            var signature = Request.Headers["x-webhook-signature"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(signature))
+            {
+                if (!_signatureService.VerifySignature(signature, payload))
+                {
+                    _logger.LogWarning("Webhook signature verification failed");
+                    return Unauthorized(new { success = false, error = "Invalid signature" });
+                }
+                _logger.LogInformation("Webhook signature verified successfully");
+            }
 
             // Process the transaction
             var transaction = await _transactionService.ProcessWebhookAsync(payload, cancellationToken);
