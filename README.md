@@ -62,12 +62,13 @@ PayGuardAI/
 │   │       └── AuditLog.cs
 │   │
 │   ├── PayGuardAI.Data/          # Data access and services
-│   │   ├── AppDbContext.cs
+│   │   ├── ApplicationDbContext.cs
 │   │   └── Services/
 │   │       ├── TransactionService.cs
 │   │       ├── RiskScoringService.cs
 │   │       ├── ReviewService.cs
-│   │       └── AfriexApiService.cs
+│   │       ├── AfriexApiService.cs
+│   │       └── WebhookSignatureService.cs
 │   │
 │   └── PayGuardAI.Web/           # Blazor UI and API controllers
 │       ├── Components/
@@ -96,8 +97,8 @@ PayGuardAI/
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/YOUR_USERNAME/PayGuardAI.git
-   cd PayGuardAI
+   git clone https://github.com/Karinateii/PayGuard-AI.git
+   cd PayGuard-AI
    ```
 
 2. **Restore dependencies**
@@ -171,9 +172,10 @@ Transactions are scored based on configurable rules:
 
 | Risk Level | Score Range | Action |
 |------------|-------------|--------|
-| Low | 0-30 | Auto-approved |
-| Medium | 31-60 | Flagged for review |
-| High | 61-100 | Requires manual review |
+| Low | 0-25 | Auto-approved |
+| Medium | 26-50 | Flagged for review |
+| High | 51-75 | Requires manual review |
+| Critical | 76-100 | Requires manual review |
 
 ### Default Risk Factors
 

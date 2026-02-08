@@ -20,7 +20,7 @@ public class RiskScoringService : IRiskScoringService
     private const int HighRiskThreshold = 75;
 
     // Auto-approve threshold (low risk transactions bypass HITL)
-    private const int AutoApproveThreshold = 20;
+    private const int AutoApproveThreshold = 25;
 
     public RiskScoringService(ApplicationDbContext context, ILogger<RiskScoringService> logger)
     {

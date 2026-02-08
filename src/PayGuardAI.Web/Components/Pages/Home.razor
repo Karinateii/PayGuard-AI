@@ -1,6 +1,10 @@
 ﻿@page "/"
 @inject ITransactionService TransactionService
 @inject IReviewService ReviewService
+@inject NavigationManager NavigationManager
+@implements IAsyncDisposable
+@using Microsoft.AspNetCore.SignalR.Client
+@using PayGuardAI.Web.Hubs
 
 <PageTitle>Dashboard - PayGuard AI</PageTitle>
 
@@ -164,10 +168,50 @@ else
     private bool _loading = true;
     private DashboardStats _stats = new();
     private List<Transaction> _recentHighRisk = new();
+    private HubConnection? _hubConnection;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadDataAsync();
+        await SetupSignalR();
+    }
+
+    private async Task SetupSignalR()
+    {
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/hubs/transactions"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hubConnection.On<TransactionNotification>("NewTransaction", async (_) =>
+        {
+            // Reload dashboard data when a new transaction arrives (no loading spinner)
+            await RefreshDataAsync();
+        });
+
+        await _hubConnection.StartAsync();
+    }
+
+    private async Task RefreshDataAsync()
+    {
+        try
+        {
+            _stats = await TransactionService.GetDashboardStatsAsync();
+            
+            var allTransactions = await TransactionService.GetTransactionsAsync(
+                pageNumber: 1, 
+                pageSize: 20);
+            _recentHighRisk = allTransactions
+                .Where(t => t.RiskAnalysis != null && t.RiskAnalysis.RiskLevel >= RiskLevel.High)
+                .Take(5)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error refreshing dashboard: {ex.Message}");
+        }
+        
+        await InvokeAsync(StateHasChanged);
     }
     
     private async Task LoadDataAsync()
@@ -177,15 +221,26 @@ else
             _loading = true;
             _stats = await TransactionService.GetDashboardStatsAsync();
             
-            var transactions = await TransactionService.GetTransactionsAsync(
+            // Get both High and Critical risk transactions
+            var allTransactions = await TransactionService.GetTransactionsAsync(
                 pageNumber: 1, 
-                pageSize: 5, 
-                riskLevel: RiskLevel.High);
-            _recentHighRisk = transactions.ToList();
+                pageSize: 20);
+            _recentHighRisk = allTransactions
+                .Where(t => t.RiskAnalysis != null && t.RiskAnalysis.RiskLevel >= RiskLevel.High)
+                .Take(5)
+                .ToList();
         }
         finally
         {
             _loading = false;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection is not null)
+        {
+            await _hubConnection.DisposeAsync();
         }
     }
 

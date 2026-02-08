@@ -103,7 +103,7 @@ public class ApplicationDbContext : DbContext
                 Description = "Transaction amount exceeds threshold for the corridor",
                 Category = "Amount",
                 Threshold = 5000m,
-                ScoreWeight = 25,
+                ScoreWeight = 35,
                 IsEnabled = true
             },
             new RiskRule
@@ -114,7 +114,7 @@ public class ApplicationDbContext : DbContext
                 Description = "Multiple transactions in 24-hour window exceeds limit",
                 Category = "Velocity",
                 Threshold = 5m,
-                ScoreWeight = 20,
+                ScoreWeight = 30,
                 IsEnabled = true
             },
             new RiskRule
@@ -125,7 +125,7 @@ public class ApplicationDbContext : DbContext
                 Description = "Customer has less than 5 transactions",
                 Category = "Pattern",
                 Threshold = 5m,
-                ScoreWeight = 15,
+                ScoreWeight = 25,
                 IsEnabled = true
             },
             new RiskRule
