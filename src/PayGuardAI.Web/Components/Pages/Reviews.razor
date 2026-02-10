@@ -2,6 +2,7 @@
 @inject IReviewService ReviewService
 @inject ISnackbar Snackbar
 @inject NavigationManager NavigationManager
+@inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
 
 <PageTitle>Pending Reviews - PayGuard AI</PageTitle>
 
@@ -216,7 +217,7 @@
         _showApproveDialog = false;
         try
         {
-            await ReviewService.ApproveAsync(_selectedReview.Id, "compliance_officer", 
+            await ReviewService.ApproveAsync(_selectedReview.Id, CurrentUser.UserName, 
                 string.IsNullOrWhiteSpace(_reviewNotes) ? null : _reviewNotes);
             Snackbar.Add($"Transaction approved", Severity.Success);
             _reviews.Remove(_selectedReview);
@@ -240,7 +241,7 @@
         _showRejectDialog = false;
         try
         {
-            await ReviewService.RejectAsync(_selectedReview.Id, "compliance_officer", 
+            await ReviewService.RejectAsync(_selectedReview.Id, CurrentUser.UserName, 
                 string.IsNullOrWhiteSpace(_reviewNotes) ? null : _reviewNotes);
             Snackbar.Add($"Transaction rejected", Severity.Warning);
             _reviews.Remove(_selectedReview);

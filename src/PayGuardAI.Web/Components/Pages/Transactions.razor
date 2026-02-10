@@ -3,6 +3,7 @@
 @inject ITransactionService TransactionService
 @inject IReviewService ReviewService
 @inject ISnackbar Snackbar
+@inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
 
 <PageTitle>Transactions - PayGuard AI</PageTitle>
 
@@ -494,7 +495,7 @@ else
         _showApproveDialog = false;
         try
         {
-            await ReviewService.ApproveAsync(_selectedTransaction.RiskAnalysis.Id, "compliance_officer", 
+            await ReviewService.ApproveAsync(_selectedTransaction.RiskAnalysis.Id, CurrentUser.UserName, 
                 string.IsNullOrWhiteSpace(_reviewNotes) ? null : _reviewNotes);
             Snackbar.Add("Transaction approved successfully", Severity.Success);
             _selectedTransaction = await TransactionService.GetByIdAsync(_selectedTransaction.Id);
@@ -517,7 +518,7 @@ else
         _showRejectDialog = false;
         try
         {
-            await ReviewService.RejectAsync(_selectedTransaction.RiskAnalysis.Id, "compliance_officer", 
+            await ReviewService.RejectAsync(_selectedTransaction.RiskAnalysis.Id, CurrentUser.UserName, 
                 string.IsNullOrWhiteSpace(_reviewNotes) ? null : _reviewNotes);
             Snackbar.Add("Transaction rejected", Severity.Warning);
             _selectedTransaction = await TransactionService.GetByIdAsync(_selectedTransaction.Id);
@@ -539,7 +540,7 @@ else
         _processing = true;
         try
         {
-            await ReviewService.EscalateAsync(_selectedTransaction.RiskAnalysis.Id, "compliance_officer");
+            await ReviewService.EscalateAsync(_selectedTransaction.RiskAnalysis.Id, CurrentUser.UserName);
             Snackbar.Add("Transaction escalated for senior review", Severity.Info);
             _selectedTransaction = await TransactionService.GetByIdAsync(_selectedTransaction.Id);
         }

@@ -2,6 +2,7 @@
 @inject PayGuardAI.Data.ApplicationDbContext DbContext
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
 @using Microsoft.EntityFrameworkCore
 
 <PageTitle>Risk Rules - PayGuard AI</PageTitle>
@@ -151,7 +152,7 @@ else
     {
         rule.IsEnabled = enabled;
         rule.UpdatedAt = DateTime.UtcNow;
-        rule.UpdatedBy = "compliance_officer";
+        rule.UpdatedBy = CurrentUser.UserName;
         await DbContext.SaveChangesAsync();
         Snackbar.Add($"Rule '{rule.Name}' {(enabled ? "enabled" : "disabled")}", 
             enabled ? Severity.Success : Severity.Warning);
@@ -161,7 +162,7 @@ else
     {
         rule.Threshold = value;
         rule.UpdatedAt = DateTime.UtcNow;
-        rule.UpdatedBy = "compliance_officer";
+        rule.UpdatedBy = CurrentUser.UserName;
         await DbContext.SaveChangesAsync();
         Snackbar.Add($"Threshold updated for '{rule.Name}'", Severity.Info);
     }
@@ -170,7 +171,7 @@ else
     {
         rule.ScoreWeight = value;
         rule.UpdatedAt = DateTime.UtcNow;
-        rule.UpdatedBy = "compliance_officer";
+        rule.UpdatedBy = CurrentUser.UserName;
         await DbContext.SaveChangesAsync();
         Snackbar.Add($"Weight updated for '{rule.Name}'", Severity.Info);
     }
