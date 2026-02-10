@@ -13,6 +13,8 @@ public class RiskScoringService : IRiskScoringService
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<RiskScoringService> _logger;
+    private readonly IAlertingService _alertingService;
+    private readonly ITenantContext _tenantContext;
 
     // Risk level thresholds
     private const int LowRiskThreshold = 25;
@@ -22,10 +24,16 @@ public class RiskScoringService : IRiskScoringService
     // Auto-approve threshold (low risk transactions bypass HITL)
     private const int AutoApproveThreshold = 25;
 
-    public RiskScoringService(ApplicationDbContext context, ILogger<RiskScoringService> logger)
+    public RiskScoringService(
+        ApplicationDbContext context,
+        ILogger<RiskScoringService> logger,
+        IAlertingService alertingService,
+        ITenantContext tenantContext)
     {
         _context = context;
         _logger = logger;
+        _alertingService = alertingService;
+        _tenantContext = tenantContext;
     }
 
     public async Task<RiskAnalysis> AnalyzeTransactionAsync(Transaction transaction, CancellationToken cancellationToken = default)
@@ -95,6 +103,13 @@ public class RiskScoringService : IRiskScoringService
         _logger.LogInformation(
             "Risk analysis complete for transaction {TransactionId}: Score={Score}, Level={Level}, Status={Status}",
             transaction.Id, totalScore, riskLevel, reviewStatus);
+
+        if (riskLevel == RiskLevel.Critical)
+        {
+            await _alertingService.AlertAsync(
+                $"Tenant {_tenantContext.TenantId}: Critical transaction {transaction.ExternalId} scored {totalScore}",
+                cancellationToken);
+        }
 
         return analysis;
     }
