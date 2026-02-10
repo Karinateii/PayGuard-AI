@@ -1,8 +1,10 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using PayGuardAI.Core.Services;
 
 namespace PayGuardAI.Data.Services;
 
@@ -39,6 +41,8 @@ public class AfriexApiService : IAfriexApiService
     private readonly ILogger<AfriexApiService> _logger;
     private readonly string _apiKey;
     private readonly string _baseUrl;
+    private readonly IMemoryCache _cache;
+    private readonly ITenantContext _tenantContext;
     
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -46,10 +50,17 @@ public class AfriexApiService : IAfriexApiService
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public AfriexApiService(HttpClient httpClient, IConfiguration configuration, ILogger<AfriexApiService> logger)
+    public AfriexApiService(
+        HttpClient httpClient,
+        IConfiguration configuration,
+        ILogger<AfriexApiService> logger,
+        IMemoryCache cache,
+        ITenantContext tenantContext)
     {
         _httpClient = httpClient;
         _logger = logger;
+        _cache = cache;
+        _tenantContext = tenantContext;
         
         // Get from configuration (appsettings.json or environment variables)
         _apiKey = configuration["Afriex:ApiKey"] ?? "";
@@ -183,6 +194,12 @@ public class AfriexApiService : IAfriexApiService
     {
         try
         {
+            var cacheKey = $"{_tenantContext.TenantId}:rate:{fromCurrency}:{toCurrency}:{amount}";
+            if (_cache.TryGetValue(cacheKey, out ExchangeRateResponse cached))
+            {
+                return cached;
+            }
+
             // Use /v2/public/rates endpoint as per documentation
             var response = await _httpClient.GetFromJsonAsync<ExchangeRateApiResponse>(
                 $"/v2/public/rates?base={fromCurrency}&symbols={toCurrency}", JsonOptions);
@@ -191,7 +208,7 @@ public class AfriexApiService : IAfriexApiService
             {
                 if (ratesForBase.TryGetValue(toCurrency, out var rateString) && decimal.TryParse(rateString, out var rate))
                 {
-                    return new ExchangeRateResponse
+                    var result = new ExchangeRateResponse
                     {
                         From = fromCurrency,
                         To = toCurrency,
@@ -199,6 +216,9 @@ public class AfriexApiService : IAfriexApiService
                         SourceAmount = amount,
                         DestinationAmount = amount * rate
                     };
+
+                    _cache.Set(cacheKey, result, TimeSpan.FromSeconds(30));
+                    return result;
                 }
             }
             
