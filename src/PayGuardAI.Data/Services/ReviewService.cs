@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using PayGuardAI.Core.Entities;
 using PayGuardAI.Core.Services;
@@ -13,11 +14,21 @@ public class ReviewService : IReviewService
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<ReviewService> _logger;
+    private readonly IMemoryCache _cache;
+    private readonly ITenantContext _tenantContext;
 
-    public ReviewService(ApplicationDbContext context, ILogger<ReviewService> logger)
+    private const string DashboardCacheKey = "dashboard-stats";
+
+    public ReviewService(
+        ApplicationDbContext context,
+        ILogger<ReviewService> logger,
+        IMemoryCache cache,
+        ITenantContext tenantContext)
     {
         _context = context;
         _logger = logger;
+        _cache = cache;
+        _tenantContext = tenantContext;
     }
 
     public async Task<RiskAnalysis> ApproveAsync(
@@ -35,6 +46,7 @@ public class ReviewService : IReviewService
         analysis.ReviewNotes = notes;
 
         await _context.SaveChangesAsync(cancellationToken);
+        InvalidateCaches();
 
         // Log audit trail
         await LogAuditAsync("REVIEW_APPROVED", "RiskAnalysis", analysisId.ToString(), reviewedBy,
@@ -66,6 +78,7 @@ public class ReviewService : IReviewService
         analysis.ReviewNotes = notes;
 
         await _context.SaveChangesAsync(cancellationToken);
+        InvalidateCaches();
 
         // Log audit trail
         await LogAuditAsync("REVIEW_REJECTED", "RiskAnalysis", analysisId.ToString(), reviewedBy,
@@ -97,6 +110,7 @@ public class ReviewService : IReviewService
         analysis.ReviewNotes = notes ?? "Escalated for senior review";
 
         await _context.SaveChangesAsync(cancellationToken);
+        InvalidateCaches();
 
         // Log audit trail
         await LogAuditAsync("REVIEW_ESCALATED", "RiskAnalysis", analysisId.ToString(), reviewedBy,
@@ -238,4 +252,11 @@ public class ReviewService : IReviewService
         _context.AuditLogs.Add(auditLog);
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    private void InvalidateCaches()
+    {
+        _cache.Remove(GetCacheKey(DashboardCacheKey));
+    }
+
+    private string GetCacheKey(string key) => $"{_tenantContext.TenantId}:{key}";
 }

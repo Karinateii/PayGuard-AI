@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using PayGuardAI.Core.Entities;
 using PayGuardAI.Core.Services;
@@ -15,15 +16,24 @@ public class TransactionService : ITransactionService
     private readonly ApplicationDbContext _context;
     private readonly IRiskScoringService _riskScoringService;
     private readonly ILogger<TransactionService> _logger;
+    private readonly IMemoryCache _cache;
+    private readonly ITenantContext _tenantContext;
+
+    private const string DashboardCacheKey = "dashboard-stats";
+    private const string TransactionsCacheKey = "transactions";
 
     public TransactionService(
         ApplicationDbContext context,
         IRiskScoringService riskScoringService,
-        ILogger<TransactionService> logger)
+        ILogger<TransactionService> logger,
+        IMemoryCache cache,
+        ITenantContext tenantContext)
     {
         _context = context;
         _riskScoringService = riskScoringService;
         _logger = logger;
+        _cache = cache;
+        _tenantContext = tenantContext;
     }
 
     public async Task<Transaction> ProcessWebhookAsync(string payload, CancellationToken cancellationToken = default)
@@ -52,6 +62,8 @@ public class TransactionService : ITransactionService
         // Perform risk analysis
         await _riskScoringService.AnalyzeTransactionAsync(transaction, cancellationToken);
 
+        InvalidateCaches();
+
         return transaction;
     }
 
@@ -62,6 +74,12 @@ public class TransactionService : ITransactionService
         ReviewStatus? reviewStatus = null,
         CancellationToken cancellationToken = default)
     {
+        var cacheKey = GetCacheKey($"{TransactionsCacheKey}:{pageNumber}:{pageSize}:{riskLevel}:{reviewStatus}");
+        if (_cache.TryGetValue(cacheKey, out IEnumerable<Transaction> cached))
+        {
+            return cached;
+        }
+
         var query = _context.Transactions
             .Include(t => t.RiskAnalysis)
                 .ThenInclude(r => r!.RiskFactors)
@@ -86,7 +104,9 @@ public class TransactionService : ITransactionService
                 .Take(pageSize.Value);
         }
 
-        return await query.ToListAsync(cancellationToken);
+        var result = await query.ToListAsync(cancellationToken);
+        _cache.Set(cacheKey, result, TimeSpan.FromSeconds(15));
+        return result;
     }
 
     public async Task<Transaction?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
@@ -99,6 +119,12 @@ public class TransactionService : ITransactionService
 
     public async Task<DashboardStats> GetDashboardStatsAsync(CancellationToken cancellationToken = default)
     {
+        var cacheKey = GetCacheKey(DashboardCacheKey);
+        if (_cache.TryGetValue(cacheKey, out DashboardStats cached))
+        {
+            return cached;
+        }
+
         var today = DateTime.UtcNow.Date;
         var tomorrow = today.AddDays(1);
 
@@ -131,7 +157,7 @@ public class TransactionService : ITransactionService
             .Where(r => r.AnalyzedAt >= today && r.AnalyzedAt < tomorrow)
             .AverageAsync(r => (double?)r.RiskScore, cancellationToken) ?? 0;
 
-        return new DashboardStats
+        var stats = new DashboardStats
         {
             TotalTransactions = totalTransactions,
             PendingReviews = pendingReviews,
@@ -141,7 +167,17 @@ public class TransactionService : ITransactionService
             TotalVolumeToday = totalVolumeToday,
             AverageRiskScore = averageRiskScore
         };
+
+        _cache.Set(cacheKey, stats, TimeSpan.FromSeconds(10));
+        return stats;
     }
+
+    private void InvalidateCaches()
+    {
+        _cache.Remove(GetCacheKey(DashboardCacheKey));
+    }
+
+    private string GetCacheKey(string key) => $"{_tenantContext.TenantId}:{key}";
 
     private Transaction ParseWebhookPayload(string payload)
     {
