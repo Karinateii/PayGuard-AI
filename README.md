@@ -37,6 +37,13 @@ PayGuard AI automates the first line of defense while keeping humans in control 
 - 📈 **Compliance Reports** - Visual analytics with risk distribution charts
 - 📝 **Audit Logging** - Complete history of all actions and decisions
 - 🔗 **Afriex API Integration** - Direct integration with Afriex Business API
+- 🔐 **Authentication & RBAC** - Role-based access control with Reviewer, Manager, and Admin roles
+- 🏢 **Multi-Tenancy** - Tenant-scoped data isolation via middleware
+- 🚦 **Rate Limiting** - Fixed-window rate limiter scoped per tenant
+- 💾 **Response Caching** - In-memory caching for dashboard stats, transactions, and exchange rates
+- 🚨 **Alerting Service** - Automatic alerts for critical-risk transactions
+- 📡 **Health Checks** - `/health` endpoint for uptime monitoring
+- 📊 **Request Logging** - Structured request/response logging with slow-request warnings
 
 ## Tech Stack
 
@@ -46,6 +53,10 @@ PayGuard AI automates the first line of defense while keeping humans in control 
 | **Backend** | ASP.NET Core 10 |
 | **Database** | SQLite with Entity Framework Core |
 | **Real-time** | SignalR WebSockets |
+| **Auth** | Custom auth handler with RBAC policies |
+| **Caching** | IMemoryCache (tenant-scoped) |
+| **Rate Limiting** | ASP.NET Core Rate Limiting (per-tenant) |
+| **Monitoring** | Health checks, structured request logging |
 | **API** | Afriex Business API |
 | **Architecture** | Clean Architecture (3-layer) |
 
@@ -55,19 +66,27 @@ PayGuard AI automates the first line of defense while keeping humans in control 
 PayGuardAI/
 ├── src/
 │   ├── PayGuardAI.Core/          # Domain entities and interfaces
-│   │   └── Entities/
-│   │       ├── Transaction.cs
-│   │       ├── RiskAnalysis.cs
-│   │       ├── RiskRule.cs
-│   │       └── AuditLog.cs
+│   │   ├── Entities/
+│   │   │   ├── Transaction.cs
+│   │   │   ├── RiskAnalysis.cs
+│   │   │   ├── RiskRule.cs
+│   │   │   └── AuditLog.cs
+│   │   └── Services/
+│   │       ├── ITenantContext.cs        # Multi-tenancy interface
+│   │       ├── IAlertingService.cs      # Alerting interface
+│   │       ├── IRiskScoringService.cs
+│   │       ├── IReviewService.cs
+│   │       └── ITransactionService.cs
 │   │
 │   ├── PayGuardAI.Data/          # Data access and services
 │   │   ├── ApplicationDbContext.cs
 │   │   └── Services/
-│   │       ├── TransactionService.cs
-│   │       ├── RiskScoringService.cs
-│   │       ├── ReviewService.cs
-│   │       ├── AfriexApiService.cs
+│   │       ├── TransactionService.cs    # Cached, tenant-scoped
+│   │       ├── RiskScoringService.cs    # With alerting
+│   │       ├── ReviewService.cs         # Cache-invalidating
+│   │       ├── AfriexApiService.cs      # Cached API client
+│   │       ├── TenantContext.cs         # Tenant resolution
+│   │       ├── AlertingService.cs       # Alert dispatcher
 │   │       └── WebhookSignatureService.cs
 │   │
 │   └── PayGuardAI.Web/           # Blazor UI and API controllers
@@ -78,10 +97,16 @@ PayGuardAI/
 │       │   │   ├── Reviews.razor      # HITL review queue
 │       │   │   ├── Rules.razor        # Rules management
 │       │   │   ├── Reports.razor      # Analytics
-│       │   │   └── Audit.razor        # Audit log
+│       │   │   ├── Audit.razor        # Audit log
+│       │   │   └── Send.razor         # Send money
 │       │   └── Layout/
 │       ├── Controllers/
 │       │   └── WebhooksController.cs  # Webhook endpoint
+│       ├── Services/
+│       │   ├── DemoAuthenticationHandler.cs  # Auth handler
+│       │   ├── TenantResolutionMiddleware.cs # Multi-tenancy
+│       │   ├── RequestLoggingMiddleware.cs   # Observability
+│       │   └── CurrentUserService.cs         # User identity
 │       └── Hubs/
 │           └── TransactionHub.cs      # SignalR hub
 ```
@@ -210,6 +235,54 @@ Configure and toggle risk detection rules without code changes.
 ```bash
 dotnet build
 ```
+
+### Security & Production Features
+
+#### Authentication & RBAC
+PayGuard AI uses a pluggable authentication scheme with role-based access control:
+
+| Role | Permissions |
+|------|-------------|
+| **Reviewer** | Approve/reject transactions, view dashboards |
+| **Manager** | All Reviewer permissions + escalation handling |
+| **Admin** | Full system access including rule management |
+
+Configure the default user in `appsettings.json`:
+```json
+{
+  "Auth": {
+    "DefaultUser": "compliance_officer@payguard.ai",
+    "DefaultRoles": "Reviewer,Manager"
+  }
+}
+```
+
+#### Multi-Tenancy
+Tenant isolation is handled via middleware. Each request is scoped to a tenant:
+- Default tenant: `afriex-demo`
+- Override per request: `X-Tenant-Id` header
+- Cache keys, rate limits, and data are all tenant-scoped
+
+#### Rate Limiting
+Fixed-window rate limiting protects API endpoints:
+```json
+{
+  "RateLimiting": {
+    "PermitLimit": 60,
+    "WindowSeconds": 60
+  }
+}
+```
+
+#### Health Checks
+Monitor application health at `GET /health` — returns `Healthy` / `Unhealthy` with component status.
+
+#### Caching Strategy
+| Resource | TTL | Invalidation |
+|----------|-----|--------------|
+| Dashboard stats | 10s | On review action |
+| Transaction list | 15s | On webhook received |
+| Exchange rates | 30s | Time-based expiry |
 
 ### Database
 
