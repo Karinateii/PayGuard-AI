@@ -1,6 +1,7 @@
 @page "/reports"
 @inject PayGuardAI.Data.ApplicationDbContext DbContext
 @inject IReviewService ReviewService
+@inject ISnackbar Snackbar
 @using Microsoft.EntityFrameworkCore
 
 <PageTitle>Compliance Reports - PayGuard AI</PageTitle>
@@ -376,8 +377,7 @@
 
     private void ExportReport()
     {
-        // In a real app, this would generate and download a CSV
-        // For hackathon demo, we'll just show a snackbar
+        Snackbar.Add("CSV export coming soon — report data is available via the audit log.", Severity.Info);
     }
 
     private Color GetRiskColor(RiskLevel level) => level switch

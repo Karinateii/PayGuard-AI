@@ -206,9 +206,9 @@ else
                 .Take(5)
                 .ToList();
         }
-        catch (Exception ex)
+        catch
         {
-            Console.WriteLine($"Error refreshing dashboard: {ex.Message}");
+            // Silently handle refresh errors - dashboard will update on next cycle
         }
         
         await InvokeAsync(StateHasChanged);

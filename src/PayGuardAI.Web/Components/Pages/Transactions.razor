@@ -52,52 +52,6 @@
     </MudPaper>
 </MudOverlay>
 
-<!-- Approve Dialog -->
-<MudOverlay Visible="_showApproveDialog" DarkBackground="true" AutoClose="false">
-    <MudPaper Class="pa-4" Style="min-width: 400px; max-width: 500px;">
-        <MudText Typo="Typo.h6" Class="mb-3">
-            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-2" Color="Color.Success" />
-            Approve Transaction
-        </MudText>
-        @if (_selectedTransaction != null)
-        {
-            <MudText Class="mb-3">
-                You are about to <strong>approve</strong> transaction <strong>@_selectedTransaction.ExternalId</strong>
-            </MudText>
-            <MudTextField @bind-Value="_reviewNotes" Label="Approval Notes (Optional)" 
-                          Variant="Variant.Outlined" Lines="3" 
-                          Placeholder="Add any notes about your decision..." Class="mb-4" />
-        }
-        <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2">
-            <MudButton OnClick="@(() => _showApproveDialog = false)">Cancel</MudButton>
-            <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="@ApproveTransaction">Approve</MudButton>
-        </MudStack>
-    </MudPaper>
-</MudOverlay>
-
-<!-- Reject Dialog -->
-<MudOverlay Visible="_showRejectDialog" DarkBackground="true" AutoClose="false">
-    <MudPaper Class="pa-4" Style="min-width: 400px; max-width: 500px;">
-        <MudText Typo="Typo.h6" Class="mb-3">
-            <MudIcon Icon="@Icons.Material.Filled.Cancel" Class="mr-2" Color="Color.Error" />
-            Reject Transaction
-        </MudText>
-        @if (_selectedTransaction != null)
-        {
-            <MudText Class="mb-3">
-                You are about to <strong>reject</strong> transaction <strong>@_selectedTransaction.ExternalId</strong>
-            </MudText>
-            <MudTextField @bind-Value="_reviewNotes" Label="Rejection Reason (Optional)" 
-                          Variant="Variant.Outlined" Lines="3" 
-                          Placeholder="Explain why this transaction is being rejected..." Class="mb-4" />
-        }
-        <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2">
-            <MudButton OnClick="@(() => _showRejectDialog = false)">Cancel</MudButton>
-            <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="@RejectTransaction">Reject</MudButton>
-        </MudStack>
-    </MudPaper>
-</MudOverlay>
-
 <MudText Typo="Typo.h4" Class="mb-4">
     <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2" />
     Transaction Monitor
@@ -597,18 +551,6 @@ else
         {
             _processing = false;
         }
-    }
-    
-    private async Task ApproveFromDrawer()
-    {
-        await ApproveTransaction();
-        await LoadTransactions();
-    }
-    
-    private async Task RejectFromDrawer()
-    {
-        await RejectTransaction();
-        await LoadTransactions();
     }
     
     private async Task EscalateFromDrawer()

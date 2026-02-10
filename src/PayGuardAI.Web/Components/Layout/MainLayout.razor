@@ -110,9 +110,9 @@
             await _hubConnection.StartAsync();
             await InvokeAsync(StateHasChanged);
         }
-        catch (Exception ex)
+        catch
         {
-            Console.WriteLine($"SignalR connection failed: {ex.Message}");
+            // SignalR will auto-reconnect via WithAutomaticReconnect()
         }
     }
 

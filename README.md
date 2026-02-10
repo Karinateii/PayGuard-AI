@@ -211,12 +211,6 @@ Configure and toggle risk detection rules without code changes.
 dotnet build
 ```
 
-### Run Tests
-
-```bash
-dotnet test
-```
-
 ### Database
 
 The app uses SQLite. The database is created automatically on first run. To reset:
