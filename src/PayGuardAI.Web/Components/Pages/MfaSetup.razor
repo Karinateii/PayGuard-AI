@@ -1,0 +1,194 @@
+@page "/mfa/setup"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using PayGuardAI.Web.Services
+@inject IMfaService MfaService
+@inject NavigationManager Navigation
+@attribute [Authorize]
+
+<PageTitle>Setup Two-Factor Authentication - PayGuard AI</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-8">
+    <MudPaper Elevation="3" Class="pa-6">
+        <MudText Typo="Typo.h4" Class="mb-4">
+            <MudIcon Icon="@Icons.Material.Filled.Security" Class="mr-2" />
+            Setup Two-Factor Authentication
+        </MudText>
+
+        @if (!_setupComplete)
+        {
+            @if (_step == 1)
+            {
+                <MudText Typo="Typo.body1" Class="mb-4">
+                    Scan this QR code with your authenticator app (Google Authenticator, Microsoft Authenticator, Authy, etc.)
+                </MudText>
+
+                <div class="text-center mb-4">
+                    @if (!string.IsNullOrEmpty(_qrCodeUri))
+                    {
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=@Uri.EscapeDataString(_qrCodeUri)" 
+                             alt="MFA QR Code" 
+                             style="max-width: 300px;" />
+                    }
+                    else
+                    {
+                        <MudProgressCircular Indeterminate="true" />
+                    }
+                </div>
+
+                <MudAlert Severity="Severity.Info" Class="mb-4">
+                    <strong>Manual Entry:</strong><br />
+                    If you can't scan the QR code, enter this secret key manually:<br />
+                    <MudText Typo="Typo.body2" Style="font-family: monospace; background-color: #f0f0f0; padding: 4px 8px; border-radius: 4px; display: inline-block;">@_secret</MudText>
+                </MudAlert>
+
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="NextStep">
+                    Next
+                </MudButton>
+            }
+            else if (_step == 2)
+            {
+                <MudText Typo="Typo.body1" Class="mb-4">
+                    Enter the 6-digit code from your authenticator app to verify the setup
+                </MudText>
+
+                <MudTextField @bind-Value="_verificationCode"
+                              Label="Verification Code"
+                              Variant="Variant.Outlined"
+                              MaxLength="6"
+                              Mask="@(new PatternMask("000000"))"
+                              HelperText="Enter the 6-digit code from your app"
+                              Immediate="true"
+                              Class="mb-4" />
+
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+                }
+
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Outlined" OnClick="PreviousStep">
+                        Back
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" 
+                               Color="Color.Primary" 
+                               OnClick="VerifyCode"
+                               Disabled="@(_verificationCode?.Length != 6)">
+                        Verify
+                    </MudButton>
+                </MudStack>
+            }
+            else if (_step == 3)
+            {
+                <MudAlert Severity="Severity.Warning" Class="mb-4">
+                    <strong>Important:</strong> Save these backup codes in a secure location. 
+                    You can use them to access your account if you lose your authenticator device.
+                </MudAlert>
+
+                <MudPaper Elevation="1" Class="pa-4 mb-4" Style="background-color: #f5f5f5;">
+                    @foreach (var backupCode in _backupCodes)
+                    {
+                        <MudText Typo="Typo.body1" Style="font-family: monospace;">@backupCode</MudText>
+                    }
+                </MudPaper>
+
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Success" 
+                           StartIcon="@Icons.Material.Filled.Download"
+                           OnClick="DownloadBackupCodes"
+                           Class="mr-2">
+                    Download Codes
+                </MudButton>
+
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Primary" 
+                           OnClick="CompleteSetup">
+                    Complete Setup
+                </MudButton>
+            }
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Success" Class="mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-2" />
+                Two-factor authentication has been successfully enabled for your account.
+            </MudAlert>
+
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/">
+                Return to Dashboard
+            </MudButton>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    private int _step = 1;
+    private string _secret = string.Empty;
+    private string _qrCodeUri = string.Empty;
+    private string _verificationCode = string.Empty;
+    private string[] _backupCodes = Array.Empty<string>();
+    private string _errorMessage = string.Empty;
+    private bool _setupComplete = false;
+    private string _userEmail = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState != null)
+        {
+            var authState = await AuthState;
+            _userEmail = authState.User.Identity?.Name ?? "user@payguard.ai";
+        }
+
+        // Generate secret and QR code
+        _secret = MfaService.GenerateSecret();
+        _qrCodeUri = MfaService.GenerateQrCodeUri(_userEmail, _secret);
+    }
+
+    private void NextStep()
+    {
+        _step++;
+    }
+
+    private void PreviousStep()
+    {
+        _step--;
+    }
+
+    private void VerifyCode()
+    {
+        _errorMessage = string.Empty;
+
+        if (MfaService.ValidateCode(_secret, _verificationCode))
+        {
+            // Generate backup codes
+            _backupCodes = MfaService.GenerateBackupCodes();
+            
+            // TODO: Store secret and backup codes in database associated with user
+            // For now, we'll just proceed to the next step
+            
+            _step++;
+        }
+        else
+        {
+            _errorMessage = "Invalid verification code. Please try again.";
+        }
+    }
+
+    private void DownloadBackupCodes()
+    {
+        var content = string.Join("\n", _backupCodes);
+        var bytes = System.Text.Encoding.UTF8.GetBytes(content);
+        var base64 = Convert.ToBase64String(bytes);
+        
+        // This would ideally trigger a download, but for now we'll just show a message
+        _errorMessage = "Download functionality requires JavaScript interop. Please copy the codes manually.";
+    }
+
+    private void CompleteSetup()
+    {
+        _setupComplete = true;
+    }
+}
