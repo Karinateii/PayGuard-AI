@@ -4,6 +4,7 @@
 @inject IDialogService DialogService
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
 @using Microsoft.EntityFrameworkCore
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Policy = "RequireManager")]
 
 <PageTitle>Risk Rules - PayGuard AI</PageTitle>
 
@@ -74,7 +75,10 @@ else
                         </MudGrid>
                         
                         <MudText Typo="Typo.caption" Class="mt-2">
-                            Code: @rule.RuleCode | Last updated: @rule.UpdatedAt.ToString("MM/dd HH:mm")
+                            Code: @rule.RuleCode
+                        </MudText>
+                        <MudText Typo="Typo.caption">
+                            Last updated: @rule.UpdatedAt.ToString("MM/dd HH:mm") by <strong>@(rule.UpdatedBy ?? "system")</strong>
                         </MudText>
                     </MudCardContent>
                     <MudCardActions>

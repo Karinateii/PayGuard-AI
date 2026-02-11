@@ -54,10 +54,21 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddHttpLogging(_ => { });
 builder.Services.AddHealthChecks();
 
-// Add Entity Framework with SQLite
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection") 
-        ?? "Data Source=payguardai.db"));
+// Add Entity Framework with feature flag-based database selection
+var usePostgres = builder.Configuration.GetValue<bool>("FeatureFlags:PostgresEnabled");
+
+if (usePostgres)
+{
+    builder.Services.AddDbContext<ApplicationDbContext>(options =>
+        options.UseNpgsql(builder.Configuration.GetConnectionString("PostgresConnection") 
+            ?? "Host=localhost;Port=5432;Database=payguard_dev;Username=postgres;Password=postgres"));
+}
+else
+{
+    builder.Services.AddDbContext<ApplicationDbContext>(options =>
+        options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection") 
+            ?? "Data Source=payguardai.db"));
+}
 
 // Register application services
 builder.Services.AddScoped<IRiskScoringService, RiskScoringService>();

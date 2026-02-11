@@ -19,13 +19,15 @@
             <MudText Class="mb-3">
                 You are about to <strong>approve</strong> transaction <strong>@_selectedTransaction.ExternalId</strong>
             </MudText>
-            <MudTextField @bind-Value="_reviewNotes" Label="Approval Notes (Optional)" 
+            <MudTextField @bind-Value="_reviewNotes" Label="Approval Notes" Required="true"
                           Variant="Variant.Outlined" Lines="3" 
-                          Placeholder="Add any notes about your decision..." Class="mb-4" />
+                          Placeholder="Explain why you are approving this transaction..." Class="mb-4"
+                          RequiredError="Approval notes are required for compliance" />
         }
         <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2">
             <MudButton OnClick="@(() => _showApproveDialog = false)">Cancel</MudButton>
-            <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="@ApproveTransaction">Approve</MudButton>
+            <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="@ApproveTransaction"
+                       Disabled="@string.IsNullOrWhiteSpace(_reviewNotes)">Approve</MudButton>
         </MudStack>
     </MudPaper>
 </MudOverlay>
@@ -42,13 +44,15 @@
             <MudText Class="mb-3">
                 You are about to <strong>reject</strong> transaction <strong>@_selectedTransaction.ExternalId</strong>
             </MudText>
-            <MudTextField @bind-Value="_reviewNotes" Label="Rejection Reason (Optional)" 
+            <MudTextField @bind-Value="_reviewNotes" Label="Rejection Reason" Required="true"
                           Variant="Variant.Outlined" Lines="3" 
-                          Placeholder="Explain why this transaction is being rejected..." Class="mb-4" />
+                          Placeholder="Explain why this transaction is being rejected..." Class="mb-4"
+                          RequiredError="A rejection reason is required for compliance" />
         }
         <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2">
             <MudButton OnClick="@(() => _showRejectDialog = false)">Cancel</MudButton>
-            <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="@RejectTransaction">Reject</MudButton>
+            <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="@RejectTransaction"
+                       Disabled="@string.IsNullOrWhiteSpace(_reviewNotes)">Reject</MudButton>
         </MudStack>
     </MudPaper>
 </MudOverlay>
@@ -156,6 +160,21 @@
                         @_selectedTransaction.RiskAnalysis.ReviewStatus
                     </MudChip>
 
+                    @if (_selectedTransaction.RiskAnalysis.ReviewStatus == ReviewStatus.Escalated)
+                    {
+                        <MudDivider Class="mb-3" />
+                        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2">
+                            <MudText Typo="Typo.body2">
+                                <strong>Escalated by:</strong> @_selectedTransaction.RiskAnalysis.ReviewedBy
+                                on @_selectedTransaction.RiskAnalysis.ReviewedAt?.ToString("MMM dd, yyyy HH:mm")
+                            </MudText>
+                            @if (!string.IsNullOrEmpty(_selectedTransaction.RiskAnalysis.ReviewNotes))
+                            {
+                                <MudText Typo="Typo.caption">Note: @_selectedTransaction.RiskAnalysis.ReviewNotes</MudText>
+                            }
+                        </MudAlert>
+                    }
+
                     @if (_selectedTransaction.RiskAnalysis.ReviewStatus == ReviewStatus.Pending ||
                          _selectedTransaction.RiskAnalysis.ReviewStatus == ReviewStatus.Escalated)
                     {
@@ -172,11 +191,14 @@
                                        OnClick="@(() => OpenRejectDialog())" Disabled="@_processing">
                                 Reject
                             </MudButton>
-                            <MudButton Variant="Variant.Outlined" Color="Color.Warning" FullWidth="true"
-                                       StartIcon="@Icons.Material.Filled.Escalator"
-                                       OnClick="@(() => EscalateTransaction())" Disabled="@_processing">
-                                Escalate
-                            </MudButton>
+                            @if (_selectedTransaction.RiskAnalysis.ReviewStatus == ReviewStatus.Pending)
+                            {
+                                <MudButton Variant="Variant.Outlined" Color="Color.Warning" FullWidth="true"
+                                           StartIcon="@Icons.Material.Filled.Escalator"
+                                           OnClick="@(() => EscalateTransaction())" Disabled="@_processing">
+                                    Escalate
+                                </MudButton>
+                            }
                         </MudStack>
                     }
                     else if (_selectedTransaction.RiskAnalysis.ReviewedAt.HasValue)
@@ -370,11 +392,14 @@ else
                                    OnClick="@(() => OpenRejectDialog())" Disabled="@_processing">
                             Reject
                         </MudButton>
-                        <MudButton Variant="Variant.Outlined" Color="Color.Warning" Size="Size.Small"
-                                   StartIcon="@Icons.Material.Filled.Escalator"
-                                   OnClick="@(() => EscalateFromDrawer())" Disabled="@_processing">
-                            Escalate
-                        </MudButton>
+                        @if (_selectedTransaction.RiskAnalysis?.ReviewStatus == ReviewStatus.Pending)
+                        {
+                            <MudButton Variant="Variant.Outlined" Color="Color.Warning" Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.Escalator"
+                                       OnClick="@(() => EscalateFromDrawer())" Disabled="@_processing">
+                                Escalate
+                            </MudButton>
+                        }
                     </MudStack>
                 }
                 
@@ -495,10 +520,10 @@ else
         _showApproveDialog = false;
         try
         {
-            await ReviewService.ApproveAsync(_selectedTransaction.RiskAnalysis.Id, CurrentUser.UserName, 
-                string.IsNullOrWhiteSpace(_reviewNotes) ? null : _reviewNotes);
+            await ReviewService.ApproveAsync(_selectedTransaction.RiskAnalysis.Id, CurrentUser.UserName, _reviewNotes);
             Snackbar.Add("Transaction approved successfully", Severity.Success);
             _selectedTransaction = await TransactionService.GetByIdAsync(_selectedTransaction.Id);
+            await LoadTransactions();
             _reviewNotes = "";
         }
         catch (Exception ex)
@@ -518,10 +543,10 @@ else
         _showRejectDialog = false;
         try
         {
-            await ReviewService.RejectAsync(_selectedTransaction.RiskAnalysis.Id, CurrentUser.UserName, 
-                string.IsNullOrWhiteSpace(_reviewNotes) ? null : _reviewNotes);
+            await ReviewService.RejectAsync(_selectedTransaction.RiskAnalysis.Id, CurrentUser.UserName, _reviewNotes);
             Snackbar.Add("Transaction rejected", Severity.Warning);
             _selectedTransaction = await TransactionService.GetByIdAsync(_selectedTransaction.Id);
+            await LoadTransactions();
             _reviewNotes = "";
         }
         catch (Exception ex)
@@ -543,6 +568,7 @@ else
             await ReviewService.EscalateAsync(_selectedTransaction.RiskAnalysis.Id, CurrentUser.UserName);
             Snackbar.Add("Transaction escalated for senior review", Severity.Info);
             _selectedTransaction = await TransactionService.GetByIdAsync(_selectedTransaction.Id);
+            await LoadTransactions();
         }
         catch (Exception ex)
         {

@@ -3,6 +3,10 @@
 @inject ISnackbar Snackbar
 @inject NavigationManager NavigationManager
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
+@implements IAsyncDisposable
+@using Microsoft.AspNetCore.SignalR.Client
+@using PayGuardAI.Core.Entities
+@using PayGuardAI.Web.Hubs
 
 <PageTitle>Pending Reviews - PayGuard AI</PageTitle>
 
@@ -30,13 +34,15 @@
             <MudText Class="mb-3">
                 You are about to <strong>approve</strong> transaction <strong>@_selectedReview.Transaction.ExternalId</strong>
             </MudText>
-            <MudTextField @bind-Value="_reviewNotes" Label="Approval Notes (Optional)" 
+            <MudTextField @bind-Value="_reviewNotes" Label="Approval Notes" Required="true"
                           Variant="Variant.Outlined" Lines="3" 
-                          Placeholder="Add any notes about your decision..." Class="mb-4" />
+                          Placeholder="Explain why you are approving this transaction..." Class="mb-4"
+                          RequiredError="Approval notes are required for compliance" />
         }
         <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2">
             <MudButton OnClick="@(() => _showApproveDialog = false)">Cancel</MudButton>
-            <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="@ApproveReview">Approve</MudButton>
+            <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="@ApproveReview"
+                       Disabled="@string.IsNullOrWhiteSpace(_reviewNotes)">Approve</MudButton>
         </MudStack>
     </MudPaper>
 </MudOverlay>
@@ -53,13 +59,15 @@
             <MudText Class="mb-3">
                 You are about to <strong>reject</strong> transaction <strong>@_selectedReview.Transaction.ExternalId</strong>
             </MudText>
-            <MudTextField @bind-Value="_reviewNotes" Label="Rejection Reason (Optional)" 
+            <MudTextField @bind-Value="_reviewNotes" Label="Rejection Reason" Required="true"
                           Variant="Variant.Outlined" Lines="3" 
-                          Placeholder="Explain why this transaction is being rejected..." Class="mb-4" />
+                          Placeholder="Explain why this transaction is being rejected..." Class="mb-4"
+                          RequiredError="A rejection reason is required for compliance" />
         }
         <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2">
             <MudButton OnClick="@(() => _showRejectDialog = false)">Cancel</MudButton>
-            <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="@RejectReview">Reject</MudButton>
+            <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="@RejectReview"
+                       Disabled="@string.IsNullOrWhiteSpace(_reviewNotes)">Reject</MudButton>
         </MudStack>
     </MudPaper>
 </MudOverlay>
@@ -128,6 +136,13 @@
                             <MudText Typo="Typo.caption" Class="mt-2">
                                 @review.RiskFactors.Count risk factor(s) detected
                             </MudText>
+                            @if (review.ReviewStatus == ReviewStatus.Escalated)
+                            {
+                                <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2" NoIcon="true">
+                                    <MudText Typo="Typo.caption"><strong>Escalated by:</strong> @review.ReviewedBy</MudText>
+                                    <MudText Typo="Typo.caption">@review.ReviewedAt?.ToString("MMM dd, HH:mm")</MudText>
+                                </MudAlert>
+                            }
                         </MudItem>
                         <MudItem xs="12" md="3">
                             <MudStack>
@@ -169,10 +184,39 @@
     private string _reviewNotes = "";
     private bool _showApproveDialog = false;
     private bool _showRejectDialog = false;
+    private HubConnection? _hubConnection;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadReviews();
+        await SetupSignalRConnection();
+    }
+
+    private async Task SetupSignalRConnection()
+    {
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/hubs/transactions"))
+            .WithAutomaticReconnect()
+            .Build();
+        
+        _hubConnection.On<TransactionNotification>("NewTransaction", async (notification) =>
+        {
+            // Auto-refresh if a Medium+ risk transaction comes in
+            if (notification.RiskLevel >= RiskLevel.Medium)
+            {
+                await LoadReviews();
+                Snackbar.Add($"New {notification.RiskLevel} risk transaction requires review", Severity.Warning);
+            }
+        });
+        
+        try
+        {
+            await _hubConnection.StartAsync();
+        }
+        catch
+        {
+            // SignalR will auto-reconnect
+        }
     }
 
     private async Task LoadReviews()
@@ -217,8 +261,7 @@
         _showApproveDialog = false;
         try
         {
-            await ReviewService.ApproveAsync(_selectedReview.Id, CurrentUser.UserName, 
-                string.IsNullOrWhiteSpace(_reviewNotes) ? null : _reviewNotes);
+            await ReviewService.ApproveAsync(_selectedReview.Id, CurrentUser.UserName, _reviewNotes);
             Snackbar.Add($"Transaction approved", Severity.Success);
             _reviews.Remove(_selectedReview);
             _reviewNotes = "";
@@ -241,8 +284,7 @@
         _showRejectDialog = false;
         try
         {
-            await ReviewService.RejectAsync(_selectedReview.Id, CurrentUser.UserName, 
-                string.IsNullOrWhiteSpace(_reviewNotes) ? null : _reviewNotes);
+            await ReviewService.RejectAsync(_selectedReview.Id, CurrentUser.UserName, _reviewNotes);
             Snackbar.Add($"Transaction rejected", Severity.Warning);
             _reviews.Remove(_selectedReview);
             _reviewNotes = "";
@@ -265,4 +307,12 @@
         RiskLevel.Critical => Color.Dark,
         _ => Color.Default
     };
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection is not null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
 }
