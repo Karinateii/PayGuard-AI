@@ -1,0 +1,132 @@
+@page "/mfa/verify"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using PayGuardAI.Web.Services
+@inject IMfaService MfaService
+@inject NavigationManager Navigation
+@attribute [Authorize]
+
+<PageTitle>Verify Two-Factor Code - PayGuard AI</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center" Style="min-height: 100vh;">
+    <MudPaper Elevation="3" Class="pa-8" Style="width: 100%;">
+        <div class="text-center mb-6">
+            <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Large" Color="Color.Primary" />
+            <MudText Typo="Typo.h4" Class="mt-4">Two-Factor Authentication</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Enter the 6-digit code from your authenticator app
+            </MudText>
+        </div>
+
+        <MudTextField @bind-Value="_verificationCode"
+                      Label="Verification Code"
+                      Variant="Variant.Outlined"
+                      MaxLength="6"
+                      Mask="@(new PatternMask("000000"))"
+                      HelperText="6-digit code"
+                      Immediate="true"
+                      FullWidth="true"
+                      Class="mb-4"
+                      AutoFocus="true" />
+
+        @if (_failedAttempts > 0)
+        {
+            <MudAlert Severity="Severity.Warning" Class="mb-4">
+                Invalid code. @(_maxAttempts - _failedAttempts) attempts remaining.
+            </MudAlert>
+        }
+
+        @if (_isLockedOut)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">
+                Too many failed attempts. Your account has been temporarily locked.
+                Please try again in @_lockoutMinutes minutes.
+            </MudAlert>
+        }
+
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Primary" 
+                   FullWidth="true"
+                   Size="Size.Large"
+                   OnClick="VerifyCode"
+                   Disabled="@(_verificationCode?.Length != 6 || _isLockedOut)">
+            Verify
+        </MudButton>
+
+        <MudDivider Class="my-4" />
+
+        <MudText Typo="Typo.body2" Align="Align.Center" Class="mb-2">
+            Lost access to your authenticator?
+        </MudText>
+
+        <MudButton Variant="Variant.Text" 
+                   Color="Color.Secondary" 
+                   FullWidth="true"
+                   StartIcon="@Icons.Material.Filled.Help"
+                   Href="/mfa/backup-codes">
+            Use Backup Code
+        </MudButton>
+
+        <MudButton Variant="Variant.Text" 
+                   Color="Color.Secondary" 
+                   FullWidth="true"
+                   StartIcon="@Icons.Material.Filled.Logout"
+                   Href="/logout"
+                   Class="mt-2">
+            Sign Out
+        </MudButton>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    private string _verificationCode = string.Empty;
+    private int _failedAttempts = 0;
+    private int _maxAttempts = 5;
+    private bool _isLockedOut = false;
+    private int _lockoutMinutes = 15;
+    private string _userSecret = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // TODO: Retrieve user's MFA secret from database
+        // For now, using a placeholder
+        if (AuthState != null)
+        {
+            var authState = await AuthState;
+            var userId = authState.User.Identity?.Name ?? "";
+            
+            // In production, fetch from database:
+            // _userSecret = await GetUserMfaSecret(userId);
+        }
+    }
+
+    private void VerifyCode()
+    {
+        if (string.IsNullOrWhiteSpace(_userSecret))
+        {
+            // MFA not set up yet, redirect to setup
+            Navigation.NavigateTo("/mfa/setup");
+            return;
+        }
+
+        if (MfaService.ValidateCode(_userSecret, _verificationCode))
+        {
+            // Success - redirect to intended destination
+            Navigation.NavigateTo("/");
+        }
+        else
+        {
+            _failedAttempts++;
+            _verificationCode = string.Empty;
+
+            if (_failedAttempts >= _maxAttempts)
+            {
+                _isLockedOut = true;
+                // TODO: Implement actual lockout in database with timestamp
+            }
+        }
+    }
+}

@@ -8,6 +8,7 @@ using PayGuardAI.Data.Services;
 using PayGuardAI.Web;
 using PayGuardAI.Web.Components;
 using PayGuardAI.Web.Hubs;
+using PayGuardAI.Web.Models;
 using PayGuardAI.Web.Services;
 using System.Threading.RateLimiting;
 
@@ -23,17 +24,14 @@ builder.Services.AddSignalR();
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpContextAccessor();
 
-// Add authentication & authorization (demo scheme)
-builder.Services.AddAuthentication("Demo")
-    .AddScheme<AuthenticationSchemeOptions, DemoAuthenticationHandler>("Demo", _ => { });
+// Add authentication with feature flag support (OAuth or Demo)
+builder.Services.AddPayGuardAuthentication(builder.Configuration);
 
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("RequireReviewer", policy => policy.RequireRole("Reviewer", "Manager", "Admin"));
     options.AddPolicy("RequireManager", policy => policy.RequireRole("Manager", "Admin"));
 });
-
-builder.Services.AddCascadingAuthenticationState();
 
 // Add rate limiting
 builder.Services.AddRateLimiter(options =>
@@ -80,6 +78,13 @@ builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.AddScoped<IAlertingService, AlertingService>();
 builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<IDatabaseMigrationService, DatabaseMigrationService>();
+
+// Register MFA service
+builder.Services.Configure<MfaSettings>(builder.Configuration.GetSection("Mfa"));
+builder.Services.AddScoped<IMfaService, TotpMfaService>();
+
+// Configure OAuth settings
+builder.Services.Configure<OAuthSettings>(builder.Configuration.GetSection("OAuth"));
 
 // Register Afriex API services
 builder.Services.AddHttpClient<IAfriexApiService, AfriexApiService>();

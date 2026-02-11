@@ -1,0 +1,72 @@
+@page "/login"
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.OpenIdConnect
+@inject IConfiguration Configuration
+@inject NavigationManager Navigation
+
+<PageTitle>Login - PayGuard AI</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center" Style="min-height: 100vh;">
+    <MudPaper Elevation="3" Class="pa-8" Style="width: 100%;">
+        <div class="text-center mb-6">
+            <MudIcon Icon="@Icons.Material.Filled.Security" Size="Size.Large" Color="Color.Primary" />
+            <MudText Typo="Typo.h4" Class="mt-4">PayGuard AI</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Cross-Border Payment Risk Monitoring</MudText>
+        </div>
+
+        @if (_isOAuthEnabled)
+        {
+            <MudButton Variant="Variant.Filled" 
+                       Color="Color.Primary" 
+                       FullWidth="true"
+                       Size="Size.Large"
+                       StartIcon="@Icons.Material.Filled.Login"
+                       OnClick="HandleOAuthLogin">
+                Sign in with Microsoft
+            </MudButton>
+
+            <MudText Typo="Typo.caption" Align="Align.Center" Class="mt-4" Color="Color.Secondary">
+                Secure OAuth 2.0 authentication powered by Azure AD
+            </MudText>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-4">
+                Demo mode is active. OAuth authentication is disabled.
+            </MudAlert>
+
+            <MudButton Variant="Variant.Filled" 
+                       Color="Color.Primary" 
+                       FullWidth="true"
+                       Size="Size.Large"
+                       StartIcon="@Icons.Material.Filled.Home"
+                       Href="/">
+                Continue to Dashboard
+            </MudButton>
+
+            <MudText Typo="Typo.caption" Align="Align.Center" Class="mt-4" Color="Color.Secondary">
+                To enable OAuth, set FeatureFlags:OAuthEnabled to true in appsettings.json
+            </MudText>
+        }
+
+        <MudDivider Class="my-6" />
+
+        <MudText Typo="Typo.caption" Align="Align.Center" Color="Color.Secondary">
+            © @DateTime.Now.Year PayGuard AI. All rights reserved.
+        </MudText>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private bool _isOAuthEnabled;
+
+    protected override void OnInitialized()
+    {
+        _isOAuthEnabled = Configuration.IsOAuthEnabled();
+    }
+
+    private void HandleOAuthLogin()
+    {
+        Navigation.NavigateTo($"/signin-oidc", forceLoad: true);
+    }
+}

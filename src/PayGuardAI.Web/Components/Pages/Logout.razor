@@ -1,0 +1,34 @@
+@page "/logout"
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
+@using Microsoft.AspNetCore.Authentication.OpenIdConnect
+@inject IConfiguration Configuration
+@inject NavigationManager Navigation
+
+<PageTitle>Logout - PayGuard AI</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center" Style="min-height: 100vh;">
+    <MudPaper Elevation="3" Class="pa-8 text-center" Style="width: 100%;">
+        <MudProgressCircular Indeterminate="true" Size="Size.Large" Color="Color.Primary" />
+        <MudText Typo="Typo.h5" Class="mt-6">Signing out...</MudText>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        var isOAuthEnabled = Configuration.IsOAuthEnabled();
+        
+        if (isOAuthEnabled)
+        {
+            // OAuth logout
+            Navigation.NavigateTo("/signout-oidc", forceLoad: true);
+        }
+        else
+        {
+            // Demo mode - just redirect to home
+            await Task.Delay(500); // Brief delay for visual feedback
+            Navigation.NavigateTo("/", forceLoad: true);
+        }
+    }
+}
