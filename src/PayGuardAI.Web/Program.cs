@@ -86,8 +86,13 @@ builder.Services.AddScoped<IMfaService, TotpMfaService>();
 // Configure OAuth settings
 builder.Services.Configure<OAuthSettings>(builder.Configuration.GetSection("OAuth"));
 
-// Register Afriex API services
+// Register payment providers
 builder.Services.AddHttpClient<IAfriexApiService, AfriexApiService>();
+builder.Services.AddScoped<AfriexProvider>();
+builder.Services.AddHttpClient<FlutterwaveProvider>();
+builder.Services.AddScoped<IPaymentProviderFactory, PaymentProviderFactory>();
+
+// Register webhook signature service
 builder.Services.AddSingleton<IWebhookSignatureService, WebhookSignatureService>();
 
 // Add controllers for API endpoints (webhooks)

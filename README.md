@@ -36,7 +36,7 @@ PayGuard AI automates the first line of defense while keeping humans in control 
 - 📋 **Rules Management** - Create, edit, and toggle risk detection rules
 - 📈 **Compliance Reports** - Visual analytics with risk distribution charts
 - 📝 **Audit Logging** - Complete history of all actions and decisions
-- 🔗 **Afriex API Integration** - Direct integration with Afriex Business API
+- � **Multi-Provider Support** - Unified abstraction for Afriex, Flutterwave, Wise, and other payment platforms
 - 🔐 **OAuth 2.0 & MFA** - Production-ready authentication with Azure AD/Google/Okta + TOTP two-factor authentication
 - 🏢 **Multi-Tenancy** - Tenant-scoped data isolation via middleware
 - 🚦 **Rate Limiting** - Fixed-window rate limiter scoped per tenant
@@ -54,7 +54,8 @@ PayGuard AI automates the first line of defense while keeping humans in control 
 | **Backend** | ASP.NET Core 10 |
 | **Database** | SQLite with Entity Framework Core |
 | **Real-time** | SignalR WebSockets |
-| **Auth** | Custom auth handler with RBAC policies |
+| **Auth** | OAuth 2.0 / OpenID Connect + TOTP MFA |
+| **Providers** | Afriex (primary), Flutterwave (feature flag) |
 | **Caching** | IMemoryCache (tenant-scoped) |
 | **Rate Limiting** | ASP.NET Core Rate Limiting (per-tenant) |
 | **Monitoring** | Health checks, structured request logging |
@@ -203,21 +204,73 @@ cd src/PayGuardAI.Web
 dotnet user-secrets set "Afriex:ApiKey" "your_api_key_here"
 ```
 
+## Multi-Provider Integration
+
+PayGuard AI supports multiple payment providers through a unified abstraction layer. Add new providers without changing core business logic.
+
+### Supported Providers
+
+**Afriex** (Primary)
+- Endpoint: `POST /api/webhooks/afriex`
+- Status: ✅ Always enabled
+- Configuration: `Afriex:ApiKey`, `Afriex:WebhookPublicKey`
+
+**Flutterwave** (Feature Flag)
+- Endpoint: `POST /api/webhooks/flutterwave`
+- Status: ⚙️ Enable with `FeatureFlags:FlutterwaveEnabled = true`
+- Configuration: `Flutterwave:SecretKey`, `Flutterwave:WebhookSecretHash`
+
+**Adding New Providers:**
+1. Implement `IPaymentProvider` interface
+2. Add configuration to appsettings.json
+3. Register in `Program.cs`
+4. Add webhook endpoint in `WebhooksController`
+
+### Provider Configuration
+
+```json
+{
+  "FeatureFlags": {
+    "FlutterwaveEnabled": false
+  },
+  "Afriex": {
+    "BaseUrl": "https://staging.afx-server.com",
+    "ApiKey": "your-api-key",
+    "WebhookPublicKey": "your-webhook-public-key"
+  },
+  "Flutterwave": {
+    "BaseUrl": "https://api.flutterwave.com/v3",
+    "SecretKey": "your-secret-key",
+    "WebhookSecretHash": "your-webhook-hash"
+  }
+}
+```
+
 ## Webhook Integration
 
-PayGuard AI receives transaction data via webhooks. The endpoint accepts POST requests at:
+PayGuard AI receives transaction data via webhooks with automatic normalization across providers.
+
+### Webhook Endpoints
 
 ```
-POST /api/webhooks/transaction
+POST /api/webhooks/afriex       # Afriex transactions
+POST /api/webhooks/flutterwave  # Flutterwave transactions
+POST /api/webhooks/transaction  # Legacy (defaults to Afriex)
 ```
 
 ### Supported Events
 
+**Afriex:**
 - `TRANSACTION.CREATED` - New transaction received
 - `TRANSACTION.UPDATED` - Transaction status changed
 
-### Example Payload
+**Flutterwave:**
+- `charge.completed` - Payment successful
+- `transfer.completed` - Transfer completed
 
+### Example Payloads
+
+**Afriex:**
 ```json
 {
   "event": "TRANSACTION.CREATED",
@@ -233,12 +286,38 @@ POST /api/webhooks/transaction
 }
 ```
 
+**Flutterwave:**
+```json
+{
+  "event": "charge.completed",
+  "data": {
+    "id": 123456,
+    "tx_ref": "FLW-TXN-123",
+    "amount": 500,
+    "currency": "USD",
+    "status": "successful",
+    "customer": {
+      "email": "customer@example.com"
+    }
+  }
+}
+```
+
 ### Testing Webhooks
 
+**Afriex:**
 ```bash
-curl -X POST http://localhost:5054/api/webhooks/transaction \
+curl -X POST http://localhost:5054/api/webhooks/afriex \
   -H "Content-Type: application/json" \
   -d '{"event":"TRANSACTION.CREATED","data":{"transactionId":"TEST-001","sourceAmount":"100","sourceCurrency":"USD","destinationAmount":"150000","destinationCurrency":"NGN","status":"PENDING"}}'
+```
+
+**Flutterwave:**
+```bash
+curl -X POST http://localhost:5054/api/webhooks/flutterwave \
+  -H "Content-Type: application/json" \
+  -H "verif-hash: your-webhook-hash" \
+  -d '{"event":"charge.completed","data":{"id":123,"amount":100,"currency":"USD","status":"successful"}}'
 ```
 
 ## Risk Scoring
