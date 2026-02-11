@@ -78,6 +78,7 @@ builder.Services.AddScoped<DemoDataSeeder>();
 builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.AddScoped<IAlertingService, AlertingService>();
 builder.Services.AddScoped<CurrentUserService>();
+builder.Services.AddScoped<IDatabaseMigrationService, DatabaseMigrationService>();
 
 // Register Afriex API services
 builder.Services.AddHttpClient<IAfriexApiService, AfriexApiService>();
@@ -95,8 +96,11 @@ var app = builder.Build();
 // Ensure database is created and seed demo data
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    db.Database.EnsureCreated();
+    var migrationService = scope.ServiceProvider.GetRequiredService<IDatabaseMigrationService>();
+    await migrationService.EnsureDatabaseReadyAsync();
+    
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    logger.LogInformation("Active database: {DatabaseType}", migrationService.GetActiveDatabaseType());
     
     // Seed demo data in development
     if (app.Environment.IsDevelopment())
