@@ -5,6 +5,7 @@ using MudBlazor.Services;
 using PayGuardAI.Core.Services;
 using PayGuardAI.Data;
 using PayGuardAI.Data.Services;
+using PayGuardAI.Web;
 using PayGuardAI.Web.Components;
 using PayGuardAI.Web.Hubs;
 using PayGuardAI.Web.Services;
@@ -55,7 +56,7 @@ builder.Services.AddHttpLogging(_ => { });
 builder.Services.AddHealthChecks();
 
 // Add Entity Framework with feature flag-based database selection
-var usePostgres = builder.Configuration.GetValue<bool>("FeatureFlags:PostgresEnabled");
+var usePostgres = builder.Configuration.IsPostgresEnabled();
 
 if (usePostgres)
 {
