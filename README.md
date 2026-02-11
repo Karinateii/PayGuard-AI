@@ -37,13 +37,14 @@ PayGuard AI automates the first line of defense while keeping humans in control 
 - 📈 **Compliance Reports** - Visual analytics with risk distribution charts
 - 📝 **Audit Logging** - Complete history of all actions and decisions
 - 🔗 **Afriex API Integration** - Direct integration with Afriex Business API
-- 🔐 **Authentication & RBAC** - Role-based access control with Reviewer, Manager, and Admin roles
+- 🔐 **OAuth 2.0 & MFA** - Production-ready authentication with Azure AD/Google/Okta + TOTP two-factor authentication
 - 🏢 **Multi-Tenancy** - Tenant-scoped data isolation via middleware
 - 🚦 **Rate Limiting** - Fixed-window rate limiter scoped per tenant
 - 💾 **Response Caching** - In-memory caching for dashboard stats, transactions, and exchange rates
 - 🚨 **Alerting Service** - Automatic alerts for critical-risk transactions
 - 📡 **Health Checks** - `/health` endpoint for uptime monitoring
 - 📊 **Request Logging** - Structured request/response logging with slow-request warnings
+- 🚩 **Feature Flags** - Safe deployment with instant rollback (OAuth, PostgreSQL, Flutterwave)
 
 ## Tech Stack
 
@@ -143,6 +144,55 @@ PayGuardAI/
    ```
 
 The app comes with 25 demo transactions pre-seeded for testing.
+
+## Authentication & Security
+
+PayGuard AI supports two authentication modes via feature flags:
+
+### Development Mode (Default)
+Demo authentication is enabled by default for quick testing:
+- Access the dashboard immediately at `http://localhost:5054`
+- Demo user: `compliance_officer@payguard.ai` (Reviewer, Manager roles)
+- No login required
+
+### Production Mode (OAuth 2.0 + MFA)
+
+Enable enterprise-grade authentication by setting `FeatureFlags:OAuthEnabled` to `true` in `appsettings.json`:
+
+```json
+{
+  "FeatureFlags": {
+    "OAuthEnabled": true
+  },
+  "OAuth": {
+    "Provider": "AzureAD",
+    "TenantId": "your-tenant-id",
+    "ClientId": "your-client-id",
+    "ClientSecret": "your-client-secret",
+    "Authority": "https://login.microsoftonline.com/{tenant}/v2.0"
+  },
+  "Mfa": {
+    "EnforceMfaForAll": false,
+    "RequiredMfaRoles": ["Admin", "Manager"]
+  }
+}
+```
+
+**Supported OAuth Providers:**
+- Azure Active Directory (Azure AD)
+- Google Workspace
+- Okta
+- Any OpenID Connect compliant provider
+
+**Multi-Factor Authentication (TOTP):**
+- RFC 6238 compliant TOTP implementation
+- Works with Google Authenticator, Microsoft Authenticator, Authy
+- Backup codes for account recovery
+- Role-based MFA enforcement
+- QR code setup flow at `/mfa/setup`
+
+**Quick Switch:**
+Toggle between Demo and OAuth mode instantly — no code changes, just restart the app after updating the feature flag.
 
 ### Configure Afriex API (Optional)
 
