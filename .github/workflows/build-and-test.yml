@@ -36,15 +36,29 @@ jobs:
     - name: Build solution
       run: dotnet build --no-restore --configuration Release
 
-    - name: Run unit tests
-      run: dotnet test --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx" --results-directory ./TestResults
+    - name: Check working directory and test project
+      run: |
+        echo "Current directory: $(pwd)"
+        echo "Files in current directory:"
+        ls -la
+        echo ""
+        echo "Test project location:"
+        find . -name "PayGuardAI.Tests.csproj" -type f
 
-    - name: List test results
+    - name: Run unit tests
+      run: dotnet test tests/PayGuardAI.Tests/PayGuardAI.Tests.csproj --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx" --results-directory ./TestResults
+
+    - name: List test results after run
       if: always()
       run: |
         echo "Looking for test result files..."
-        find . -name "*.trx" -type f 2>/dev/null || echo "No .trx files found"
+        find . -name "*.trx" -type f
+        echo ""
+        echo "TestResults directory contents:"
         ls -la ./TestResults/ 2>/dev/null || echo "TestResults directory not found"
+        echo ""
+        echo "Current directory contents:"
+        ls -la
 
     - name: Publish test results
       uses: dorny/test-reporter@v1
