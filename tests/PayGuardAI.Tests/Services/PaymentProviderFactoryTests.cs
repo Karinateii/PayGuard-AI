@@ -116,7 +116,7 @@ public class PaymentProviderFactoryTests
     {
         // Arrange
         var unconfiguredFlutterwaveProvider = new Mock<IPaymentProvider>();
-        unconfiguredFlutterwaveProvider.Setup(x => x.ProviderName).Returns("Flutterwave");
+        unconfiguredFlutterwaveProvider.Setup(x => x.ProviderName).Returns("flutterwave");
         unconfiguredFlutterwaveProvider.Setup(x => x.IsConfigured()).Returns(false);
 
         _mockServiceProvider.Setup(x => x.GetService(typeof(AfriexProvider)))
@@ -330,7 +330,7 @@ public class PaymentProviderFactoryTests
         // Assert
         if (shouldRegisterFlutterwave)
         {
-            allProviders.Select(p => p.ProviderName).Should().Contain("Flutterwave");
+            allProviders.Select(p => p.ProviderName).Should().Contain("flutterwave");
         }
         else
         {

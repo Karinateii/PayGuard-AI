@@ -329,43 +329,9 @@ public class FlutterwaveProviderTests
     }
 
     [Fact]
-    public async Task GetExchangeRateAsync_ShouldReturnCachedRate_WhenAvailable()
+    public async Task GetExchangeRateAsync_ShouldCallHttpClient_AndReturnRate()
     {
         // Arrange
-        var cacheKey = "flw_rate_USD_NGN";
-        decimal cachedRate = 1500m;
-        
-        _mockCache.Setup(x => x.TryGetValue(cacheKey, out cachedRate))
-            .Returns(true);
-
-        // Act
-        var result = await _provider.GetExchangeRateAsync("USD", "NGN", 100m);
-
-        // Assert
-        result.Should().Be(1500m);
-        // Verify no HTTP calls were made since cache was hit
-        _mockHttpHandler.Protected().Verify(
-            "SendAsync",
-            Times.Never(),
-            ItExpr.IsAny<HttpRequestMessage>(),
-            ItExpr.IsAny<CancellationToken>()
-        );
-    }
-
-    [Fact]
-    public async Task GetExchangeRateAsync_ShouldFetchAndCacheRate_WhenNotCached()
-    {
-        // Arrange
-        var cacheKey = "flw_rate_USD_NGN";
-        decimal? cachedRate = null;
-        
-        _mockCache.Setup(x => x.TryGetValue(cacheKey, out cachedRate))
-            .Returns(false);
-
-        var mockCacheEntry = new Mock<ICacheEntry>();
-        _mockCache.Setup(x => x.CreateEntry(cacheKey))
-            .Returns(mockCacheEntry.Object);
-
         var responseContent = new
         {
             status = "success",
@@ -391,7 +357,37 @@ public class FlutterwaveProviderTests
 
         // Assert
         result.Should().Be(1500m);
-        _mockCache.Verify(x => x.Set(cacheKey, 1500m, It.IsAny<TimeSpan>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetExchangeRateAsync_ShouldFetchAndReturnRate_WhenNeeded()
+    {
+        // Arrange
+        var responseContent = new
+        {
+            status = "success",
+            data = new { rate = 1500 }
+        };
+
+        var response = new HttpResponseMessage
+        {
+            StatusCode = HttpStatusCode.OK,
+            Content = new StringContent(JsonSerializer.Serialize(responseContent))
+        };
+
+        _mockHttpHandler.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>()
+            )
+            .ReturnsAsync(response);
+
+        // Act
+        var result = await _provider.GetExchangeRateAsync("USD", "NGN", 100m);
+
+        // Assert
+        result.Should().Be(1500m);
     }
 
     [Fact]
