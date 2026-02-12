@@ -121,8 +121,11 @@ PayGuardAI/
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - Git
+- Docker Desktop (optional, for containerized deployment)
 
 ### Installation
+
+#### Option 1: Local Development (Recommended for Development)
 
 1. **Clone the repository**
    ```bash
@@ -146,7 +149,40 @@ PayGuardAI/
    http://localhost:5054
    ```
 
+#### Option 2: Docker (Recommended for Production)
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/Karinateii/PayGuard-AI.git
+   cd PayGuard-AI
+   ```
+
+2. **Start with Docker Compose**
+   ```bash
+   ./start-docker.sh
+   # Or manually: docker-compose up -d
+   ```
+
+3. **Open in browser**
+   ```
+   http://localhost:5054
+   ```
+
+4. **View logs**
+   ```bash
+   docker-compose logs -f payguard-web
+   ```
+
+5. **Stop containers**
+   ```bash
+   docker-compose down
+   ```
+
 The app comes with 25 demo transactions pre-seeded for testing.
+
+### Deployment
+
+For production deployment to Heroku or other cloud platforms, see [DOCKER-HEROKU-GUIDE.md](DOCKER-HEROKU-GUIDE.md).
 
 ## Authentication & Security
 
