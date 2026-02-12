@@ -5,7 +5,7 @@
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
 [![Blazor](https://img.shields.io/badge/Blazor-Server-512BD4)](https://blazor.net/)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/Karinateii/PayGuard-AI/build-and-test.yml?branch=main&label=build)](https://github.com/Karinateii/PayGuard-AI/actions)
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/Karinateii/PayGuard-AI/actions)
+[![Tests](https://img.shields.io/badge/tests-70%2F70%20passing-brightgreen)](https://github.com/Karinateii/PayGuard-AI/actions)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ## Overview
