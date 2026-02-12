@@ -48,10 +48,14 @@ ScaffoldingReadMe.txt
 # Entity Framework
 migrations/
 
+# Local documentation (deployment guides)
+DEPLOYMENT.md
+
 # Documentation (keep locally, hide from GitHub)
 FLUTTERWAVE-SETUP.md
 MULTI-PROVIDER-VERIFICATION.md
 PROVIDER-TEST-PAYLOADS.md
+DEPLOYMENT-GUIDE.md
 
 # Secrets
 appsettings.Development.json
