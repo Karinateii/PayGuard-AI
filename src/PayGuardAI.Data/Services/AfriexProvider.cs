@@ -32,7 +32,8 @@ public class AfriexProvider : IPaymentProvider
         {
             // Parse Afriex webhook payload
             var json = webhookPayload is string str ? str : JsonSerializer.Serialize(webhookPayload);
-            var payload = JsonSerializer.Deserialize<AfriexWebhookPayload>(json);
+            var payload = JsonSerializer.Deserialize<AfriexWebhookPayload>(json,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
             if (payload?.Data == null)
             {

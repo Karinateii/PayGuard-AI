@@ -22,13 +22,13 @@ public class PaymentProviderFactoryTests
         _mockConfiguration = new Mock<IConfiguration>();
         _mockLogger = new Mock<ILogger<PaymentProviderFactory>>();
 
-        // Setup mock providers
+        // Setup mock providers with lowercase names to match implementation
         _mockAfriexProvider = new Mock<IPaymentProvider>();
-        _mockAfriexProvider.Setup(x => x.ProviderName).Returns("Afriex");
+        _mockAfriexProvider.Setup(x => x.ProviderName).Returns("afriex");
         _mockAfriexProvider.Setup(x => x.IsConfigured()).Returns(true);
 
         _mockFlutterwaveProvider = new Mock<IPaymentProvider>();
-        _mockFlutterwaveProvider.Setup(x => x.ProviderName).Returns("Flutterwave");
+        _mockFlutterwaveProvider.Setup(x => x.ProviderName).Returns("flutterwave");
         _mockFlutterwaveProvider.Setup(x => x.IsConfigured()).Returns(true);
     }
 
@@ -54,7 +54,7 @@ public class PaymentProviderFactoryTests
 
         // Assert
         allProviders.Should().ContainSingle();
-        allProviders.First().ProviderName.Should().Be("Afriex");
+        allProviders.First().ProviderName.Should().Be("afriex");
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public class PaymentProviderFactoryTests
 
         // Assert
         allProviders.Should().HaveCount(2);
-        allProviders.Select(p => p.ProviderName).Should().Contain(new[] { "Afriex", "Flutterwave" });
+        allProviders.Select(p => p.ProviderName).Should().Contain(new[] { "afriex", "flutterwave" });
     }
 
     [Fact]
@@ -220,7 +220,7 @@ public class PaymentProviderFactoryTests
     }
 
     [Fact]
-    public void GetProviderByName_ShouldReturnNull_WhenProviderNotExists()
+    public void GetProviderByName_ShouldThrowException_WhenProviderNotFound()
     {
         // Arrange
         _mockServiceProvider.Setup(x => x.GetService(typeof(AfriexProvider)))
@@ -237,10 +237,11 @@ public class PaymentProviderFactoryTests
         );
 
         // Act
-        var provider = factory.GetProviderByName("wise");
+        Action act = () => factory.GetProviderByName("wise");
 
         // Assert
-        provider.Should().BeNull();
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("*Payment provider 'wise' is not registered*");
     }
 
     [Fact]
@@ -292,7 +293,7 @@ public class PaymentProviderFactoryTests
 
         // Assert
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*No payment providers available*");
+            .WithMessage("*No payment providers are configured*");
     }
 
     [Theory]

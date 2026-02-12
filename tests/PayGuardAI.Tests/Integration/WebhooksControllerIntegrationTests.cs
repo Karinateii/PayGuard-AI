@@ -33,7 +33,7 @@ public class WebhooksControllerIntegrationTests : IClassFixture<PayGuardApiWebAp
         var content = await response.Content.ReadAsStringAsync();
         content.Should().Contain("healthy");
         content.Should().Contain("PayGuard AI");
-        content.Should().Contain("Afriex");
+        content.Should().Contain("afriex");
     }
 
     [Fact]
@@ -49,7 +49,7 @@ public class WebhooksControllerIntegrationTests : IClassFixture<PayGuardApiWebAp
         content.Should().NotBeNull();
         content!.Status.Should().Be("healthy");
         content.Providers.Should().NotBeEmpty();
-        content.Providers.Should().Contain(p => p.Name == "Afriex");
+        content.Providers.Should().Contain(p => p.Name == "afriex");
     }
 
     [Fact]

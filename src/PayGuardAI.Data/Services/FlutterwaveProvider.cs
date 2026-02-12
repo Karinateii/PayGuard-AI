@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -199,16 +200,33 @@ internal class FlutterwaveWebhookPayload
 internal class FlutterwaveWebhookData
 {
     public int? Id { get; set; }
+    
+    [JsonPropertyName("tx_ref")]
     public string? TxRef { get; set; }
+    
+    [JsonPropertyName("flw_ref")]
     public string? FlwRef { get; set; }
+    
     public string? Currency { get; set; }
+    
+    [JsonPropertyName("destination_currency")]
     public string? DestinationCurrency { get; set; }
+    
     public decimal? Amount { get; set; }
+    
+    [JsonPropertyName("amount_settled")]
     public decimal? AmountSettled { get; set; }
+    
     public string? Status { get; set; }
+    
+    [JsonPropertyName("payment_type")]
     public string? PaymentType { get; set; }
+    
     public string? Narration { get; set; }
+    
+    [JsonPropertyName("created_at")]
     public DateTime? CreatedAt { get; set; }
+    
     public FlutterwaveCustomer? Customer { get; set; }
 }
 
@@ -216,7 +234,10 @@ internal class FlutterwaveCustomer
 {
     public int? Id { get; set; }
     public string? Email { get; set; }
+    
+    [JsonPropertyName("phone_number")]
     public string? PhoneNumber { get; set; }
+    
     public string? Name { get; set; }
     public string? Country { get; set; }
 }
