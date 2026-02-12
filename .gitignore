@@ -84,7 +84,12 @@ node_modules/
 .env
 .env.local
 .env.*.local
+
 # SQLite database files
 *.db
 *.db-shm
-*.db-waldocumentation/
+*.db-wal
+
+# Local deployment guides (keep private until ready to publish)
+DOCKER-HEROKU-GUIDE.md
+documentation/
