@@ -184,7 +184,7 @@ public class FlutterwaveProvider : IPaymentProvider
             var type when type.Contains("ghana") => "GH",
             var type when type.Contains("uganda") => "UG",
             var type when type.Contains("south_africa") => "ZA",
-            _ => "NG" // Default to Nigeria
+            _ => null // Return null for unknown types (like "card") so ?? fallback applies
         };
     }
 }

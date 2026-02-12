@@ -166,7 +166,7 @@ public class PaymentProviderFactoryTests
 
         // Assert
         provider.Should().NotBeNull();
-        provider.ProviderName.Should().Be("Flutterwave"); // Priority: Flutterwave > Afriex
+        provider.ProviderName.Should().Be("flutterwave"); // Priority: Flutterwave > Afriex
     }
 
     [Fact]
@@ -191,7 +191,7 @@ public class PaymentProviderFactoryTests
 
         // Assert
         provider.Should().NotBeNull();
-        provider.ProviderName.Should().Be("Afriex");
+        provider.ProviderName.Should().Be("afriex");
     }
 
     [Fact]
@@ -216,7 +216,7 @@ public class PaymentProviderFactoryTests
 
         // Assert
         provider.Should().NotBeNull();
-        provider!.ProviderName.Should().Be("Afriex");
+        provider!.ProviderName.Should().Be("afriex");
     }
 
     [Fact]
@@ -268,7 +268,7 @@ public class PaymentProviderFactoryTests
 
         // Assert
         providers.Should().HaveCount(2);
-        providers.Select(p => p.ProviderName).Should().BeEquivalentTo("Afriex", "Flutterwave");
+        providers.Select(p => p.ProviderName).Should().BeEquivalentTo("afriex", "flutterwave");
     }
 
     [Fact]

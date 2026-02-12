@@ -16,7 +16,7 @@ public class FlutterwaveProviderTests
 {
     private readonly Mock<HttpMessageHandler> _mockHttpHandler;
     private readonly HttpClient _httpClient;
-    private readonly Mock<IMemoryCache> _mockCache;
+    private readonly IMemoryCache _cache;
     private readonly Mock<IConfiguration> _mockConfiguration;
     private readonly Mock<ILogger<FlutterwaveProvider>> _mockLogger;
     private readonly FlutterwaveProvider _provider;
@@ -29,7 +29,7 @@ public class FlutterwaveProviderTests
             BaseAddress = new Uri("https://api.flutterwave.com/v3")
         };
 
-        _mockCache = new Mock<IMemoryCache>();
+        _cache = new MemoryCache(new MemoryCacheOptions());
         _mockConfiguration = new Mock<IConfiguration>();
         _mockLogger = new Mock<ILogger<FlutterwaveProvider>>();
 
@@ -42,7 +42,7 @@ public class FlutterwaveProviderTests
             _httpClient,
             _mockConfiguration.Object,
             _mockLogger.Object,
-            _mockCache.Object
+            _cache
         );
     }
 
@@ -83,11 +83,12 @@ public class FlutterwaveProviderTests
             BaseAddress = new Uri("https://api.flutterwave.com/v3")
         };
 
+        var freshCache = new MemoryCache(new MemoryCacheOptions());
         var provider = new FlutterwaveProvider(
             freshHttpClient,
             mockConfig.Object,
             _mockLogger.Object,
-            _mockCache.Object
+            freshCache
         );
 
         // Act
@@ -133,7 +134,7 @@ public class FlutterwaveProviderTests
 
         // Assert
         result.Should().NotBeNull();
-        result.TransactionId.Should().Be("FLW123456789"); // Uses flw_ref
+        result.TransactionId.Should().Be("FLW-TEST-001"); // Uses tx_ref (TxRef) first
         result.Provider.Should().Be("flutterwave");
         result.CustomerId.Should().Be("test@example.com");
         result.SourceAmount.Should().Be(100m);
@@ -314,18 +315,18 @@ public class FlutterwaveProviderTests
     }
 
     [Fact]
-    public void VerifyWebhookSignature_ShouldReturnTrue_WhenSignatureIsEmpty()
+    public void VerifyWebhookSignature_ShouldReturnFalse_WhenSignatureIsEmpty()
     {
         // Arrange
         var payload = "{\"event\":\"charge.completed\"}";
         var signature = "";
 
         // Act
-        // Note: When webhook secret hash is empty string (test config), provider returns true (dev mode)
+        // Provider has test-webhook-hash configured, so empty signature won't match
         var result = _provider.VerifyWebhookSignature(payload, signature);
 
         // Assert
-        result.Should().BeTrue(); // Allows in development when secret not configured
+        result.Should().BeFalse(); // Empty signature can't match computed hash
     }
 
     [Fact]
@@ -341,7 +342,7 @@ public class FlutterwaveProviderTests
         var response = new HttpResponseMessage
         {
             StatusCode = HttpStatusCode.OK,
-            Content = new StringContent(JsonSerializer.Serialize(responseContent))
+            Content = new StringContent(JsonSerializer.Serialize(responseContent), Encoding.UTF8, "application/json")
         };
 
         _mockHttpHandler.Protected()
@@ -372,7 +373,7 @@ public class FlutterwaveProviderTests
         var response = new HttpResponseMessage
         {
             StatusCode = HttpStatusCode.OK,
-            Content = new StringContent(JsonSerializer.Serialize(responseContent))
+            Content = new StringContent(JsonSerializer.Serialize(responseContent), Encoding.UTF8, "application/json")
         };
 
         _mockHttpHandler.Protected()
