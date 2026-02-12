@@ -37,7 +37,28 @@ jobs:
       run: dotnet build --no-restore --configuration Release
 
     - name: Run unit tests
-      run: dotnet test tests/PayGuardAI.Tests/PayGuardAI.Tests.csproj --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx" --results-directory ./TestResults
+      run: dotnet test tests/PayGuardAI.Tests/PayGuardAI.Tests.csproj --no-build --configuration Release --verbosity normal --logger "console;verbosity=normal" --logger "trx;LogFileName=test-results.trx" --results-directory ./TestResults
+
+    - name: Check for test results (PowerShell)
+      if: always()
+      shell: pwsh
+      run: |
+        Write-Host "Checking for TRX files..."
+        $trxFiles = Get-ChildItem -Path . -Filter "*.trx" -Recurse
+        if ($trxFiles) {
+          Write-Host "Found TRX files:"
+          $trxFiles | ForEach-Object { Write-Host $_.FullName }
+        } else {
+          Write-Host "No TRX files found"
+        }
+        
+        Write-Host "`nChecking TestResults directory..."
+        if (Test-Path "./TestResults") {
+          Write-Host "TestResults directory exists:"
+          Get-ChildItem -Path "./TestResults" -Recurse
+        } else {
+          Write-Host "TestResults directory does not exist"
+        }
 
     - name: Publish test results
       uses: dorny/test-reporter@v1
