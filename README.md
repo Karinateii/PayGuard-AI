@@ -4,6 +4,8 @@
 
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
 [![Blazor](https://img.shields.io/badge/Blazor-Server-512BD4)](https://blazor.net/)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/Karinateii/PayGuard-AI/build-and-test.yml?branch=main&label=build)](https://github.com/Karinateii/PayGuard-AI/actions)
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/Karinateii/PayGuard-AI/actions)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ## Overview
@@ -302,6 +304,50 @@ POST /api/webhooks/transaction  # Legacy (defaults to Afriex)
   }
 }
 ```
+
+## Testing
+
+PayGuard AI includes comprehensive unit and integration tests to ensure reliability.
+
+### Running Tests
+
+```bash
+# Run all tests
+dotnet test
+
+# Run with detailed output
+dotnet test --logger "console;verbosity=detailed"
+
+# Run with code coverage
+dotnet test --collect:"XPlat Code Coverage"
+```
+
+### Test Coverage
+
+- **Unit Tests**: 60+ tests covering payment providers, factory pattern, and business logic
+- **Integration Tests**: API endpoint testing with WebApplicationFactory
+- **CI/CD**: Automated testing on push via GitHub Actions
+
+### Test Structure
+
+```
+tests/
+├── Services/
+│   ├── AfriexProviderTests.cs          # Afriex provider unit tests
+│   ├── FlutterwaveProviderTests.cs     # Flutterwave provider unit tests
+│   └── PaymentProviderFactoryTests.cs  # Factory pattern tests
+└── Integration/
+    ├── PayGuardApiWebApplicationFactory.cs
+    └── WebhooksControllerIntegrationTests.cs
+```
+
+### Continuous Integration
+
+GitHub Actions workflow runs on every push:
+- ✅ Multi-platform testing (Ubuntu, Windows, macOS)
+- ✅ Code quality checks
+- ✅ Security vulnerability scanning
+- ✅ Test result reporting
 
 ### Testing Webhooks
 
