@@ -1,0 +1,71 @@
+# .dockerignore - Files to exclude from Docker build context
+# This speeds up builds and reduces image size
+
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+documentation/
+DEPLOYMENT.md
+POSTGRESQL-MIGRATION.md
+FLUTTERWAVE-SETUP.md
+MULTI-PROVIDER-VERIFICATION.md
+PROVIDER-TEST-PAYLOADS.md
+
+# IDE and editor files
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build outputs
+**/bin/
+**/obj/
+**/out/
+**/TestResults/
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+
+# Test files
+**/tests/
+**/*.Tests/
+
+# Database files (will be created at runtime)
+*.db
+*.db-shm
+*.db-wal
+
+# Environment and secrets
+appsettings.Development.json
+*.pfx
+*.p12
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker files (don't copy into the image)
+docker-compose*.yml
+Dockerfile*
+
+# CI/CD
+.github/
+scripts/
+
+# Node modules (if any)
+node_modules/
+npm-debug.log
+
+# Logs
+logs/
+*.log
