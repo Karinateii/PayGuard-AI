@@ -5,13 +5,14 @@
 <PageTitle>Logout - PayGuard AI</PageTitle>
 
 @code {
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         // Clear authentication session
         var httpContext = HttpContextAccessor.HttpContext;
         if (httpContext != null)
         {
             httpContext.Session.Clear();
+            await httpContext.Session.CommitAsync();
         }
         
         // Redirect to login

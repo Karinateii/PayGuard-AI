@@ -66,14 +66,16 @@
         _isOAuthEnabled = Configuration.IsOAuthEnabled();
     }
 
-    private void HandleDemoLogin()
+    private async Task HandleDemoLogin()
     {
         // Set session to mark user as authenticated
         var httpContext = HttpContextAccessor.HttpContext;
         if (httpContext != null)
         {
             httpContext.Session.SetString("IsAuthenticated", "true");
+            await httpContext.Session.CommitAsync();
         }
+        // Full page reload to ensure session is loaded and re-authentication happens
         Navigation.NavigateTo("/", forceLoad: true);
     }
 
