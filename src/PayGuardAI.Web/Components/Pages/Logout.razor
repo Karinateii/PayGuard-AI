@@ -1,12 +1,20 @@
 @page "/logout"
 @inject NavigationManager Navigation
+@inject IHttpContextAccessor HttpContextAccessor
 
 <PageTitle>Logout - PayGuard AI</PageTitle>
 
 @code {
     protected override void OnInitialized()
     {
-        // In demo mode, just redirect to login
+        // Clear authentication session
+        var httpContext = HttpContextAccessor.HttpContext;
+        if (httpContext != null)
+        {
+            httpContext.Session.Clear();
+        }
+        
+        // Redirect to login
         Navigation.NavigateTo("/login", forceLoad: true);
     }
 }

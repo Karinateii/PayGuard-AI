@@ -1,12 +1,14 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Options;
 
 namespace PayGuardAI.Web.Services;
 
 /// <summary>
 /// Demo authentication handler that creates a user from headers or defaults.
+/// Checks session to determine if user is actually logged in.
 /// </summary>
 public class DemoAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
@@ -24,6 +26,15 @@ public class DemoAuthenticationHandler : AuthenticationHandler<AuthenticationSch
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+        // Check if user has authenticated via session cookie
+        var isAuthenticated = Context.Session.GetString("IsAuthenticated");
+        
+        // If not authenticated and not trying to login, fail
+        if (isAuthenticated != "true")
+        {
+            return Task.FromResult(AuthenticateResult.NoResult());
+        }
+
         var userHeader = Request.Headers["X-Demo-User"].FirstOrDefault();
         var rolesHeader = Request.Headers["X-Demo-Roles"].FirstOrDefault();
 

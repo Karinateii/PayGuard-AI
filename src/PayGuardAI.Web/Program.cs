@@ -24,6 +24,15 @@ builder.Services.AddSignalR();
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpContextAccessor();
 
+// Add session for demo authentication state
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
+
 // Add authentication with feature flag support (OAuth or Demo)
 builder.Services.AddPayGuardAuthentication(builder.Configuration);
 
@@ -135,6 +144,7 @@ app.UseHttpLogging();
 app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseMiddleware<TenantResolutionMiddleware>();
 
+app.UseSession();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();

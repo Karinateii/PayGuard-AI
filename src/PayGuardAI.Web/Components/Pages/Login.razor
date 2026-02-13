@@ -3,6 +3,7 @@
 @using Microsoft.AspNetCore.Authentication.OpenIdConnect
 @inject IConfiguration Configuration
 @inject NavigationManager Navigation
+@inject IHttpContextAccessor HttpContextAccessor
 
 <PageTitle>Login - PayGuard AI</PageTitle>
 
@@ -40,7 +41,7 @@
                        FullWidth="true"
                        Size="Size.Large"
                        StartIcon="@Icons.Material.Filled.Home"
-                       Href="/">
+                       OnClick="HandleDemoLogin">
                 Continue to Dashboard
             </MudButton>
 
@@ -63,6 +64,17 @@
     protected override void OnInitialized()
     {
         _isOAuthEnabled = Configuration.IsOAuthEnabled();
+    }
+
+    private void HandleDemoLogin()
+    {
+        // Set session to mark user as authenticated
+        var httpContext = HttpContextAccessor.HttpContext;
+        if (httpContext != null)
+        {
+            httpContext.Session.SetString("IsAuthenticated", "true");
+        }
+        Navigation.NavigateTo("/", forceLoad: true);
     }
 
     private void HandleOAuthLogin()
