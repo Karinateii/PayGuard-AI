@@ -75,10 +75,11 @@
 </MudOverlay>
 
 <MudPaper Class="pa-4" Elevation="2">
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
-        <MudStack Row="true" Spacing="3">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3 flex-wrap">
+        <MudStack Row="true" Spacing="2" Class="flex-wrap">
             <MudSelect T="RiskLevel?" Label="Min Risk Level" Value="@_minRiskLevel" 
-                       ValueChanged="@OnFilterChanged" Dense="true" Style="width: 150px">
+                       ValueChanged="@OnFilterChanged" Dense="true" Class="flex-grow-1" 
+                       Style="min-width: 130px; max-width: 150px;">
                 <MudSelectItem T="RiskLevel?" Value="@((RiskLevel?)null)">All</MudSelectItem>
                 <MudSelectItem T="RiskLevel?" Value="RiskLevel.Medium">Medium+</MudSelectItem>
                 <MudSelectItem T="RiskLevel?" Value="RiskLevel.High">High+</MudSelectItem>

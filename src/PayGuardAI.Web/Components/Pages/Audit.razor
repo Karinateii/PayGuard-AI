@@ -17,12 +17,14 @@
 
 <MudPaper Class="pa-4" Elevation="2">
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
-        <MudStack Row="true" Spacing="3">
+        <MudStack Row="true" Spacing="2" Class="flex-wrap">
             <MudTextField T="string" Label="Search" @bind-Value="_searchTerm" 
                           Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                          Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 250px" />
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Class="flex-grow-1" 
+                          Style="min-width: 150px; max-width: 250px;" />
             <MudSelect T="string" Label="Action Type" @bind-Value="_actionFilter" 
-                       Margin="Margin.Dense" Style="width: 180px" Variant="Variant.Outlined">
+                       Margin="Margin.Dense" Class="flex-grow-1" 
+                       Style="min-width: 120px; max-width: 180px;" Variant="Variant.Outlined">
                 <MudSelectItem T="string" Value="@((string)null!)">All Actions</MudSelectItem>
                 <MudSelectItem T="string" Value="@("TRANSACTION_ANALYZED")">Transaction Analyzed</MudSelectItem>
                 <MudSelectItem T="string" Value="@("REVIEW_APPROVED")">Review Approved</MudSelectItem>

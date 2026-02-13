@@ -229,10 +229,11 @@ else
 {
     <!-- Transaction List View -->
     <MudPaper Class="pa-4" Elevation="2">
-        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
-            <MudStack Row="true" Spacing="3">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3 flex-wrap">
+            <MudStack Row="true" Spacing="2" Class="flex-wrap">
                 <MudSelect T="RiskLevel?" Label="Risk Level" Value="@_filterRiskLevel" 
-                           ValueChanged="@OnRiskLevelFilterChanged" Dense="true" Style="width: 150px">
+                           ValueChanged="@OnRiskLevelFilterChanged" Dense="true" Class="flex-grow-1"
+                           Style="min-width: 130px; max-width: 150px;">
                     <MudSelectItem T="RiskLevel?" Value="@((RiskLevel?)null)">All</MudSelectItem>
                     <MudSelectItem T="RiskLevel?" Value="RiskLevel.Low">Low</MudSelectItem>
                     <MudSelectItem T="RiskLevel?" Value="RiskLevel.Medium">Medium</MudSelectItem>
@@ -240,7 +241,8 @@ else
                     <MudSelectItem T="RiskLevel?" Value="RiskLevel.Critical">Critical</MudSelectItem>
                 </MudSelect>
                 <MudSelect T="ReviewStatus?" Label="Status" Value="@_filterStatus" 
-                           ValueChanged="@OnStatusFilterChanged" Dense="true" Style="width: 150px">
+                           ValueChanged="@OnStatusFilterChanged" Dense="true" Class="flex-grow-1"
+                           Style="min-width: 130px; max-width: 150px;">
                     <MudSelectItem T="ReviewStatus?" Value="@((ReviewStatus?)null)">All</MudSelectItem>
                     <MudSelectItem T="ReviewStatus?" Value="ReviewStatus.Pending">Pending</MudSelectItem>
                     <MudSelectItem T="ReviewStatus?" Value="ReviewStatus.Approved">Approved</MudSelectItem>
@@ -299,7 +301,8 @@ else
     </MudPaper>
     
     <!-- Quick View Drawer -->
-    <MudDrawer @bind-Open="_drawerOpen" Anchor="Anchor.End" Elevation="4" Width="450px" Variant="DrawerVariant.Temporary">
+    <MudDrawer @bind-Open="_drawerOpen" Anchor="Anchor.End" Elevation="4" 
+               Width="@GetDrawerWidth()" Variant="DrawerVariant.Temporary" Responsive="true">
         @if (_selectedTransaction != null)
         {
             <MudDrawerHeader>
@@ -587,6 +590,8 @@ else
         await EscalateTransaction();
         await LoadTransactions();
     }
+
+    private string GetDrawerWidth() => "100%";  // Responsive: full width on mobile, MudDrawer will constrain on large screens
 
     private Color GetRiskColor(RiskLevel? level) => level switch
     {
