@@ -17,17 +17,27 @@
 @code {
     protected override async Task OnInitializedAsync()
     {
-        var isOAuthEnabled = Configuration.IsOAuthEnabled();
-        
-        if (isOAuthEnabled)
+        try
         {
-            // OAuth logout
-            Navigation.NavigateTo("/signout-oidc", forceLoad: true);
+            var isOAuthEnabled = Configuration.IsOAuthEnabled();
+            
+            if (isOAuthEnabled)
+            {
+                // OAuth logout
+                await Task.Delay(300); // Brief delay for visual feedback
+                Navigation.NavigateTo("/signout-oidc", forceLoad: true);
+            }
+            else
+            {
+                // Demo mode - just redirect to home
+                await Task.Delay(500); // Brief delay for visual feedback
+                Navigation.NavigateTo("/", forceLoad: true);
+            }
         }
-        else
+        catch
         {
-            // Demo mode - just redirect to home
-            await Task.Delay(500); // Brief delay for visual feedback
+            // Fallback: redirect to home on any error
+            await Task.Delay(500);
             Navigation.NavigateTo("/", forceLoad: true);
         }
     }
