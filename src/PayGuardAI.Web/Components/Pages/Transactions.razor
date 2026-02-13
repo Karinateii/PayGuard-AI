@@ -1,5 +1,7 @@
 @page "/transactions"
 @page "/transactions/{TransactionId:guid}"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
 @inject ITransactionService TransactionService
 @inject IReviewService ReviewService
 @inject ISnackbar Snackbar

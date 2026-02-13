@@ -1,4 +1,6 @@
 @page "/reports"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
 @inject PayGuardAI.Data.ApplicationDbContext DbContext
 @inject IReviewService ReviewService
 @inject ISnackbar Snackbar

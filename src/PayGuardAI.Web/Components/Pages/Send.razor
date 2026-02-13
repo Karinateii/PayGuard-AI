@@ -1,4 +1,6 @@
 @page "/send"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
 @inject PayGuardAI.Data.Services.IAfriexApiService AfriexApi
 @inject ISnackbar Snackbar
 

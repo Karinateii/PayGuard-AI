@@ -1,4 +1,6 @@
 @page "/reviews"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
 @inject IReviewService ReviewService
 @inject ISnackbar Snackbar
 @inject NavigationManager NavigationManager

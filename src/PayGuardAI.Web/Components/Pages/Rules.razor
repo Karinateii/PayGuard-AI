@@ -1,4 +1,6 @@
 @page "/rules"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
 @inject PayGuardAI.Data.ApplicationDbContext DbContext
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
