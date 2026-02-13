@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using PayGuardAI.Core.Services;
@@ -156,4 +157,115 @@ public class WebhooksController : ControllerBase
             providers
         });
     }
+
+    /// <summary>
+    /// Simulate a transaction for demo purposes.
+    /// Creates a webhook payload locally and processes it through the full risk pipeline.
+    /// No external API calls required.
+    /// </summary>
+    [HttpPost("simulate")]
+    [AllowAnonymous]
+    public async Task<IActionResult> SimulateTransaction(
+        [FromBody] SimulateTransactionRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger.LogInformation("[SIMULATE] Simulating transaction: {Amount} {SourceCurrency} from {SourceCountry} to {DestCountry}",
+                request.Amount, request.SourceCurrency, request.SourceCountry, request.DestinationCountry);
+
+            var transactionId = Guid.NewGuid().ToString();
+            var destCurrency = GetCurrencyForCountry(request.DestinationCountry);
+            var srcCurrency = request.SourceCurrency ?? "USD";
+
+            var payload = $$"""
+            {
+                "event": "transaction.completed",
+                "data": {
+                    "id": "{{transactionId}}",
+                    "type": "{{request.TransactionType ?? "REMITTANCE"}}",
+                    "status": "COMPLETED",
+                    "amount": {{request.Amount}},
+                    "sourceCurrency": "{{srcCurrency}}",
+                    "destinationCurrency": "{{destCurrency}}",
+                    "senderId": "{{request.SenderId ?? $"sender-{Guid.NewGuid().ToString()[..8]}"}}",
+                    "receiverId": "{{request.ReceiverId ?? $"receiver-{Guid.NewGuid().ToString()[..8]}"}}",
+                    "sourceCountry": "{{request.SourceCountry}}",
+                    "destinationCountry": "{{request.DestinationCountry}}",
+                    "createdAt": "{{DateTime.UtcNow:O}}"
+                }
+            }
+            """;
+
+            var transaction = await _transactionService.ProcessWebhookAsync(payload, cancellationToken);
+
+            _logger.LogInformation("[SIMULATE] Transaction {Id} processed - Risk: {Score} ({Level})",
+                transaction.Id, transaction.RiskAnalysis?.RiskScore, transaction.RiskAnalysis?.RiskLevel);
+
+            // Broadcast to SignalR
+            if (transaction.RiskAnalysis != null)
+            {
+                var notification = new TransactionNotification(
+                    transaction.Id,
+                    transaction.ExternalId,
+                    transaction.Amount,
+                    transaction.SourceCountry,
+                    transaction.DestinationCountry,
+                    transaction.RiskAnalysis.RiskScore,
+                    transaction.RiskAnalysis.RiskLevel,
+                    transaction.RiskAnalysis.ReviewStatus,
+                    transaction.RiskAnalysis.Explanation ?? "Risk analysis complete"
+                );
+
+                await _hubContext.Clients.All.SendAsync("NewTransaction", notification, cancellationToken);
+            }
+
+            return Ok(new
+            {
+                success = true,
+                transactionId = transaction.Id,
+                externalId = transactionId,
+                amount = transaction.Amount,
+                sourceCountry = transaction.SourceCountry,
+                destinationCountry = transaction.DestinationCountry,
+                riskScore = transaction.RiskAnalysis?.RiskScore,
+                riskLevel = transaction.RiskAnalysis?.RiskLevel.ToString(),
+                reviewStatus = transaction.RiskAnalysis?.ReviewStatus.ToString(),
+                explanation = transaction.RiskAnalysis?.Explanation
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[SIMULATE] Error simulating transaction");
+            return BadRequest(new { success = false, error = ex.Message });
+        }
+    }
+
+    private static string GetCurrencyForCountry(string country) => country switch
+    {
+        "NG" => "NGN",
+        "US" => "USD",
+        "GB" => "GBP",
+        "KE" => "KES",
+        "GH" => "GHS",
+        "ZA" => "ZAR",
+        "CA" => "CAD",
+        "DE" => "EUR",
+        "TZ" => "TZS",
+        "UG" => "UGX",
+        "KP" => "KPW",
+        "SY" => "SYP",
+        _ => "USD"
+    };
+}
+
+public class SimulateTransactionRequest
+{
+    public decimal Amount { get; set; } = 100;
+    public string SourceCountry { get; set; } = "US";
+    public string DestinationCountry { get; set; } = "NG";
+    public string? SourceCurrency { get; set; }
+    public string? SenderId { get; set; }
+    public string? ReceiverId { get; set; }
+    public string? TransactionType { get; set; }
 }

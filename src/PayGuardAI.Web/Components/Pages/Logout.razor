@@ -1,21 +1,14 @@
 @page "/logout"
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
 @inject NavigationManager Navigation
-@inject IHttpContextAccessor HttpContextAccessor
 
 <PageTitle>Logout - PayGuard AI</PageTitle>
 
 @code {
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        // Clear authentication session
-        var httpContext = HttpContextAccessor.HttpContext;
-        if (httpContext != null)
-        {
-            httpContext.Session.Clear();
-            await httpContext.Session.CommitAsync();
-        }
-        
-        // Redirect to login
-        Navigation.NavigateTo("/login", forceLoad: true);
+        // Redirect to logout API endpoint
+        Navigation.NavigateTo("/api/Auth/demo-logout", forceLoad: true);
     }
 }

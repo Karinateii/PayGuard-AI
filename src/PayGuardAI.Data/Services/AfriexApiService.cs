@@ -68,6 +68,7 @@ public class AfriexApiService : IAfriexApiService
         
         _httpClient.BaseAddress = new Uri(_baseUrl);
         _httpClient.DefaultRequestHeaders.Add("x-api-key", _apiKey);
+        _httpClient.Timeout = TimeSpan.FromSeconds(10);
     }
     
     #region Customers
@@ -217,7 +218,7 @@ public class AfriexApiService : IAfriexApiService
                         DestinationAmount = amount * rate
                     };
 
-                    _cache.Set(cacheKey, result, TimeSpan.FromSeconds(30));
+                    _cache.Set(cacheKey, result, TimeSpan.FromMinutes(5));
                     return result;
                 }
             }

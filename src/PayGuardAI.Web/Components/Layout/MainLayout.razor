@@ -46,7 +46,7 @@
                     </MudMenuItem>
                     <MudDivider />
                     <MudMenuItem Icon="@Icons.Material.Filled.Security" Href="/mfa/setup">Setup MFA</MudMenuItem>
-                    <MudMenuItem Icon="@Icons.Material.Filled.Logout" Href="/logout">Sign Out</MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Logout" OnClick="@SignOut">Sign Out</MudMenuItem>
                 </MudMenu>
                 
                 <MudBadge Content="@_notificationCount" Color="Color.Error" Overlap="true" Visible="@(_notificationCount > 0)">
@@ -193,4 +193,9 @@
             DrawerBackground = "#1A2530"
         }
     };
+
+    private void SignOut()
+    {
+        NavigationManager.NavigateTo("/api/Auth/demo-logout", forceLoad: true);
+    }
 }

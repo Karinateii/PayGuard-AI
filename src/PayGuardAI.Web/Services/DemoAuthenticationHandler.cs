@@ -26,14 +26,21 @@ public class DemoAuthenticationHandler : AuthenticationHandler<AuthenticationSch
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+        var path = Context.Request.Path;
+        Logger.LogInformation("[AUTH] Checking authentication for path: {Path}", path);
+        
         // Check if user has authenticated via session cookie
         var isAuthenticated = Context.Session.GetString("IsAuthenticated");
+        Logger.LogInformation("[AUTH] Session IsAuthenticated value: {Value}", isAuthenticated ?? "(null)");
         
         // If not authenticated and not trying to login, fail
         if (isAuthenticated != "true")
         {
+            Logger.LogInformation("[AUTH] Not authenticated - returning NoResult");
             return Task.FromResult(AuthenticateResult.NoResult());
         }
+        
+        Logger.LogInformation("[AUTH] User is authenticated - creating claims principal");
 
         var userHeader = Request.Headers["X-Demo-User"].FirstOrDefault();
         var rolesHeader = Request.Headers["X-Demo-Roles"].FirstOrDefault();
@@ -62,5 +69,12 @@ public class DemoAuthenticationHandler : AuthenticationHandler<AuthenticationSch
         var ticket = new AuthenticationTicket(principal, Scheme.Name);
 
         return Task.FromResult(AuthenticateResult.Success(ticket));
+    }
+
+    protected override Task HandleChallengeAsync(AuthenticationProperties properties)
+    {
+        Logger.LogInformation("[AUTH] HandleChallengeAsync called - redirecting to /login");
+        Response.Redirect("/login");
+        return Task.CompletedTask;
     }
 }

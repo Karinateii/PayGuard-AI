@@ -1,9 +1,10 @@
 @page "/login"
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Authentication.OpenIdConnect
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
 @inject IConfiguration Configuration
 @inject NavigationManager Navigation
-@inject IHttpContextAccessor HttpContextAccessor
 
 <PageTitle>Login - PayGuard AI</PageTitle>
 
@@ -36,14 +37,16 @@
                 Demo mode is active. OAuth authentication is disabled.
             </MudAlert>
 
-            <MudButton Variant="Variant.Filled" 
-                       Color="Color.Primary" 
-                       FullWidth="true"
-                       Size="Size.Large"
-                       StartIcon="@Icons.Material.Filled.Home"
-                       OnClick="HandleDemoLogin">
-                Continue to Dashboard
-            </MudButton>
+            <form method="post" action="/api/Auth/demo-login">
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Primary" 
+                           FullWidth="true"
+                           Size="Size.Large"
+                           StartIcon="@Icons.Material.Filled.Home"
+                           ButtonType="ButtonType.Submit">
+                    Continue to Dashboard
+                </MudButton>
+            </form>
 
             <MudText Typo="Typo.caption" Align="Align.Center" Class="mt-4" Color="Color.Secondary">
                 To enable OAuth, set FeatureFlags:OAuthEnabled to true in appsettings.json
@@ -64,19 +67,6 @@
     protected override void OnInitialized()
     {
         _isOAuthEnabled = Configuration.IsOAuthEnabled();
-    }
-
-    private async Task HandleDemoLogin()
-    {
-        // Set session to mark user as authenticated
-        var httpContext = HttpContextAccessor.HttpContext;
-        if (httpContext != null)
-        {
-            httpContext.Session.SetString("IsAuthenticated", "true");
-            await httpContext.Session.CommitAsync();
-        }
-        // Full page reload to ensure session is loaded and re-authentication happens
-        Navigation.NavigateTo("/", forceLoad: true);
     }
 
     private void HandleOAuthLogin()

@@ -1,4 +1,8 @@
-@page "/send"
+#!/usr/bin/env python3
+"""Write the new Send.razor (Transaction Simulator) file."""
+import pathlib
+
+content = r'''@page "/send"
 @using Microsoft.AspNetCore.Authorization
 @using System.Net.Http.Json
 @attribute [Authorize]
@@ -301,3 +305,8 @@
         public string? Explanation { get; set; }
     }
 }
+'''
+
+target = pathlib.Path('/Users/ebenezer/Desktop/Afriex/PayGuardAI/src/PayGuardAI.Web/Components/Pages/Send.razor')
+target.write_text(content.lstrip('\n'))
+print(f"Written {len(content.strip())} chars to {target}")
