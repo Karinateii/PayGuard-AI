@@ -11,7 +11,7 @@
 
 <!-- Approve Dialog -->
 <MudOverlay Visible="_showApproveDialog" DarkBackground="true" AutoClose="false">
-    <MudPaper Class="pa-4" Style="min-width: 400px; max-width: 500px;">
+    <MudPaper Class="pa-4" Style="min-width: 90vw; max-width: 500px; max-height: 90vh; overflow-y: auto;">
         <MudText Typo="Typo.h6" Class="mb-3">
             <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-2" Color="Color.Success" />
             Approve Transaction
@@ -36,7 +36,7 @@
 
 <!-- Reject Dialog -->
 <MudOverlay Visible="_showRejectDialog" DarkBackground="true" AutoClose="false">
-    <MudPaper Class="pa-4" Style="min-width: 400px; max-width: 500px;">
+    <MudPaper Class="pa-4" Style="min-width: 90vw; max-width: 500px; max-height: 90vh; overflow-y: auto;">
         <MudText Typo="Typo.h6" Class="mb-3">
             <MudIcon Icon="@Icons.Material.Filled.Cancel" Class="mr-2" Color="Color.Error" />
             Reject Transaction
