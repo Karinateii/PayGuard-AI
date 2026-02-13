@@ -15,7 +15,7 @@
 </MudContainer>
 
 @code {
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         try
         {
@@ -24,20 +24,17 @@
             if (isOAuthEnabled)
             {
                 // OAuth logout
-                await Task.Delay(300); // Brief delay for visual feedback
                 Navigation.NavigateTo("/signout-oidc", forceLoad: true);
             }
             else
             {
                 // Demo mode - just redirect to home
-                await Task.Delay(500); // Brief delay for visual feedback
                 Navigation.NavigateTo("/", forceLoad: true);
             }
         }
         catch
         {
             // Fallback: redirect to home on any error
-            await Task.Delay(500);
             Navigation.NavigateTo("/", forceLoad: true);
         }
     }
