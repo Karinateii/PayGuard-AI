@@ -1,0 +1,9 @@
+# Heroku deployment configuration for PayGuard AI
+# Uses Docker-based deployment
+
+build:
+  docker:
+    web: Dockerfile
+
+run:
+  web: dotnet PayGuardAI.Web.dll
