@@ -1,4 +1,6 @@
 ﻿@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
@@ -12,57 +14,83 @@
 <MudDialogProvider />
 <MudSnackbarProvider />
 
-<MudLayout>
-    <MudAppBar Elevation="1" Dense="true">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@ToggleDrawer" />
-        <MudText Typo="Typo.h5" Class="ml-3">
-            <MudIcon Icon="@Icons.Material.Filled.Security" Class="mr-2" />
-            PayGuard AI
-        </MudText>
-        <MudSpacer />
-        <MudText Typo="Typo.body2" Class="mr-4 d-none d-md-flex">Cross-Border Fintech Hackathon 2026</MudText>
-        @if (_hubConnection?.State == HubConnectionState.Connected)
-        {
-            <MudChip T="string" Size="Size.Small" Color="Color.Success" Class="mr-2">
-                <MudIcon Icon="@Icons.Material.Filled.Wifi" Size="Size.Small" Class="mr-1" />
-                Live
-            </MudChip>
-        }
-        <MudTooltip Text="@(_isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode")">
-            <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" 
-                           Color="Color.Inherit" 
-                           OnClick="@ToggleTheme" />
-        </MudTooltip>
-        
-        <MudMenu Icon="@Icons.Material.Filled.Person" Color="Color.Inherit" Dense="true" Class="mr-2">
-            <MudMenuItem>
-                <MudChip T="string" Size="Size.Small" Color="Color.Default">
-                    @CurrentUser.UserName
-                </MudChip>
-            </MudMenuItem>
-            <MudDivider />
-            <MudMenuItem Icon="@Icons.Material.Filled.Security" Href="/mfa/setup">Setup MFA</MudMenuItem>
-            <MudMenuItem Icon="@Icons.Material.Filled.Logout" Href="/logout">Sign Out</MudMenuItem>
-        </MudMenu>
-        
-        <MudBadge Content="@_notificationCount" Color="Color.Error" Overlap="true" Visible="@(_notificationCount > 0)">
-            <MudIconButton Icon="@Icons.Material.Filled.Notifications" Color="Color.Inherit" />
-        </MudBadge>
-    </MudAppBar>
+<AuthorizeView>
+    <Authorized>
+        <MudLayout>
+            <MudAppBar Elevation="1" Dense="true">
+                <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@ToggleDrawer" />
+                <MudText Typo="Typo.h5" Class="ml-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Security" Class="mr-2" />
+                    PayGuard AI
+                </MudText>
+                <MudSpacer />
+                <MudText Typo="Typo.body2" Class="mr-4 d-none d-md-flex">Cross-Border Fintech Hackathon 2026</MudText>
+                @if (_hubConnection?.State == HubConnectionState.Connected)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Class="mr-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Wifi" Size="Size.Small" Class="mr-1" />
+                        Live
+                    </MudChip>
+                }
+                <MudTooltip Text="@(_isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode")">
+                    <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" 
+                                   Color="Color.Inherit" 
+                                   OnClick="@ToggleTheme" />
+                </MudTooltip>
+                
+                <MudMenu Icon="@Icons.Material.Filled.Person" Color="Color.Inherit" Dense="true" Class="mr-2">
+                    <MudMenuItem>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Default">
+                            @CurrentUser.UserName
+                        </MudChip>
+                    </MudMenuItem>
+                    <MudDivider />
+                    <MudMenuItem Icon="@Icons.Material.Filled.Security" Href="/mfa/setup">Setup MFA</MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Logout" Href="/logout">Sign Out</MudMenuItem>
+                </MudMenu>
+                
+                <MudBadge Content="@_notificationCount" Color="Color.Error" Overlap="true" Visible="@(_notificationCount > 0)">
+                    <MudIconButton Icon="@Icons.Material.Filled.Notifications" Color="Color.Inherit" />
+                </MudBadge>
+            </MudAppBar>
 
-    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
-        <MudDrawerHeader>
-            <MudText Typo="Typo.h6">Navigation</MudText>
-        </MudDrawerHeader>
-        <NavMenu />
-    </MudDrawer>
+            <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+                <MudDrawerHeader>
+                    <MudText Typo="Typo.h6">Navigation</MudText>
+                </MudDrawerHeader>
+                <NavMenu />
+            </MudDrawer>
 
-    <MudMainContent Class="pt-16 px-4">
-        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-4">
-            @Body
-        </MudContainer>
-    </MudMainContent>
-</MudLayout>
+            <MudMainContent Class="pt-16 px-4">
+                <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-4">
+                    @Body
+                </MudContainer>
+            </MudMainContent>
+        </MudLayout>
+    </Authorized>
+    <NotAuthorized>
+        <MudLayout>
+            <MudAppBar Elevation="1" Dense="true">
+                <MudText Typo="Typo.h5" Class="ml-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Security" Class="mr-2" />
+                    PayGuard AI
+                </MudText>
+                <MudSpacer />
+                <MudTooltip Text="@(_isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode")">
+                    <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" 
+                                   Color="Color.Inherit" 
+                                   OnClick="@ToggleTheme" />
+                </MudTooltip>
+            </MudAppBar>
+
+            <MudMainContent Class="pt-16 px-4">
+                <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-4">
+                    @Body
+                </MudContainer>
+            </MudMainContent>
+        </MudLayout>
+    </NotAuthorized>
+</AuthorizeView>
 
 @code {
     private bool _drawerOpen = true;
