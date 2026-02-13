@@ -15,7 +15,18 @@
     Risk Monitoring Dashboard
 </MudText>
 
-@if (_loading)
+@if (_loadError)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">
+        <MudStack Row="true" AlignItems="AlignItems.Center">
+            <MudText>Failed to load dashboard: @_errorMessage</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Error" Size="Size.Small" OnClick="RetryLoadAsync">
+                Retry
+            </MudButton>
+        </MudStack>
+    </MudAlert>
+}
+else if (_loading)
 {
     <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
 }
@@ -168,14 +179,36 @@ else
 
 @code {
     private bool _loading = true;
+    private bool _loadError = false;
+    private string _errorMessage = "";
     private DashboardStats _stats = new();
     private List<Transaction> _recentHighRisk = new();
     private HubConnection? _hubConnection;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadDataAsync();
-        await SetupSignalR();
+        try
+        {
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            _loadError = true;
+            _errorMessage = ex.Message;
+            _loading = false;
+            return;
+        }
+        
+        // Setup SignalR after data loads successfully
+        try
+        {
+            await SetupSignalR();
+        }
+        catch (Exception ex)
+        {
+            // SignalR failure shouldn't block the dashboard
+            Console.WriteLine($"SignalR setup failed: {ex.Message}");
+        }
     }
 
     private async Task SetupSignalR()
@@ -192,6 +225,14 @@ else
         });
 
         await _hubConnection.StartAsync();
+    }
+
+    private async Task RetryLoadAsync()
+    {
+        _loadError = false;
+        _errorMessage = "";
+        await OnInitializedAsync();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task RefreshDataAsync()
@@ -218,24 +259,19 @@ else
     
     private async Task LoadDataAsync()
     {
-        try
-        {
-            _loading = true;
-            _stats = await TransactionService.GetDashboardStatsAsync();
-            
-            // Get both High and Critical risk transactions
-            var allTransactions = await TransactionService.GetTransactionsAsync(
-                pageNumber: 1, 
-                pageSize: 20);
-            _recentHighRisk = allTransactions
-                .Where(t => t.RiskAnalysis != null && t.RiskAnalysis.RiskLevel >= RiskLevel.High)
-                .Take(5)
-                .ToList();
-        }
-        finally
-        {
-            _loading = false;
-        }
+        _loading = true;
+        _stats = await TransactionService.GetDashboardStatsAsync();
+        
+        // Get both High and Critical risk transactions
+        var allTransactions = await TransactionService.GetTransactionsAsync(
+            pageNumber: 1, 
+            pageSize: 20);
+        _recentHighRisk = allTransactions
+            .Where(t => t.RiskAnalysis != null && t.RiskAnalysis.RiskLevel >= RiskLevel.High)
+            .Take(5)
+            .ToList();
+        
+        _loading = false;
     }
 
     public async ValueTask DisposeAsync()
