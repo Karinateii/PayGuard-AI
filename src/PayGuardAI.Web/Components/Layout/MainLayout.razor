@@ -61,7 +61,7 @@
                 <NavMenu />
             </MudDrawer>
 
-            <MudMainContent Class="pt-16 px-4">
+            <MudMainContent Class="pt-16 px-4" @onclick="CloseDrawer">
                 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-4">
                     @Body
                 </MudContainer>
@@ -83,7 +83,7 @@
                 </MudTooltip>
             </MudAppBar>
 
-            <MudMainContent Class="pt-16 px-4">
+            <MudMainContent Class="pt-16 px-4" style="cursor: pointer;">
                 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-4">
                     @Body
                 </MudContainer>
@@ -160,6 +160,11 @@
     private void ToggleDrawer()
     {
         _drawerOpen = !_drawerOpen;
+    }
+
+    private void CloseDrawer()
+    {
+        if (_drawerOpen) _drawerOpen = false;
     }
 
     private void ToggleTheme()
