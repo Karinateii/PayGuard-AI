@@ -16,15 +16,17 @@
 </MudAlert>
 
 <MudPaper Class="pa-4" Elevation="2">
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
-        <MudStack Row="true" Spacing="2" Class="flex-wrap">
-            <MudTextField T="string" Label="Search" @bind-Value="_searchTerm" 
+    <!-- Filters: 2 cols on mobile, 3 on tablet, 4 on desktop -->
+    <MudGrid Spacing="2" Class="mb-2">
+        <MudItem xs="6" sm="4" md="3">
+            <MudTextField T="string" Label="Search" @bind-Value="_searchTerm"
                           Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                          Variant="Variant.Outlined" Margin="Margin.Dense" Class="flex-grow-1" 
-                          Style="min-width: 150px; max-width: 250px;" />
-            <MudSelect T="string" Label="Action Type" @bind-Value="_actionFilter" 
-                       Margin="Margin.Dense" Class="flex-grow-1" 
-                       Style="min-width: 120px; max-width: 180px;" Variant="Variant.Outlined">
+                          Variant="Variant.Outlined" Dense="true" FullWidth="@true"
+                          Placeholder="User, entity ID, notes..." />
+        </MudItem>
+        <MudItem xs="6" sm="4" md="3">
+            <MudSelect T="string" Label="Action Type" @bind-Value="_actionFilter"
+                       Dense="true" Variant="Variant.Outlined" FullWidth="@true">
                 <MudSelectItem T="string" Value="@((string)null!)">All Actions</MudSelectItem>
                 <MudSelectItem T="string" Value="@("TRANSACTION_ANALYZED")">Transaction Analyzed</MudSelectItem>
                 <MudSelectItem T="string" Value="@("REVIEW_APPROVED")">Review Approved</MudSelectItem>
@@ -32,9 +34,32 @@
                 <MudSelectItem T="string" Value="@("REVIEW_ESCALATED")">Review Escalated</MudSelectItem>
                 <MudSelectItem T="string" Value="@("RULE_UPDATED")">Rule Updated</MudSelectItem>
             </MudSelect>
-        </MudStack>
-        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" 
-                   OnClick="@LoadAuditLogs">Refresh</MudButton>
+        </MudItem>
+        <MudItem xs="6" sm="4" md="2">
+            <MudDatePicker Label="From Date" Date="@_fromDate" DateChanged="@OnFromDateChanged"
+                           Variant="Variant.Outlined" Clearable="true" />
+        </MudItem>
+        <MudItem xs="6" sm="4" md="2">
+            <MudDatePicker Label="To Date" Date="@_toDate" DateChanged="@OnToDateChanged"
+                           Variant="Variant.Outlined" Clearable="true" />
+        </MudItem>
+    </MudGrid>
+    <!-- Action Buttons -->
+    <MudStack Row="true" Spacing="2" Class="mb-3">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.FilterAlt" OnClick="@LoadAuditLogs">
+            Apply Filters
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.ClearAll" OnClick="@ClearFilters">
+            Clear
+        </MudButton>
+        @if (FilteredLogs.Any())
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-flex align-center">
+                Showing @FilteredLogs.Count() of @_auditLogs.Count entries
+            </MudText>
+        }
     </MudStack>
 
     @if (_loading)
@@ -43,6 +68,9 @@
     }
     else
     {
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
+            Showing @FilteredLogs.Count() of @_auditLogs.Count entries
+        </MudText>
         <MudTable Items="@FilteredLogs" Hover="true" Dense="true">
             <HeaderContent>
                 <MudTh>Timestamp</MudTh>
@@ -87,13 +115,38 @@
     private List<AuditLog> _auditLogs = new();
     private string? _searchTerm;
     private string? _actionFilter;
+    private DateTime? _fromDate;
+    private DateTime? _toDate;
 
     private IEnumerable<AuditLog> FilteredLogs => _auditLogs
         .Where(l => string.IsNullOrEmpty(_actionFilter) || l.Action == _actionFilter)
+        .Where(l => _fromDate == null || l.CreatedAt.Date >= _fromDate.Value.Date)
+        .Where(l => _toDate == null || l.CreatedAt.Date <= _toDate.Value.Date)
         .Where(l => string.IsNullOrEmpty(_searchTerm) || 
                     l.EntityId.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
                     l.PerformedBy.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    l.Action.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
                     (l.Notes?.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ?? false));
+
+    private void ClearFilters()
+    {
+        _searchTerm = null;
+        _actionFilter = null;
+        _fromDate = null;
+        _toDate = null;
+    }
+
+    private Task OnFromDateChanged(DateTime? date)
+    {
+        _fromDate = date;
+        return Task.CompletedTask;
+    }
+
+    private Task OnToDateChanged(DateTime? date)
+    {
+        _toDate = date;
+        return Task.CompletedTask;
+    }
 
     protected override async Task OnInitializedAsync()
     {
