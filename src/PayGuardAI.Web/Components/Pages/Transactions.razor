@@ -9,52 +9,58 @@
 
 <PageTitle>Transactions - PayGuard AI</PageTitle>
 
-<!-- Approve Dialog -->
-<MudOverlay Visible="_showApproveDialog" DarkBackground="true" AutoClose="false">
-    <MudPaper Class="pa-4" Style="min-width: 90vw; max-width: 500px; max-height: 90vh; overflow-y: auto;">
-        <MudText Typo="Typo.h6" Class="mb-3">
-            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-2" Color="Color.Success" />
-            Approve Transaction
-        </MudText>
-        @if (_selectedTransaction != null)
-        {
-            <MudText Class="mb-3">
-                You are about to <strong>approve</strong> transaction <strong>@_selectedTransaction.ExternalId</strong>
+<!-- Approve Dialog - Centered modal above the drawer -->
+<MudOverlay Visible="_showApproveDialog" DarkBackground="false" AutoClose="false" Style="background-color: rgba(0,0,0,0.5); z-index: 2000;">
+    <MudPaper Class="pa-6" Style="max-width: 380px; border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);">
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.h6" Class="mb-2">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-2" Color="Color.Success" />
+                Approve Transaction
             </MudText>
-            <MudTextField @bind-Value="_reviewNotes" Label="Approval Notes" Required="true"
-                          Variant="Variant.Outlined" Lines="3" 
-                          Placeholder="Explain why you are approving this transaction..." Class="mb-4"
-                          RequiredError="Approval notes are required for compliance" />
-        }
-        <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2">
-            <MudButton OnClick="@(() => _showApproveDialog = false)">Cancel</MudButton>
-            <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="@ApproveTransaction"
-                       Disabled="@string.IsNullOrWhiteSpace(_reviewNotes)">Approve</MudButton>
+            @if (_selectedTransaction != null)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    ID: <strong>@_selectedTransaction.ExternalId</strong>
+                </MudText>
+                <MudDivider Class="my-2" />
+                <MudTextField @bind-Value="_reviewNotes" Label="Approval Notes" Required="true"
+                              Variant="Variant.Outlined" Lines="3" Margin="Margin.Dense"
+                              Placeholder="Explain why..." Class="mb-3"
+                              RequiredError="Notes required" />
+                <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="1">
+                    <MudButton OnClick="@(() => _showApproveDialog = false)" Size="Size.Small">Cancel</MudButton>
+                    <MudButton Color="Color.Success" Variant="Variant.Filled" Size="Size.Small" OnClick="@ApproveTransaction"
+                               Disabled="@string.IsNullOrWhiteSpace(_reviewNotes)">Approve</MudButton>
+                </MudStack>
+            }
         </MudStack>
     </MudPaper>
 </MudOverlay>
 
-<!-- Reject Dialog -->
-<MudOverlay Visible="_showRejectDialog" DarkBackground="true" AutoClose="false">
-    <MudPaper Class="pa-4" Style="min-width: 90vw; max-width: 500px; max-height: 90vh; overflow-y: auto;">
-        <MudText Typo="Typo.h6" Class="mb-3">
-            <MudIcon Icon="@Icons.Material.Filled.Cancel" Class="mr-2" Color="Color.Error" />
-            Reject Transaction
-        </MudText>
-        @if (_selectedTransaction != null)
-        {
-            <MudText Class="mb-3">
-                You are about to <strong>reject</strong> transaction <strong>@_selectedTransaction.ExternalId</strong>
+<!-- Reject Dialog - Centered modal above the drawer -->
+<MudOverlay Visible="_showRejectDialog" DarkBackground="false" AutoClose="false" Style="background-color: rgba(0,0,0,0.5); z-index: 2000;">
+    <MudPaper Class="pa-6" Style="max-width: 380px; border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);">
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.h6" Class="mb-2">
+                <MudIcon Icon="@Icons.Material.Filled.Cancel" Class="mr-2" Color="Color.Error" />
+                Reject Transaction
             </MudText>
-            <MudTextField @bind-Value="_reviewNotes" Label="Rejection Reason" Required="true"
-                          Variant="Variant.Outlined" Lines="3" 
-                          Placeholder="Explain why this transaction is being rejected..." Class="mb-4"
-                          RequiredError="A rejection reason is required for compliance" />
-        }
-        <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2">
-            <MudButton OnClick="@(() => _showRejectDialog = false)">Cancel</MudButton>
-            <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="@RejectTransaction"
-                       Disabled="@string.IsNullOrWhiteSpace(_reviewNotes)">Reject</MudButton>
+            @if (_selectedTransaction != null)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    ID: <strong>@_selectedTransaction.ExternalId</strong>
+                </MudText>
+                <MudDivider Class="my-2" />
+                <MudTextField @bind-Value="_reviewNotes" Label="Rejection Reason" Required="true"
+                              Variant="Variant.Outlined" Lines="3" Margin="Margin.Dense"
+                              Placeholder="Explain why..." Class="mb-3"
+                              RequiredError="Reason required" />
+                <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="1">
+                    <MudButton OnClick="@(() => _showRejectDialog = false)" Size="Size.Small">Cancel</MudButton>
+                    <MudButton Color="Color.Error" Variant="Variant.Filled" Size="Size.Small" OnClick="@RejectTransaction"
+                               Disabled="@string.IsNullOrWhiteSpace(_reviewNotes)">Reject</MudButton>
+                </MudStack>
+            }
         </MudStack>
     </MudPaper>
 </MudOverlay>
@@ -150,7 +156,7 @@
                                              Size="Size.Large" Value="@_selectedTransaction.RiskAnalysis.RiskScore">
                             <MudText Typo="Typo.h4">@_selectedTransaction.RiskAnalysis.RiskScore</MudText>
                         </MudProgressCircular>
-                        <MudChip T="string" Color="@GetRiskColor(_selectedTransaction.RiskAnalysis.RiskLevel)" Size="Size.Medium">
+                        <MudChip T="string" Color="@GetRiskColor(_selectedTransaction.RiskAnalysis.RiskLevel)" Size="Size.Medium" Style="@GetRiskStyle(_selectedTransaction.RiskAnalysis.RiskLevel)">
                             @_selectedTransaction.RiskAnalysis.RiskLevel Risk
                         </MudChip>
                     </MudStack>
@@ -229,20 +235,21 @@ else
 {
     <!-- Transaction List View -->
     <MudPaper Class="pa-4" Elevation="2">
-        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3 flex-wrap">
-            <MudStack Row="true" Spacing="2" Class="flex-wrap">
-                <MudSelect T="RiskLevel?" Label="Risk Level" Value="@_filterRiskLevel" 
-                           ValueChanged="@OnRiskLevelFilterChanged" Dense="true" Class="flex-grow-1"
-                           Style="min-width: 130px; max-width: 150px;">
+        <!-- Filters: 2 cols on mobile, 3 on tablet, 6 on desktop -->
+        <MudGrid Spacing="2" Class="mb-2">
+            <MudItem xs="6" sm="4" md="2">
+                <MudSelect T="RiskLevel?" Label="Risk Level" Value="@_filterRiskLevel"
+                           ValueChanged="@OnRiskLevelFilterChanged" Dense="true" Variant="Variant.Outlined" FullWidth="true">
                     <MudSelectItem T="RiskLevel?" Value="@((RiskLevel?)null)">All</MudSelectItem>
                     <MudSelectItem T="RiskLevel?" Value="RiskLevel.Low">Low</MudSelectItem>
                     <MudSelectItem T="RiskLevel?" Value="RiskLevel.Medium">Medium</MudSelectItem>
                     <MudSelectItem T="RiskLevel?" Value="RiskLevel.High">High</MudSelectItem>
                     <MudSelectItem T="RiskLevel?" Value="RiskLevel.Critical">Critical</MudSelectItem>
                 </MudSelect>
-                <MudSelect T="ReviewStatus?" Label="Status" Value="@_filterStatus" 
-                           ValueChanged="@OnStatusFilterChanged" Dense="true" Class="flex-grow-1"
-                           Style="min-width: 130px; max-width: 150px;">
+            </MudItem>
+            <MudItem xs="6" sm="4" md="2">
+                <MudSelect T="ReviewStatus?" Label="Status" Value="@_filterStatus"
+                           ValueChanged="@OnStatusFilterChanged" Dense="true" Variant="Variant.Outlined" FullWidth="true">
                     <MudSelectItem T="ReviewStatus?" Value="@((ReviewStatus?)null)">All</MudSelectItem>
                     <MudSelectItem T="ReviewStatus?" Value="ReviewStatus.Pending">Pending</MudSelectItem>
                     <MudSelectItem T="ReviewStatus?" Value="ReviewStatus.Approved">Approved</MudSelectItem>
@@ -250,11 +257,42 @@ else
                     <MudSelectItem T="ReviewStatus?" Value="ReviewStatus.Escalated">Escalated</MudSelectItem>
                     <MudSelectItem T="ReviewStatus?" Value="ReviewStatus.AutoApproved">Auto-Approved</MudSelectItem>
                 </MudSelect>
-            </MudStack>
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" 
-                       StartIcon="@Icons.Material.Filled.Refresh" OnClick="@LoadTransactions">
-                Refresh
+            </MudItem>
+            <MudItem xs="6" sm="4" md="2">
+                <MudDatePicker Label="From Date" Date="@_filterFromDate" DateChanged="@OnFromDateChanged"
+                               Variant="Variant.Outlined" Clearable="true" />
+            </MudItem>
+            <MudItem xs="6" sm="4" md="2">
+                <MudDatePicker Label="To Date" Date="@_filterToDate" DateChanged="@OnToDateChanged"
+                               Variant="Variant.Outlined" Clearable="true" />
+            </MudItem>
+            <MudItem xs="6" sm="4" md="2">
+                <MudNumericField @bind-Value="_filterMinAmount" Label="Min ($)" Variant="Variant.Outlined"
+                                 FullWidth="true" Min="0" Step="100"
+                                 Placeholder="e.g. 100" Adornment="Adornment.Start" AdornmentText="$" />
+            </MudItem>
+            <MudItem xs="6" sm="4" md="2">
+                <MudNumericField @bind-Value="_filterMaxAmount" Label="Max ($)" Variant="Variant.Outlined"
+                                 FullWidth="true" Min="0" Step="100"
+                                 Placeholder="e.g. 5000" Adornment="Adornment.Start" AdornmentText="$" />
+            </MudItem>
+        </MudGrid>
+        <!-- Action Buttons -->
+        <MudStack Row="true" Spacing="2" Class="mb-3">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.FilterAlt" OnClick="@LoadTransactions">
+                Apply Filters
             </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.ClearAll" OnClick="@ClearFilters">
+                Clear
+            </MudButton>
+            @if (_transactions.Any())
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-flex align-center">
+                    Showing @_transactions.Count result@(_transactions.Count == 1 ? "" : "s")
+                </MudText>
+            }
         </MudStack>
 
         @if (_loading)
@@ -263,7 +301,8 @@ else
         }
         else
         {
-            <MudTable Items="@_transactions" Hover="true" Dense="true" OnRowClick="@OnRowClick" T="Transaction">
+            <MudTable Items="@_transactions" Hover="true" Dense="true" OnRowClick="@OnRowClick" T="Transaction"
+                      @bind-RowsPerPage="_rowsPerPage">
                 <HeaderContent>
                     <MudTh>External ID</MudTh>
                     <MudTh>Type</MudTh>
@@ -280,12 +319,12 @@ else
                     <MudTd>@context.Amount.ToString("C2") @context.SourceCurrency</MudTd>
                     <MudTd>@context.SourceCountry → @context.DestinationCountry</MudTd>
                     <MudTd>
-                        <MudChip T="string" Size="Size.Small" Color="@GetRiskColor(context.RiskAnalysis?.RiskLevel)">
+                        <MudChip T="string" Size="Size.Small" Color="@GetRiskColor(context.RiskAnalysis?.RiskLevel)" Style="@GetRiskStyle(context.RiskAnalysis?.RiskLevel)">
                             @(context.RiskAnalysis?.RiskScore ?? 0)
                         </MudChip>
                     </MudTd>
                     <MudTd>
-                        <MudChip T="string" Size="Size.Small" Color="@GetRiskColor(context.RiskAnalysis?.RiskLevel)">
+                        <MudChip T="string" Size="Size.Small" Color="@GetRiskColor(context.RiskAnalysis?.RiskLevel)" Style="@GetRiskStyle(context.RiskAnalysis?.RiskLevel)">
                             @(context.RiskAnalysis?.RiskLevel.ToString() ?? "N/A")
                         </MudChip>
                     </MudTd>
@@ -296,6 +335,9 @@ else
                     </MudTd>
                     <MudTd>@context.ReceivedAt.ToString("MM/dd HH:mm")</MudTd>
                 </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[]{10, 25, 50}" RowsPerPageString="Per page:" />
+                </PagerContent>
             </MudTable>
         }
     </MudPaper>
@@ -317,10 +359,11 @@ else
                     @if (_selectedTransaction.RiskAnalysis != null)
                     {
                         <MudProgressCircular Color="@GetRiskColor(_selectedTransaction.RiskAnalysis.RiskLevel)" 
-                                             Size="Size.Large" Value="@_selectedTransaction.RiskAnalysis.RiskScore">
-                            <MudText Typo="Typo.h4">@_selectedTransaction.RiskAnalysis.RiskScore</MudText>
+                                             Size="Size.Large" Value="@_selectedTransaction.RiskAnalysis.RiskScore"
+                                             Class="d-flex align-center justify-center">
+                            <MudText Typo="Typo.h4" Class="text-center">@_selectedTransaction.RiskAnalysis.RiskScore</MudText>
                         </MudProgressCircular>
-                        <MudChip T="string" Color="@GetRiskColor(_selectedTransaction.RiskAnalysis.RiskLevel)" Size="Size.Medium">
+                        <MudChip T="string" Color="@GetRiskColor(_selectedTransaction.RiskAnalysis.RiskLevel)" Size="Size.Medium" Style="@GetRiskStyle(_selectedTransaction.RiskAnalysis.RiskLevel)">
                             @_selectedTransaction.RiskAnalysis.RiskLevel Risk
                         </MudChip>
                     }
@@ -423,13 +466,22 @@ else
     [Parameter]
     public Guid? TransactionId { get; set; }
 
+    [SupplyParameterFromQuery]
+    public string? ReturnTo { get; set; }
+
     private bool _loading = true;
     private bool _processing = false;
     private bool _drawerOpen = false;
+    private int _rowsPerPage = 10;
     private List<Transaction> _transactions = new();
     private Transaction? _selectedTransaction;
     private RiskLevel? _filterRiskLevel;
-    private ReviewStatus? _filterStatus;    private bool _showApproveDialog = false;
+    private ReviewStatus? _filterStatus;
+    private DateTime? _filterFromDate;
+    private DateTime? _filterToDate;
+    private decimal? _filterMinAmount;
+    private decimal? _filterMaxAmount;
+    private bool _showApproveDialog = false;
     private bool _showRejectDialog = false;
     private string _reviewNotes = "";
     protected override async Task OnInitializedAsync()
@@ -459,7 +511,31 @@ else
                 pageSize: 50,
                 riskLevel: _filterRiskLevel,
                 reviewStatus: _filterStatus);
-            _transactions = transactions.ToList();
+            
+            // Apply client-side filters for date and amount
+            var filtered = transactions.AsEnumerable();
+            
+            if (_filterFromDate.HasValue)
+            {
+                filtered = filtered.Where(t => t.ReceivedAt.Date >= _filterFromDate.Value.Date);
+            }
+            
+            if (_filterToDate.HasValue)
+            {
+                filtered = filtered.Where(t => t.ReceivedAt.Date <= _filterToDate.Value.Date);
+            }
+            
+            if (_filterMinAmount.HasValue)
+            {
+                filtered = filtered.Where(t => t.Amount >= _filterMinAmount.Value);
+            }
+            
+            if (_filterMaxAmount.HasValue)
+            {
+                filtered = filtered.Where(t => t.Amount <= _filterMaxAmount.Value);
+            }
+            
+            _transactions = filtered.ToList();
         }
         finally
         {
@@ -479,6 +555,34 @@ else
         await LoadTransactions();
     }
 
+    private async Task OnFromDateChanged(DateTime? value)
+    {
+        _filterFromDate = value;
+        await LoadTransactions();
+    }
+
+    private async Task OnToDateChanged(DateTime? value)
+    {
+        _filterToDate = value;
+        await LoadTransactions();
+    }
+
+    private async Task OnAmountFilterChanged()
+    {
+        await LoadTransactions();
+    }
+
+    private async Task ClearFilters()
+    {
+        _filterRiskLevel = null;
+        _filterStatus = null;
+        _filterFromDate = null;
+        _filterToDate = null;
+        _filterMinAmount = null;
+        _filterMaxAmount = null;
+        await LoadTransactions();
+    }
+
     private void OnRowClick(TableRowClickEventArgs<Transaction> args)
     {
         _selectedTransaction = args.Item;
@@ -488,6 +592,15 @@ else
     private void CloseDrawer()
     {
         _drawerOpen = false;
+        // Navigate back to returnTo page or default to /transactions
+        if (!string.IsNullOrEmpty(ReturnTo))
+        {
+            NavigationManager.NavigateTo(ReturnTo);
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/transactions");
+        }
     }
     
     private void ViewFullDetails()
@@ -500,7 +613,14 @@ else
 
     private void NavigateToList()
     {
-        NavigationManager.NavigateTo("/transactions");
+        if (!string.IsNullOrEmpty(ReturnTo))
+        {
+            NavigationManager.NavigateTo(ReturnTo);
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/transactions");
+        }
     }
 
     private void OpenApproveDialog()
@@ -595,11 +715,18 @@ else
 
     private Color GetRiskColor(RiskLevel? level) => level switch
     {
-        RiskLevel.Low => Color.Success,
-        RiskLevel.Medium => Color.Warning,
-        RiskLevel.High => Color.Error,
-        RiskLevel.Critical => Color.Dark,
+        RiskLevel.Low => Color.Success,      // Green
+        RiskLevel.Medium => Color.Warning,   // Orange
+        RiskLevel.High => Color.Error,       // Red (lighter shade)
+        RiskLevel.Critical => Color.Error,   // Red (darker/brighter - most alarming)
         _ => Color.Default
+    };
+
+    private string GetRiskStyle(RiskLevel? level) => level switch
+    {
+        RiskLevel.High => "opacity: 0.8;",         // Slightly muted red
+        RiskLevel.Critical => "opacity: 1.0; font-weight: bold;",  // Bright, bold red
+        _ => ""
     };
 
     private Color GetStatusColor(ReviewStatus? status) => status switch
