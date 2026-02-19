@@ -25,73 +25,99 @@
 </MudAlert>
 
 <!-- Approve Dialog using MudOverlay -->
-<MudOverlay Visible="_showApproveDialog" DarkBackground="true" AutoClose="false">
-    <MudPaper Class="pa-4" Style="min-width: 90vw; max-width: 500px; max-height: 90vh; overflow-y: auto;">
-        <MudText Typo="Typo.h6" Class="mb-3">
-            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-2" Color="Color.Success" />
-            Approve Transaction
-        </MudText>
-        @if (_selectedReview != null)
-        {
-            <MudText Class="mb-3">
-                You are about to <strong>approve</strong> transaction <strong>@_selectedReview.Transaction.ExternalId</strong>
+<MudOverlay Visible="_showApproveDialog" DarkBackground="false" AutoClose="false" Style="background-color: rgba(0,0,0,0.5); z-index: 2000;">
+    <MudPaper Class="pa-6" Style="max-width: 380px; border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.3);">
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.h6" Class="mb-2">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-2" Color="Color.Success" />
+                Approve Transaction
             </MudText>
-            <MudTextField @bind-Value="_reviewNotes" Label="Approval Notes" Required="true"
-                          Variant="Variant.Outlined" Lines="3" 
-                          Placeholder="Explain why you are approving this transaction..." Class="mb-4"
-                          RequiredError="Approval notes are required for compliance" />
-        }
-        <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2">
-            <MudButton OnClick="@(() => _showApproveDialog = false)">Cancel</MudButton>
-            <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="@ApproveReview"
-                       Disabled="@string.IsNullOrWhiteSpace(_reviewNotes)">Approve</MudButton>
+            @if (_selectedReview != null)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    ID: <strong>@_selectedReview.Transaction.ExternalId</strong>
+                </MudText>
+                <MudDivider Class="my-2" />
+                <MudTextField @bind-Value="_reviewNotes" Label="Approval Notes" Required="true"
+                              Variant="Variant.Outlined" Lines="3" Margin="Margin.Dense"
+                              Placeholder="Explain why you are approving this transaction..." Class="mb-3"
+                              RequiredError="Approval notes are required for compliance" />
+            }
+            <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="1">
+                <MudButton OnClick="@(() => _showApproveDialog = false)" Size="Size.Small">Cancel</MudButton>
+                <MudButton Color="Color.Success" Variant="Variant.Filled" Size="Size.Small" OnClick="@ApproveReview"
+                           Disabled="@string.IsNullOrWhiteSpace(_reviewNotes)">Approve</MudButton>
+            </MudStack>
         </MudStack>
     </MudPaper>
 </MudOverlay>
 
 <!-- Reject Dialog using MudOverlay -->
-<MudOverlay Visible="_showRejectDialog" DarkBackground="true" AutoClose="false">
-    <MudPaper Class="pa-4" Style="min-width: 90vw; max-width: 500px; max-height: 90vh; overflow-y: auto;">
-        <MudText Typo="Typo.h6" Class="mb-3">
-            <MudIcon Icon="@Icons.Material.Filled.Cancel" Class="mr-2" Color="Color.Error" />
-            Reject Transaction
-        </MudText>
-        @if (_selectedReview != null)
-        {
-            <MudText Class="mb-3">
-                You are about to <strong>reject</strong> transaction <strong>@_selectedReview.Transaction.ExternalId</strong>
+<MudOverlay Visible="_showRejectDialog" DarkBackground="false" AutoClose="false" Style="background-color: rgba(0,0,0,0.5); z-index: 2000;">
+    <MudPaper Class="pa-6" Style="max-width: 380px; border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.3);">
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.h6" Class="mb-2">
+                <MudIcon Icon="@Icons.Material.Filled.Cancel" Class="mr-2" Color="Color.Error" />
+                Reject Transaction
             </MudText>
-            <MudTextField @bind-Value="_reviewNotes" Label="Rejection Reason" Required="true"
-                          Variant="Variant.Outlined" Lines="3" 
-                          Placeholder="Explain why this transaction is being rejected..." Class="mb-4"
-                          RequiredError="A rejection reason is required for compliance" />
-        }
-        <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2">
-            <MudButton OnClick="@(() => _showRejectDialog = false)">Cancel</MudButton>
-            <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="@RejectReview"
-                       Disabled="@string.IsNullOrWhiteSpace(_reviewNotes)">Reject</MudButton>
+            @if (_selectedReview != null)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    ID: <strong>@_selectedReview.Transaction.ExternalId</strong>
+                </MudText>
+                <MudDivider Class="my-2" />
+                <MudTextField @bind-Value="_reviewNotes" Label="Rejection Reason" Required="true"
+                              Variant="Variant.Outlined" Lines="3" Margin="Margin.Dense"
+                              Placeholder="Explain why this transaction is being rejected..." Class="mb-3"
+                              RequiredError="A rejection reason is required for compliance" />
+            }
+            <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="1">
+                <MudButton OnClick="@(() => _showRejectDialog = false)" Size="Size.Small">Cancel</MudButton>
+                <MudButton Color="Color.Error" Variant="Variant.Filled" Size="Size.Small" OnClick="@RejectReview"
+                           Disabled="@string.IsNullOrWhiteSpace(_reviewNotes)">Reject</MudButton>
+            </MudStack>
         </MudStack>
     </MudPaper>
 </MudOverlay>
 
 <MudPaper Class="pa-4" Elevation="2">
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3 flex-wrap">
-        <MudStack Row="true" Spacing="2" Class="flex-wrap">
+    <MudGrid Spacing="2" Class="mb-3">
+        <!-- Min Risk Level Filter -->
+        <MudItem xs="12" sm="6" md="4">
             <MudSelect T="RiskLevel?" Label="Min Risk Level" Value="@_minRiskLevel" 
-                       ValueChanged="@OnFilterChanged" Dense="true" Class="flex-grow-1" 
-                       Style="min-width: 130px; max-width: 150px;">
+                       ValueChanged="@OnFilterChanged" Dense="true" FullWidth="true">
                 <MudSelectItem T="RiskLevel?" Value="@((RiskLevel?)null)">All</MudSelectItem>
                 <MudSelectItem T="RiskLevel?" Value="RiskLevel.Medium">Medium+</MudSelectItem>
                 <MudSelectItem T="RiskLevel?" Value="RiskLevel.High">High+</MudSelectItem>
                 <MudSelectItem T="RiskLevel?" Value="RiskLevel.Critical">Critical Only</MudSelectItem>
             </MudSelect>
-        </MudStack>
-        <MudStack Row="true" Spacing="2">
-            <MudChip T="string" Color="Color.Warning">@_reviews.Count Pending</MudChip>
+        </MudItem>
+
+        <!-- Reviews Count -->
+        <MudItem xs="12" sm="6" md="4" Class="d-flex align-center">
+            <MudChip T="string" Color="Color.Warning" Size="Size.Medium">@_reviews.Count Pending</MudChip>
+        </MudItem>
+
+        <!-- Per Page Filter & Refresh -->
+        <MudItem xs="12" sm="6" md="2">
+            <MudSelect T="int" Value="_pageSize" ValueChanged="OnPageSizeChanged" Label="Per page" Dense="true" FullWidth="true">
+                <MudSelectItem T="int" Value="5">5</MudSelectItem>
+                <MudSelectItem T="int" Value="10">10</MudSelectItem>
+                <MudSelectItem T="int" Value="25">25</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+
+        <!-- Refresh Button -->
+        <MudItem xs="12" sm="6" md="2" Class="d-flex align-center">
             <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" 
-                       OnClick="@LoadReviews">Refresh</MudButton>
-        </MudStack>
-    </MudStack>
+                       OnClick="@LoadReviews" FullWidth="true">Refresh</MudButton>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Page Info Display -->
+    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3">
+        Showing @(Math.Min((_currentPage - 1) * _pageSize + 1, _reviews.Count))–@(Math.Min(_currentPage * _pageSize, _reviews.Count)) of @_reviews.Count
+    </MudText>
 
     @if (_loading)
     {
@@ -106,7 +132,7 @@
     }
     else
     {
-        @foreach (var review in _reviews)
+        @foreach (var review in PagedReviews)
         {
             <MudCard Class="mb-3" Elevation="1">
                 <MudCardContent>
@@ -126,7 +152,7 @@
                                                      Size="Size.Medium" Value="@review.RiskScore">
                                     <MudText Typo="Typo.body2">@review.RiskScore</MudText>
                                 </MudProgressCircular>
-                                <MudChip T="string" Color="@GetRiskColor(review.RiskLevel)" Size="Size.Small">
+                                <MudChip T="string" Color="@GetRiskColor(review.RiskLevel)" Size="Size.Small" Style="@GetRiskStyle(review.RiskLevel)">
                                     @review.RiskLevel
                                 </MudChip>
                             </MudStack>
@@ -166,7 +192,7 @@
                                 <MudButton Variant="Variant.Outlined" Color="Color.Primary" 
                                            FullWidth="true" Size="Size.Small"
                                            StartIcon="@Icons.Material.Filled.Visibility"
-                                           Href="@($"/transactions/{review.TransactionId}")">
+                                           Href="@($"/transactions/{review.TransactionId}?returnTo=/reviews")">
                                     View Details
                                 </MudButton>
                             </MudStack>
@@ -174,6 +200,15 @@
                     </MudGrid>
                 </MudCardContent>
             </MudCard>
+        }
+
+        @if (TotalPages > 1)
+        {
+            <MudStack Row="true" Justify="Justify.Center" Class="mt-3">
+                <MudPagination Count="@TotalPages" Selected="@_currentPage" 
+                               SelectedChanged="OnPageChanged"
+                               BoundaryCount="1" MiddleCount="3" ShowFirstButton="true" ShowLastButton="true" />
+            </MudStack>
         }
     }
 </MudPaper>
@@ -188,6 +223,17 @@
     private bool _showApproveDialog = false;
     private bool _showRejectDialog = false;
     private HubConnection? _hubConnection;
+
+    // Pagination - smaller page size since review cards are larger than table rows
+    private int _currentPage = 1;
+    private int _pageSize = 5;
+    private int TotalPages => (int)Math.Ceiling(_reviews.Count / (double)_pageSize);
+    private IEnumerable<RiskAnalysis> PagedReviews => _reviews
+        .Skip((_currentPage - 1) * _pageSize)
+        .Take(_pageSize);
+
+    private void OnPageChanged(int page) => _currentPage = page;
+    private void OnPageSizeChanged(int size) { _pageSize = size; _currentPage = 1; }
 
     protected override async Task OnInitializedAsync()
     {
@@ -239,6 +285,7 @@
     private async Task OnFilterChanged(RiskLevel? value)
     {
         _minRiskLevel = value;
+        _currentPage = 1;
         await LoadReviews();
     }
 
@@ -307,8 +354,15 @@
         RiskLevel.Low => Color.Success,
         RiskLevel.Medium => Color.Warning,
         RiskLevel.High => Color.Error,
-        RiskLevel.Critical => Color.Dark,
+        RiskLevel.Critical => Color.Error,
         _ => Color.Default
+    };
+
+    private string GetRiskStyle(RiskLevel level) => level switch
+    {
+        RiskLevel.High => "opacity: 0.8;",
+        RiskLevel.Critical => "opacity: 1.0; font-weight: bold;",
+        _ => ""
     };
 
     public async ValueTask DisposeAsync()
