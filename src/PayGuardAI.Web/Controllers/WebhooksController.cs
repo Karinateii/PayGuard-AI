@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
 using PayGuardAI.Core.Services;
 using PayGuardAI.Data.Services;
@@ -10,9 +11,11 @@ namespace PayGuardAI.Web.Controllers;
 /// <summary>
 /// Webhook controller for receiving payment provider events.
 /// Supports multiple providers: Afriex, Flutterwave, Wise, etc.
+/// Per-API-key rate limiting applied for programmatic access control.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[EnableRateLimiting("PerApiKey")]
 public class WebhooksController : ControllerBase
 {
     private readonly ITransactionService _transactionService;

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using PayGuardAI.Data;
 using PayGuardAI.Web;
 
 namespace PayGuardAI.Tests.Integration;
@@ -16,6 +17,13 @@ public class PayGuardApiWebApplicationFactory : WebApplicationFactory<Program>
             // For example, replace production services with test doubles
         });
 
-        return base.CreateHost(builder);
+        var host = base.CreateHost(builder);
+
+        // Ensure DB is created for integration tests
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        db.Database.EnsureCreated();
+
+        return host;
     }
 }

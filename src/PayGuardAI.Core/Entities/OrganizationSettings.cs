@@ -15,6 +15,11 @@ public class OrganizationSettings
     public string? WebhookUrl { get; set; }
     public int AutoApproveThreshold { get; set; } = 20;
     public int AutoRejectThreshold { get; set; } = 80;
+    /// <summary>
+    /// Comma-separated list of allowed IP addresses for API access.
+    /// Empty = all IPs allowed.
+    /// </summary>
+    public string? IpWhitelist { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public string UpdatedBy { get; set; } = "system";

@@ -4,4 +4,7 @@
     <Project Path="src/PayGuardAI.Data/PayGuardAI.Data.csproj" />
     <Project Path="src/PayGuardAI.Web/PayGuardAI.Web.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PayGuardAI.Tests/PayGuardAI.Tests.csproj" />
+  </Folder>
 </Solution>

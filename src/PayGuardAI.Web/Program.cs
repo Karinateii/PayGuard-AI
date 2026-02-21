@@ -68,10 +68,12 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("RequireManager", policy => policy.RequireRole("Manager", "Admin"));
 });
 
-// Add rate limiting
+// Add rate limiting — global per-tenant + per-API-key
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Global rate limit partitioned by tenant
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
     {
         var tenantId = context.Items["TenantId"] as string ?? "default";
@@ -80,6 +82,19 @@ builder.Services.AddRateLimiter(options =>
             PermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:PermitLimit") ?? 60,
             Window = TimeSpan.FromSeconds(builder.Configuration.GetValue<int?>("RateLimiting:WindowSeconds") ?? 60),
             QueueLimit = 0
+        });
+    });
+
+    // Per-API-key rate limit policy (stricter, for programmatic access)
+    options.AddPolicy("PerApiKey", context =>
+    {
+        var apiKeyId = context.Items["ApiKeyId"] as Guid?;
+        var partitionKey = apiKeyId?.ToString() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:PerKeyPermitLimit") ?? 120,
+            Window = TimeSpan.FromSeconds(builder.Configuration.GetValue<int?>("RateLimiting:PerKeyWindowSeconds") ?? 60),
+            QueueLimit = 2
         });
     });
 });
@@ -216,8 +231,14 @@ app.UseSerilogRequestLogging(options =>
         diagnosticContext.Set("UserId", httpContext.User?.Identity?.Name ?? "anonymous");
     };
 });
+
+// Security middleware pipeline (order matters!)
+app.UseMiddleware<SecurityHeadersMiddleware>();    // Security headers on every response
+app.UseMiddleware<InputValidationMiddleware>();     // Reject oversized / malicious payloads
 app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseMiddleware<TenantResolutionMiddleware>();
+app.UseMiddleware<ApiKeyAuthenticationMiddleware>(); // Validate X-API-Key for /api/ endpoints
+app.UseMiddleware<IpWhitelistMiddleware>();          // Enforce per-tenant IP whitelist
 
 app.UseSession();
 app.UseRateLimiter();

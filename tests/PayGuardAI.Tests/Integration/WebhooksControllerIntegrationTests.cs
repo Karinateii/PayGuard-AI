@@ -7,7 +7,8 @@ using System.Text.Json;
 
 namespace PayGuardAI.Tests.Integration;
 
-public class WebhooksControllerIntegrationTests : IClassFixture<PayGuardApiWebApplicationFactory>
+[Collection("Integration")]
+public class WebhooksControllerIntegrationTests
 {
     private readonly HttpClient _client;
     private readonly PayGuardApiWebApplicationFactory _factory;
