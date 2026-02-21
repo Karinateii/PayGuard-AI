@@ -34,7 +34,14 @@ public class InputValidationMiddleware
             return;
         }
 
-        // Enforce Content-Type on POST/PUT/PATCH
+        // Skip auth endpoints (demo-login uses form POST, not JSON)
+        if (context.Request.Path.StartsWithSegments("/api/Auth"))
+        {
+            await _next(context);
+            return;
+        }
+
+        // Enforce Content-Type on POST/PUT/PATCH for webhook/data endpoints
         if (HttpMethods.IsPost(context.Request.Method) ||
             HttpMethods.IsPut(context.Request.Method) ||
             HttpMethods.IsPatch(context.Request.Method))
@@ -42,7 +49,8 @@ public class InputValidationMiddleware
             var contentType = context.Request.ContentType;
             if (!string.IsNullOrEmpty(contentType) &&
                 !contentType.Contains("application/json", StringComparison.OrdinalIgnoreCase) &&
-                !contentType.Contains("text/json", StringComparison.OrdinalIgnoreCase))
+                !contentType.Contains("text/json", StringComparison.OrdinalIgnoreCase) &&
+                !contentType.Contains("application/x-www-form-urlencoded", StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogWarning("Rejected request with invalid content type: {ContentType} to {Path}",
                     contentType, context.Request.Path);
