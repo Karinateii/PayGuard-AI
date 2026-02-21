@@ -18,6 +18,7 @@ public class TransactionService : ITransactionService
     private readonly ILogger<TransactionService> _logger;
     private readonly IMemoryCache _cache;
     private readonly ITenantContext _tenantContext;
+    private readonly IMetricsService _metrics;
 
     private const string DashboardCacheKey = "dashboard-stats";
     private const string TransactionsCacheKey = "transactions";
@@ -27,13 +28,15 @@ public class TransactionService : ITransactionService
         IRiskScoringService riskScoringService,
         ILogger<TransactionService> logger,
         IMemoryCache cache,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IMetricsService metrics)
     {
         _context = context;
         _riskScoringService = riskScoringService;
         _logger = logger;
         _cache = cache;
         _tenantContext = tenantContext;
+        _metrics = metrics;
     }
 
     public async Task<Transaction> ProcessWebhookAsync(string payload, CancellationToken cancellationToken = default)
@@ -60,7 +63,16 @@ public class TransactionService : ITransactionService
         _logger.LogInformation("Transaction {TransactionId} saved, starting risk analysis", transaction.Id);
 
         // Perform risk analysis
-        await _riskScoringService.AnalyzeTransactionAsync(transaction, cancellationToken);
+        var riskAnalysis = await _riskScoringService.AnalyzeTransactionAsync(transaction, cancellationToken);
+
+        // Record Prometheus metrics
+        var outcome = riskAnalysis.ReviewStatus == ReviewStatus.AutoApproved ? "auto_approved" : "flagged";
+        _metrics.RecordTransactionProcessed(riskAnalysis.RiskLevel.ToString().ToLower(), outcome);
+        _metrics.RecordRiskScore(riskAnalysis.RiskScore);
+
+        _logger.LogInformation(
+            "Transaction {TransactionId} risk analysis complete: Score={RiskScore}, Level={RiskLevel}, Outcome={Outcome}",
+            transaction.Id, riskAnalysis.RiskScore, riskAnalysis.RiskLevel, outcome);
 
         InvalidateCaches();
 

@@ -16,6 +16,7 @@ public class ReviewService : IReviewService
     private readonly ILogger<ReviewService> _logger;
     private readonly IMemoryCache _cache;
     private readonly ITenantContext _tenantContext;
+    private readonly IMetricsService _metrics;
 
     private const string DashboardCacheKey = "dashboard-stats";
 
@@ -23,12 +24,14 @@ public class ReviewService : IReviewService
         ApplicationDbContext context,
         ILogger<ReviewService> logger,
         IMemoryCache cache,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IMetricsService metrics)
     {
         _context = context;
         _logger = logger;
         _cache = cache;
         _tenantContext = tenantContext;
+        _metrics = metrics;
     }
 
     public async Task<RiskAnalysis> ApproveAsync(
@@ -57,6 +60,7 @@ public class ReviewService : IReviewService
         // Update customer profile
         await UpdateCustomerAfterReviewAsync(analysis.Transaction.SenderId, false, cancellationToken);
 
+        _metrics.RecordReviewCompleted("approved");
         _logger.LogInformation("Transaction {TransactionId} approved by {Reviewer}", 
             analysis.TransactionId, reviewedBy);
 
@@ -89,6 +93,7 @@ public class ReviewService : IReviewService
         // Update customer profile (this was a rejection)
         await UpdateCustomerAfterReviewAsync(analysis.Transaction.SenderId, true, cancellationToken);
 
+        _metrics.RecordReviewCompleted("rejected");
         _logger.LogInformation("Transaction {TransactionId} rejected by {Reviewer}", 
             analysis.TransactionId, reviewedBy);
 
@@ -118,6 +123,7 @@ public class ReviewService : IReviewService
             $"{{\"newStatus\": \"Escalated\"}}",
             notes, cancellationToken);
 
+        _metrics.RecordReviewCompleted("escalated");
         _logger.LogInformation("Transaction {TransactionId} escalated by {Reviewer}", 
             analysis.TransactionId, reviewedBy);
 

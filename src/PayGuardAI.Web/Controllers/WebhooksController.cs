@@ -19,17 +19,20 @@ public class WebhooksController : ControllerBase
     private readonly IHubContext<TransactionHub> _hubContext;
     private readonly IPaymentProviderFactory _providerFactory;
     private readonly ILogger<WebhooksController> _logger;
+    private readonly IMetricsService _metrics;
 
     public WebhooksController(
         ITransactionService transactionService,
         IHubContext<TransactionHub> hubContext,
         IPaymentProviderFactory providerFactory,
-        ILogger<WebhooksController> logger)
+        ILogger<WebhooksController> logger,
+        IMetricsService metrics)
     {
         _transactionService = transactionService;
         _hubContext = hubContext;
         _providerFactory = providerFactory;
         _logger = logger;
+        _metrics = metrics;
     }
 
     /// <summary>
@@ -76,6 +79,7 @@ public class WebhooksController : ControllerBase
             using var reader = new StreamReader(Request.Body);
             var payload = await reader.ReadToEndAsync(cancellationToken);
 
+            _metrics.RecordWebhookReceived(providerName);
             _logger.LogInformation("[{Provider}] Received webhook: {PayloadPreview}...",
                 providerName, payload.Length > 100 ? payload[..100] : payload);
 

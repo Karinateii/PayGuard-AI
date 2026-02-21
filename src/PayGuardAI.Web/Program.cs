@@ -10,9 +10,35 @@ using PayGuardAI.Web.Components;
 using PayGuardAI.Web.Hubs;
 using PayGuardAI.Web.Models;
 using PayGuardAI.Web.Services;
+using Prometheus;
+using Serilog;
+using Serilog.Events;
+using Serilog.Formatting.Compact;
 using System.Threading.RateLimiting;
 
+// Bootstrap logger captures fatal startup errors before DI is ready
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .MinimumLevel.Override("System", LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .WriteTo.Console(new CompactJsonFormatter())
+    .CreateBootstrapLogger();
+
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure Serilog - structured JSON logs (searchable in Railway log viewer)
+builder.Host.UseSerilog((context, services, config) => config
+    .ReadFrom.Configuration(context.Configuration)
+    .ReadFrom.Services(services)
+    .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.EntityFrameworkCore.Database.Command", LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
+    .MinimumLevel.Override("System.Net.Http", LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .Enrich.WithEnvironmentName()
+    .Enrich.WithThreadId()
+    .Enrich.WithProperty("Application", "PayGuardAI")
+    .WriteTo.Console(new CompactJsonFormatter()));
 
 // Add MudBlazor services
 builder.Services.AddMudServices();
@@ -58,8 +84,7 @@ builder.Services.AddRateLimiter(options =>
     });
 });
 
-// Add basic monitoring
-builder.Services.AddHttpLogging(_ => { });
+// Add basic monitoring (logging handled by Serilog)
 builder.Services.AddHealthChecks();
 
 // Add Entity Framework with feature flag-based database selection
@@ -87,6 +112,9 @@ builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.AddScoped<IAlertingService, AlertingService>();
 builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<IDatabaseMigrationService, DatabaseMigrationService>();
+
+// Register Prometheus metrics service
+builder.Services.AddSingleton<IMetricsService, PrometheusMetricsService>();
 
 // Register MFA service
 builder.Services.Configure<MfaSettings>(builder.Configuration.GetSection("Mfa"));
@@ -140,7 +168,25 @@ if (!app.Environment.IsDevelopment())
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
-app.UseHttpLogging();
+// Serilog structured request logging (replaces UseHttpLogging)
+app.UseSerilogRequestLogging(options =>
+{
+    options.MessageTemplate = "{RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000}ms";
+    options.GetLevel = (httpContext, elapsed, ex) => ex != null
+        ? LogEventLevel.Error
+        : httpContext.Response.StatusCode >= 500
+            ? LogEventLevel.Error
+            : elapsed > 2000
+                ? LogEventLevel.Warning
+                : LogEventLevel.Information;
+    options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+    {
+        diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value ?? "");
+        diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent.FirstOrDefault() ?? "");
+        diagnosticContext.Set("TenantId", httpContext.Items["TenantId"] as string ?? "unknown");
+        diagnosticContext.Set("UserId", httpContext.User?.Identity?.Name ?? "anonymous");
+    };
+});
 app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseMiddleware<TenantResolutionMiddleware>();
 
@@ -153,6 +199,7 @@ app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapHealthChecks("/health");
+app.MapMetrics("/metrics");  // Prometheus scrape endpoint
 app.MapControllers(); // Map API controllers
 app.MapHub<TransactionHub>("/hubs/transactions"); // SignalR hub
 app.MapRazorComponents<App>()
