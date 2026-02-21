@@ -138,6 +138,7 @@ builder.Services.Configure<OAuthSettings>(builder.Configuration.GetSection("OAut
 builder.Services.AddHttpClient<IAfriexApiService, AfriexApiService>();
 builder.Services.AddScoped<AfriexProvider>();
 builder.Services.AddHttpClient<FlutterwaveProvider>();
+builder.Services.AddHttpClient<WiseProvider>();
 builder.Services.AddScoped<IPaymentProviderFactory, PaymentProviderFactory>();
 
 // Register webhook signature service

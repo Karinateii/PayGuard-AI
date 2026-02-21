@@ -57,6 +57,17 @@ public class WebhooksController : ControllerBase
     }
 
     /// <summary>
+    /// Receives transaction webhooks from Wise (TransferWise).
+    /// Wise sends transfer state change events with RSA-SHA256 signed payloads.
+    /// Endpoint: POST /api/webhooks/wise
+    /// </summary>
+    [HttpPost("wise")]
+    public async Task<IActionResult> ReceiveWiseWebhook(CancellationToken cancellationToken)
+    {
+        return await ProcessWebhook("wise", cancellationToken);
+    }
+
+    /// <summary>
     /// Generic transaction webhook endpoint (auto-detects provider)
     /// Legacy endpoint for backward compatibility
     /// Endpoint: POST /api/webhooks/transaction
@@ -85,7 +96,8 @@ public class WebhooksController : ControllerBase
 
             // Verify signature based on provider
             var signature = Request.Headers["x-webhook-signature"].FirstOrDefault()
-                           ?? Request.Headers["verif-hash"].FirstOrDefault(); // Flutterwave uses verif-hash
+                           ?? Request.Headers["verif-hash"].FirstOrDefault()       // Flutterwave uses verif-hash
+                           ?? Request.Headers["X-Signature-SHA256"].FirstOrDefault(); // Wise uses X-Signature-SHA256
 
             if (!string.IsNullOrEmpty(signature))
             {

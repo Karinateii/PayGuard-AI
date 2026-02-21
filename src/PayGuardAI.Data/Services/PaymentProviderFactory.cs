@@ -55,6 +55,23 @@ public class PaymentProviderFactory : IPaymentProviderFactory
                 _logger.LogWarning("Flutterwave enabled but not properly configured");
             }
         }
+
+        // Conditionally register Wise based on feature flag
+        var wiseEnabled = bool.TryParse(flutterwaveSection["WiseEnabled"], out var wiseFlag) && wiseFlag;
+        
+        if (wiseEnabled)
+        {
+            var wiseProvider = _serviceProvider.GetService(typeof(WiseProvider)) as IPaymentProvider;
+            if (wiseProvider != null && wiseProvider.IsConfigured())
+            {
+                _providers[wiseProvider.ProviderName] = wiseProvider;
+                _logger.LogInformation("Registered payment provider: {Provider}", wiseProvider.ProviderName);
+            }
+            else
+            {
+                _logger.LogWarning("Wise enabled but not properly configured");
+            }
+        }
     }
 
     public IPaymentProvider GetProvider(string? providerHint = null)
@@ -66,9 +83,17 @@ public class PaymentProviderFactory : IPaymentProviderFactory
             return hintedProvider;
         }
 
-        // Default priority: Flutterwave (if enabled) > Afriex
-        var flutterwaveSection = _configuration.GetSection("FeatureFlags");
-        var flutterwaveEnabled = bool.TryParse(flutterwaveSection["FlutterwaveEnabled"], out var enabled) && enabled;
+        // Default priority: Wise (if enabled) > Flutterwave (if enabled) > Afriex
+        var featureFlags = _configuration.GetSection("FeatureFlags");
+
+        var wiseEnabled = bool.TryParse(featureFlags["WiseEnabled"], out var wiseFlag) && wiseFlag;
+        if (wiseEnabled && _providers.ContainsKey("wise"))
+        {
+            _logger.LogDebug("Using default provider: wise");
+            return _providers["wise"];
+        }
+
+        var flutterwaveEnabled = bool.TryParse(featureFlags["FlutterwaveEnabled"], out var enabled) && enabled;
         
         if (flutterwaveEnabled && _providers.ContainsKey("flutterwave"))
         {
