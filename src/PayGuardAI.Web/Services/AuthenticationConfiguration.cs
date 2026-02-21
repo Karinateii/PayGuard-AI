@@ -1,8 +1,8 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.Options;
-using Microsoft.Identity.Web;
 using PayGuardAI.Web.Models;
 
 namespace PayGuardAI.Web.Services;
@@ -15,7 +15,7 @@ public static class AuthenticationConfiguration
 {
     /// <summary>
     /// Configure authentication based on feature flags
-    /// When OAuthEnabled=true, uses OAuth 2.0 / OpenID Connect
+    /// When OAuthEnabled=true, uses OAuth 2.0 / OpenID Connect (Google, Azure AD, etc.)
     /// When OAuthEnabled=false, uses Demo authentication handler
     /// </summary>
     public static IServiceCollection AddPayGuardAuthentication(
@@ -64,7 +64,8 @@ public static class AuthenticationConfiguration
         {
             options.Cookie.Name = "PayGuardAuth";
             options.Cookie.HttpOnly = true;
-            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+            // SameAsRequest works behind Railway's reverse proxy (which forwards HTTP internally)
+            options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
             options.Cookie.SameSite = SameSiteMode.Lax;
             options.ExpireTimeSpan = TimeSpan.FromMinutes(settings.CookieExpirationMinutes);
             options.SlidingExpiration = settings.UseSlidingExpiration;
@@ -79,6 +80,8 @@ public static class AuthenticationConfiguration
             options.ClientSecret = settings.ClientSecret;
             options.ResponseType = "code";
             options.UsePkce = true;
+            options.CallbackPath = "/signin-oidc";
+            options.SignedOutCallbackPath = "/signout-callback-oidc";
             
             // Configure scopes
             options.Scope.Clear();
@@ -91,18 +94,18 @@ public static class AuthenticationConfiguration
             options.SaveTokens = settings.SaveTokens;
             options.GetClaimsFromUserInfoEndpoint = true;
 
-            // Map claims
+            // Map claims — Google uses different claim types than Azure AD
             options.TokenValidationParameters = new()
             {
                 NameClaimType = "name",
-                RoleClaimType = "roles",
+                RoleClaimType = ClaimTypes.Role,
                 ValidateIssuer = true,
                 ValidateAudience = true,
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true
             };
 
-            // Events for logging
+            // Events for logging and role assignment
             options.Events = new OpenIdConnectEvents
             {
                 OnAuthenticationFailed = context =>
@@ -112,7 +115,7 @@ public static class AuthenticationConfiguration
                     var logger = loggerFactory.CreateLogger("PayGuard.OAuth");
                     logger.LogError(context.Exception, "OAuth authentication failed");
                     
-                    context.Response.Redirect("/error?message=authentication_failed");
+                    context.Response.Redirect("/login?error=authentication_failed");
                     context.HandleResponse();
                     return Task.CompletedTask;
                 },
@@ -122,30 +125,60 @@ public static class AuthenticationConfiguration
                         .GetRequiredService<ILoggerFactory>();
                     var logger = loggerFactory.CreateLogger("PayGuard.OAuth");
                     
-                    var userEmail = context.Principal?.FindFirst("preferred_username")?.Value
+                    var userEmail = context.Principal?.FindFirst(ClaimTypes.Email)?.Value
                                     ?? context.Principal?.FindFirst("email")?.Value
+                                    ?? context.Principal?.FindFirst("preferred_username")?.Value
                                     ?? "unknown";
                     
-                    logger.LogInformation("User authenticated: {UserEmail}", userEmail);
+                    logger.LogInformation("User authenticated via OAuth: {UserEmail}", userEmail);
+
+                    // Add default roles — Google doesn't provide roles, so we assign them
+                    var config = context.HttpContext.RequestServices.GetRequiredService<IConfiguration>();
+                    var defaultRoles = config["Auth:DefaultRoles"] ?? "Reviewer,Manager";
+                    
+                    if (context.Principal?.Identity is ClaimsIdentity identity)
+                    {
+                        // Add roles if not already present
+                        if (!identity.HasClaim(c => c.Type == ClaimTypes.Role))
+                        {
+                            foreach (var role in defaultRoles.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                            {
+                                identity.AddClaim(new Claim(ClaimTypes.Role, role));
+                            }
+                        }
+                        
+                        // Ensure Name claim is set (some providers use different claim types)
+                        if (!identity.HasClaim(c => c.Type == ClaimTypes.Name))
+                        {
+                            identity.AddClaim(new Claim(ClaimTypes.Name, userEmail));
+                        }
+                    }
+                    
                     return Task.CompletedTask;
                 },
                 OnRedirectToIdentityProvider = context =>
                 {
-                    // Add tenant hint if using Azure AD multi-tenant
-                    if (context.Properties.Items.TryGetValue("tenant", out var tenant))
+                    // Ensure redirect URI uses HTTPS scheme when behind reverse proxy
+                    var forwardedProto = context.HttpContext.Request.Headers["X-Forwarded-Proto"].FirstOrDefault();
+                    if (forwardedProto == "https")
                     {
-                        context.ProtocolMessage.SetParameter("domain_hint", tenant);
+                        context.ProtocolMessage.RedirectUri = context.ProtocolMessage.RedirectUri
+                            .Replace("http://", "https://");
+                    }
+                    return Task.CompletedTask;
+                },
+                OnRedirectToIdentityProviderForSignOut = context =>
+                {
+                    var forwardedProto = context.HttpContext.Request.Headers["X-Forwarded-Proto"].FirstOrDefault();
+                    if (forwardedProto == "https" && context.ProtocolMessage.PostLogoutRedirectUri != null)
+                    {
+                        context.ProtocolMessage.PostLogoutRedirectUri = context.ProtocolMessage.PostLogoutRedirectUri
+                            .Replace("http://", "https://");
                     }
                     return Task.CompletedTask;
                 }
             };
         });
-
-        // For Azure AD specific features (optional, enhanced integration)
-        if (settings.Provider.Equals("AzureAD", StringComparison.OrdinalIgnoreCase))
-        {
-            services.AddMicrosoftIdentityWebAppAuthentication(configuration, "OAuth");
-        }
 
         services.AddCascadingAuthenticationState();
     }

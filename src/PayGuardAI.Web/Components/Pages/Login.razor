@@ -24,11 +24,11 @@
                        Size="Size.Large"
                        StartIcon="@Icons.Material.Filled.Login"
                        OnClick="HandleOAuthLogin">
-                Sign in with Microsoft
+                Sign in with Google
             </MudButton>
 
             <MudText Typo="Typo.caption" Align="Align.Center" Class="mt-4" Color="Color.Secondary">
-                Secure OAuth 2.0 authentication powered by Azure AD
+                Secure OAuth 2.0 authentication powered by Google
             </MudText>
         }
         else
@@ -71,6 +71,7 @@
 
     private void HandleOAuthLogin()
     {
-        Navigation.NavigateTo($"/signin-oidc", forceLoad: true);
+        // Navigate to the OIDC challenge endpoint which triggers the Google login flow
+        Navigation.NavigateTo("/api/Auth/oauth-login", forceLoad: true);
     }
 }

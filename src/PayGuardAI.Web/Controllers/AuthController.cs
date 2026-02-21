@@ -1,20 +1,24 @@
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace PayGuardAI.Web.Controllers;
 
 /// <summary>
-/// Authentication controller for demo mode login/logout
+/// Authentication controller for demo mode login/logout and OAuth
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
 {
     private readonly ILogger<AuthController> _logger;
+    private readonly IConfiguration _configuration;
 
-    public AuthController(ILogger<AuthController> logger)
+    public AuthController(ILogger<AuthController> logger, IConfiguration configuration)
     {
         _logger = logger;
+        _configuration = configuration;
     }
 
     /// <summary>
@@ -33,6 +37,24 @@ public class AuthController : ControllerBase
         
         // Redirect to home page
         return Redirect("/");
+    }
+
+    /// <summary>
+    /// OAuth login endpoint - triggers OIDC challenge (redirects to Google/Azure AD)
+    /// </summary>
+    [HttpGet("oauth-login")]
+    [AllowAnonymous]
+    public IActionResult OAuthLogin()
+    {
+        _logger.LogInformation("[AUTH-CONTROLLER] OAuth login requested - triggering OIDC challenge");
+        
+        var properties = new AuthenticationProperties
+        {
+            RedirectUri = "/",
+            IsPersistent = true
+        };
+
+        return Challenge(properties, OpenIdConnectDefaults.AuthenticationScheme);
     }
 
     /// <summary>
