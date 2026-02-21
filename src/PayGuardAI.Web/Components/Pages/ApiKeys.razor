@@ -1,0 +1,177 @@
+@page "/admin/api-keys"
+@using Microsoft.AspNetCore.Authorization
+@using PayGuardAI.Core.Entities
+@attribute [Authorize(Policy = "RequireManager")]
+@inject PayGuardAI.Core.Services.IAdminService AdminService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
+@inject IJSRuntime JS
+
+<PageTitle>API Keys — PayGuard AI</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">
+        <MudIcon Icon="@Icons.Material.Filled.Key" Class="mr-2" />
+        API Key Management
+    </MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="GenerateKey">
+        Generate New Key
+    </MudButton>
+</MudStack>
+
+<MudAlert Severity="Severity.Info" Class="mb-4" Dense="true">
+    API keys authenticate webhook and API requests. Use the key in the <code>X-API-Key</code> header.
+    Keys are shown only once when generated — store them securely.
+</MudAlert>
+
+@if (!string.IsNullOrWhiteSpace(_newlyGeneratedKey))
+{
+    <MudAlert Severity="Severity.Warning" Class="mb-4" Icon="@Icons.Material.Filled.Warning">
+        <MudStack Spacing="1">
+            <MudText Typo="Typo.subtitle2" Style="font-weight:700;">
+                Copy your API key now — it won't be shown again!
+            </MudText>
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudText Typo="Typo.body2" Style="font-family: monospace; background: rgba(0,0,0,0.2); padding: 4px 8px; border-radius: 4px;">
+                    @_newlyGeneratedKey
+                </MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small"
+                               OnClick="CopyKey" />
+            </MudStack>
+        </MudStack>
+    </MudAlert>
+}
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <MudTable Items="_keys" Hover="true" Elevation="2" Dense="true">
+        <HeaderContent>
+            <MudTh>Name</MudTh>
+            <MudTh>Key Prefix</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Created</MudTh>
+            <MudTh>Last Used</MudTh>
+            <MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Name">
+                <MudText Typo="Typo.body2" Style="font-weight:600;">@context.Name</MudText>
+            </MudTd>
+            <MudTd DataLabel="Key">
+                <code>@(context.KeyPrefix)••••••••</code>
+            </MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Size="Size.Small"
+                         Color="@(context.IsActive ? Color.Success : Color.Default)">
+                    @(context.IsActive ? "Active" : "Revoked")
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Created">@context.CreatedAt.ToString("MMM dd, yyyy")</MudTd>
+            <MudTd DataLabel="Last Used">
+                @(context.LastUsedAt?.ToString("MMM dd HH:mm") ?? "Never")
+            </MudTd>
+            <MudTd DataLabel="Actions">
+                @if (context.IsActive)
+                {
+                    <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small"
+                               OnClick="@(() => RevokeKey(context))">
+                        Revoke
+                    </MudButton>
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                No API keys yet. Generate one to get started.
+            </MudText>
+        </NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    private List<ApiKey> _keys = [];
+    private bool _loading = true;
+    private string? _newlyGeneratedKey;
+
+    protected override async Task OnInitializedAsync() => await LoadKeys();
+
+    private async Task LoadKeys()
+    {
+        _loading = true;
+        try { _keys = await AdminService.GetApiKeysAsync("afriex-demo"); }
+        catch { /* logged by service */ }
+        finally { _loading = false; }
+    }
+
+    private async Task GenerateKey()
+    {
+        var name = await DialogService.ShowMessageBox(
+            "Generate API Key",
+            (MarkupString)"<p>Enter a name for this API key (e.g. <b>Production</b>, <b>Staging</b>):</p>",
+            yesText: "Generate", cancelText: "Cancel");
+
+        if (name != true) return;
+
+        // Use a simple input dialog
+        var parameters = new DialogParameters<GenerateKeyDialog>();
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<GenerateKeyDialog>("Generate API Key", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: string keyName } && !string.IsNullOrWhiteSpace(keyName))
+        {
+            try
+            {
+                var (_, rawKey) = await AdminService.GenerateApiKeyAsync("afriex-demo", keyName, CurrentUser.UserName);
+                _newlyGeneratedKey = rawKey;
+                Snackbar.Add("API key generated! Copy it now — it won't be shown again.", Severity.Warning);
+                await LoadKeys();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add(ex.Message, Severity.Error);
+            }
+        }
+    }
+
+    private async Task RevokeKey(ApiKey key)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Revoke API Key",
+            $"Are you sure you want to revoke '{key.Name}' ({key.KeyPrefix}...)? This cannot be undone.",
+            yesText: "Revoke", cancelText: "Cancel");
+        if (confirmed == true)
+        {
+            try
+            {
+                await AdminService.RevokeApiKeyAsync(key.Id);
+                Snackbar.Add("API key revoked.", Severity.Info);
+                await LoadKeys();
+            }
+            catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        }
+    }
+
+    private async Task CopyKey()
+    {
+        if (_newlyGeneratedKey != null)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("navigator.clipboard.writeText", _newlyGeneratedKey);
+                Snackbar.Add("API key copied to clipboard!", Severity.Success);
+            }
+            catch
+            {
+                Snackbar.Add("Could not copy — please select and copy manually.", Severity.Warning);
+            }
+        }
+    }
+}

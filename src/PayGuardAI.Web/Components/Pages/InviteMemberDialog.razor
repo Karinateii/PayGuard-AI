@@ -1,0 +1,52 @@
+@using PayGuardAI.Core.Entities
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_displayName" Label="Full Name" Required="true"
+                          Variant="Variant.Outlined" Placeholder="Jane Doe" />
+            <MudTextField @bind-Value="_email" Label="Email Address" Required="true"
+                          Variant="Variant.Outlined" InputType="InputType.Email"
+                          Placeholder="jane@company.com" />
+            <MudSelect T="string" @bind-Value="_role" Label="Role" Required="true"
+                       Variant="Variant.Outlined">
+                <MudSelectItem Value="@("Reviewer")">Reviewer — Can review flagged transactions</MudSelectItem>
+                <MudSelectItem Value="@("Manager")">Manager — Can manage rules and review</MudSelectItem>
+                <MudSelectItem Value="@("Admin")">Admin — Full access to all settings</MudSelectItem>
+            </MudSelect>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   OnClick="Submit" Disabled="@(!IsValid)">
+            Send Invitation
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance? MudDialog { get; set; }
+
+    private string _displayName = string.Empty;
+    private string _email = string.Empty;
+    private string _role = "Reviewer";
+
+    private bool IsValid => !string.IsNullOrWhiteSpace(_displayName)
+                         && !string.IsNullOrWhiteSpace(_email)
+                         && _email.Contains('@');
+
+    private void Cancel() => MudDialog?.Cancel();
+
+    private void Submit()
+    {
+        var member = new TeamMember
+        {
+            DisplayName = _displayName,
+            Email = _email,
+            Role = _role
+        };
+        MudDialog?.Close(DialogResult.Ok(member));
+    }
+}

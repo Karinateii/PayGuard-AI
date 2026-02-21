@@ -146,6 +146,9 @@ builder.Services.AddSingleton<IWebhookSignatureService, WebhookSignatureService>
 // Register Paystack billing service
 builder.Services.AddHttpClient<IBillingService, PaystackBillingService>();
 
+// Register admin dashboard service
+builder.Services.AddScoped<IAdminService, AdminService>();
+
 // Add controllers for API endpoints (webhooks)
 builder.Services.AddControllers();
 

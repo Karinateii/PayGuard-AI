@@ -1,0 +1,170 @@
+@page "/admin/webhooks"
+@using Microsoft.AspNetCore.Authorization
+@using PayGuardAI.Core.Entities
+@attribute [Authorize(Policy = "RequireManager")]
+@inject PayGuardAI.Core.Services.IAdminService AdminService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Webhook Configuration — PayGuard AI</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">
+        <MudIcon Icon="@Icons.Material.Filled.Webhook" Class="mr-2" />
+        Webhook Endpoints
+    </MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="AddEndpoint">
+        Add Endpoint
+    </MudButton>
+</MudStack>
+
+<MudAlert Severity="Severity.Info" Class="mb-4" Dense="true">
+    Configure where PayGuard AI sends real-time event notifications. Events are signed with 
+    HMAC-SHA256 using the endpoint's signing secret.
+</MudAlert>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @foreach (var ep in _endpoints)
+    {
+        <MudCard Class="mb-4" Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudChip T="string" Size="Size.Small" Color="@(ep.IsActive ? Color.Success : Color.Default)">
+                            @(ep.IsActive ? "Active" : "Disabled")
+                        </MudChip>
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600;">
+                            @(ep.Description ?? "Webhook Endpoint")
+                        </MudText>
+                    </MudStack>
+                </CardHeaderContent>
+                <CardHeaderActions>
+                    <MudSwitch T="bool" Value="@ep.IsActive" Color="Color.Success"
+                               ValueChanged="@(async (bool v) => await ToggleEndpoint(ep, v))" />
+                </CardHeaderActions>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudGrid Spacing="3">
+                    <MudItem xs="12">
+                        <MudTextField Value="@ep.Url" Label="Endpoint URL" ReadOnly="true"
+                                      Variant="Variant.Outlined" Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Link" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField Value="@($"{ep.SigningSecret[..8]}••••••••••••")" 
+                                      Label="Signing Secret" ReadOnly="true"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="3">
+                        <MudNumericField T="int" Value="@ep.MaxRetries" Label="Max Retries"
+                                         Variant="Variant.Outlined" Min="0" Max="10"
+                                         ValueChanged="@(async (int v) => await UpdateRetries(ep, v))" />
+                    </MudItem>
+                    <MudItem xs="12" sm="3">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Last Delivery</MudText>
+                        <MudText Typo="Typo.body2">
+                            @(ep.LastDeliveryAt?.ToString("MMM dd HH:mm") ?? "Never")
+                            @if (ep.LastDeliveryStatus != null)
+                            {
+                                <MudChip T="string" Size="Size.Small" Class="ml-2"
+                                         Color="@(ep.LastDeliveryStatus.StartsWith("2") ? Color.Success : Color.Error)">
+                                    @ep.LastDeliveryStatus
+                                </MudChip>
+                            }
+                        </MudText>
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1">Events</MudText>
+                        <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap">
+                            @foreach (var evt in ep.Events)
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@evt</MudChip>
+                            }
+                        </MudStack>
+                    </MudItem>
+                </MudGrid>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Delete"
+                           OnClick="@(() => DeleteEndpoint(ep))">
+                    Delete
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    }
+
+    @if (_endpoints.Count == 0)
+    {
+        <MudAlert Severity="Severity.Normal">
+            No webhook endpoints configured. Add one to receive real-time event notifications.
+        </MudAlert>
+    }
+}
+
+@code {
+    private List<WebhookEndpoint> _endpoints = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync() => await LoadEndpoints();
+
+    private async Task LoadEndpoints()
+    {
+        _loading = true;
+        try { _endpoints = await AdminService.GetWebhookEndpointsAsync("afriex-demo"); }
+        catch { }
+        finally { _loading = false; }
+    }
+
+    private async Task AddEndpoint()
+    {
+        var parameters = new DialogParameters<AddWebhookDialog>();
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<AddWebhookDialog>("Add Webhook Endpoint", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: WebhookEndpoint ep })
+        {
+            try
+            {
+                ep.TenantId = "afriex-demo";
+                await AdminService.AddWebhookEndpointAsync(ep);
+                Snackbar.Add("Webhook endpoint added!", Severity.Success);
+                await LoadEndpoints();
+            }
+            catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        }
+    }
+
+    private async Task ToggleEndpoint(WebhookEndpoint ep, bool active)
+    {
+        ep.IsActive = active;
+        await AdminService.UpdateWebhookEndpointAsync(ep);
+        Snackbar.Add(active ? "Endpoint enabled" : "Endpoint disabled", Severity.Info);
+    }
+
+    private async Task UpdateRetries(WebhookEndpoint ep, int retries)
+    {
+        ep.MaxRetries = retries;
+        await AdminService.UpdateWebhookEndpointAsync(ep);
+    }
+
+    private async Task DeleteEndpoint(WebhookEndpoint ep)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Delete Endpoint", $"Delete webhook to {ep.Url}?", yesText: "Delete", cancelText: "Cancel");
+        if (confirmed == true)
+        {
+            await AdminService.DeleteWebhookEndpointAsync(ep.Id);
+            Snackbar.Add("Endpoint deleted", Severity.Info);
+            await LoadEndpoints();
+        }
+    }
+}

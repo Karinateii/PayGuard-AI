@@ -1,0 +1,76 @@
+@using PayGuardAI.Core.Entities
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_url" Label="Endpoint URL" Required="true"
+                          Variant="Variant.Outlined" InputType="InputType.Url"
+                          Placeholder="https://api.yourapp.com/webhooks/payguard" />
+            <MudTextField @bind-Value="_description" Label="Description"
+                          Variant="Variant.Outlined"
+                          Placeholder="Production webhook endpoint" />
+            <MudText Typo="Typo.subtitle2" Class="mt-2">Events to receive:</MudText>
+            <MudStack Spacing="1">
+                @foreach (var evt in _availableEvents)
+                {
+                    <MudCheckBox T="bool" Value="@_selectedEvents.Contains(evt)"
+                                 ValueChanged="@((bool v) => ToggleEvent(evt, v))"
+                                 Label="@evt" Dense="true" />
+                }
+            </MudStack>
+            <MudNumericField T="int" @bind-Value="_maxRetries" Label="Max Retries"
+                             Variant="Variant.Outlined" Min="0" Max="10" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   OnClick="Submit" Disabled="@(!IsValid)">
+            Add Endpoint
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance? MudDialog { get; set; }
+
+    private string _url = string.Empty;
+    private string _description = string.Empty;
+    private int _maxRetries = 3;
+
+    private readonly string[] _availableEvents =
+    [
+        "transaction.analyzed",
+        "review.completed",
+        "alert.triggered",
+        "risk.score_changed",
+        "subscription.updated"
+    ];
+
+    private readonly HashSet<string> _selectedEvents = ["transaction.analyzed", "review.completed", "alert.triggered"];
+
+    private bool IsValid => !string.IsNullOrWhiteSpace(_url)
+                         && _url.StartsWith("https://")
+                         && _selectedEvents.Count > 0;
+
+    private void ToggleEvent(string evt, bool selected)
+    {
+        if (selected) _selectedEvents.Add(evt);
+        else _selectedEvents.Remove(evt);
+    }
+
+    private void Cancel() => MudDialog?.Cancel();
+
+    private void Submit()
+    {
+        var endpoint = new WebhookEndpoint
+        {
+            Url = _url,
+            Description = _description,
+            Events = _selectedEvents.ToArray(),
+            MaxRetries = _maxRetries
+        };
+        MudDialog?.Close(DialogResult.Ok(endpoint));
+    }
+}

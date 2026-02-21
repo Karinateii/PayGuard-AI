@@ -20,6 +20,10 @@ public class ApplicationDbContext : DbContext
     public DbSet<RiskRule> RiskRules => Set<RiskRule>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<TenantSubscription> TenantSubscriptions => Set<TenantSubscription>();
+    public DbSet<OrganizationSettings> OrganizationSettings => Set<OrganizationSettings>();
+    public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
+    public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
+    public DbSet<WebhookEndpoint> WebhookEndpoints => Set<WebhookEndpoint>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -97,6 +101,46 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(e => e.ProviderCustomerId);
             entity.HasIndex(e => e.ProviderSubscriptionId);
             entity.HasIndex(e => e.Status);
+        });
+
+        // OrganizationSettings configuration
+        modelBuilder.Entity<OrganizationSettings>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.TenantId).IsUnique();
+        });
+
+        // TeamMember configuration
+        modelBuilder.Entity<TeamMember>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.TenantId, e.Email }).IsUnique();
+            entity.HasIndex(e => e.TenantId);
+        });
+
+        // ApiKey configuration
+        modelBuilder.Entity<ApiKey>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.KeyHash).IsUnique();
+            entity.HasIndex(e => e.TenantId);
+            // Store Scopes as comma-separated string for SQLite compatibility
+            entity.Property(e => e.Scopes)
+                  .HasConversion(
+                      v => string.Join(',', v),
+                      v => v.Split(',', StringSplitOptions.RemoveEmptyEntries));
+        });
+
+        // WebhookEndpoint configuration
+        modelBuilder.Entity<WebhookEndpoint>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.TenantId);
+            // Store Events as comma-separated string for SQLite compatibility
+            entity.Property(e => e.Events)
+                  .HasConversion(
+                      v => string.Join(',', v),
+                      v => v.Split(',', StringSplitOptions.RemoveEmptyEntries));
         });
 
         // Seed default risk rules

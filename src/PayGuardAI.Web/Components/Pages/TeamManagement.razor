@@ -1,0 +1,157 @@
+@page "/admin/team"
+@using Microsoft.AspNetCore.Authorization
+@using PayGuardAI.Core.Entities
+@attribute [Authorize(Policy = "RequireManager")]
+@inject PayGuardAI.Core.Services.IAdminService AdminService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Team Management — PayGuard AI</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">
+        <MudIcon Icon="@Icons.Material.Filled.Group" Class="mr-2" />
+        Team Management
+    </MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.PersonAdd"
+               OnClick="OpenInviteDialog">
+        Invite Member
+    </MudButton>
+</MudStack>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <MudTable Items="_members" Hover="true" Elevation="2" Dense="true">
+        <HeaderContent>
+            <MudTh>Name</MudTh>
+            <MudTh>Email</MudTh>
+            <MudTh>Role</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Last Login</MudTh>
+            <MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Name">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudAvatar Size="Size.Small" Color="Color.Primary">
+                        @(context.DisplayName.Length > 0 ? context.DisplayName[0].ToString().ToUpper() : "?")
+                    </MudAvatar>
+                    @context.DisplayName
+                </MudStack>
+            </MudTd>
+            <MudTd DataLabel="Email">@context.Email</MudTd>
+            <MudTd DataLabel="Role">
+                <MudSelect T="string" Value="@context.Role" Dense="true" Margin="Margin.Dense"
+                           Variant="Variant.Text"
+                           ValueChanged="@(async (string role) => await ChangeRole(context, role))">
+                    <MudSelectItem Value="@("Reviewer")">Reviewer</MudSelectItem>
+                    <MudSelectItem Value="@("Manager")">Manager</MudSelectItem>
+                    <MudSelectItem Value="@("Admin")">Admin</MudSelectItem>
+                </MudSelect>
+            </MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">
+                    @context.Status
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Last Login">
+                @(context.LastLoginAt?.ToString("MMM dd, yyyy HH:mm") ?? "Never")
+            </MudTd>
+            <MudTd DataLabel="Actions">
+                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                               Color="Color.Error" Size="Size.Small"
+                               OnClick="@(() => RemoveMember(context))" />
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                No team members yet. Invite your first member!
+            </MudText>
+        </NoRecordsContent>
+    </MudTable>
+}
+
+@if (!string.IsNullOrWhiteSpace(_error))
+{
+    <MudAlert Severity="Severity.Error" Class="mt-4">@_error</MudAlert>
+}
+
+@code {
+    private List<TeamMember> _members = [];
+    private bool _loading = true;
+    private string _error = string.Empty;
+
+    protected override async Task OnInitializedAsync() => await LoadMembers();
+
+    private async Task LoadMembers()
+    {
+        _loading = true;
+        try { _members = await AdminService.GetTeamMembersAsync("afriex-demo"); }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private async Task OpenInviteDialog()
+    {
+        var parameters = new DialogParameters<InviteMemberDialog>();
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<InviteMemberDialog>("Invite Team Member", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: TeamMember newMember })
+        {
+            try
+            {
+                await AdminService.InviteTeamMemberAsync("afriex-demo", newMember.Email, newMember.DisplayName, newMember.Role);
+                Snackbar.Add($"Invitation sent to {newMember.Email}!", Severity.Success);
+                await LoadMembers();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add(ex.Message, Severity.Error);
+            }
+        }
+    }
+
+    private async Task ChangeRole(TeamMember member, string newRole)
+    {
+        try
+        {
+            await AdminService.UpdateTeamMemberRoleAsync(member.Id, newRole);
+            member.Role = newRole;
+            Snackbar.Add($"Updated {member.DisplayName}'s role to {newRole}", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private async Task RemoveMember(TeamMember member)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Remove Team Member",
+            $"Are you sure you want to remove {member.DisplayName} ({member.Email})?",
+            yesText: "Remove", cancelText: "Cancel");
+        if (confirmed == true)
+        {
+            try
+            {
+                await AdminService.RemoveTeamMemberAsync(member.Id);
+                Snackbar.Add($"Removed {member.DisplayName}", Severity.Info);
+                await LoadMembers();
+            }
+            catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        }
+    }
+
+    private static Color GetStatusColor(string status) => status switch
+    {
+        "active" => Color.Success,
+        "invited" => Color.Info,
+        "disabled" => Color.Default,
+        _ => Color.Default
+    };
+}

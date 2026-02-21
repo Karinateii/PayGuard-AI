@@ -1,0 +1,148 @@
+@page "/admin/settings"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "RequireManager")]
+@inject PayGuardAI.Core.Services.IAdminService AdminService
+@inject ISnackbar Snackbar
+@inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
+
+<PageTitle>Organization Settings — PayGuard AI</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.Settings" Class="mr-2" />
+    Organization Settings
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_settings != null)
+{
+    <MudGrid Spacing="4">
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-6" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-4">General</MudText>
+                <MudStack Spacing="3">
+                    <MudTextField @bind-Value="_settings.OrganizationName"
+                                  Label="Organization Name" Variant="Variant.Outlined"
+                                  Placeholder="Acme Fintech Ltd" />
+                    <MudTextField @bind-Value="_settings.SupportEmail"
+                                  Label="Support Email" Variant="Variant.Outlined"
+                                  InputType="InputType.Email"
+                                  Placeholder="support@acme.com" />
+                    <MudTextField @bind-Value="_settings.LogoUrl"
+                                  Label="Logo URL" Variant="Variant.Outlined"
+                                  Placeholder="https://example.com/logo.png" />
+                    <MudGrid>
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="string" @bind-Value="_settings.Timezone"
+                                       Label="Timezone" Variant="Variant.Outlined">
+                                <MudSelectItem Value="@("UTC")">UTC</MudSelectItem>
+                                <MudSelectItem Value="@("Africa/Lagos")">Africa/Lagos (WAT)</MudSelectItem>
+                                <MudSelectItem Value="@("Africa/Nairobi")">Africa/Nairobi (EAT)</MudSelectItem>
+                                <MudSelectItem Value="@("Africa/Johannesburg")">Africa/Johannesburg (SAST)</MudSelectItem>
+                                <MudSelectItem Value="@("America/New_York")">America/New York (EST)</MudSelectItem>
+                                <MudSelectItem Value="@("Europe/London")">Europe/London (GMT)</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="string" @bind-Value="_settings.DefaultCurrency"
+                                       Label="Default Currency" Variant="Variant.Outlined">
+                                <MudSelectItem Value="@("USD")">USD — US Dollar</MudSelectItem>
+                                <MudSelectItem Value="@("NGN")">NGN — Nigerian Naira</MudSelectItem>
+                                <MudSelectItem Value="@("KES")">KES — Kenyan Shilling</MudSelectItem>
+                                <MudSelectItem Value="@("GBP")">GBP — British Pound</MudSelectItem>
+                                <MudSelectItem Value="@("EUR")">EUR — Euro</MudSelectItem>
+                                <MudSelectItem Value="@("ZAR")">ZAR — South African Rand</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                    </MudGrid>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-6" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-4">Risk Thresholds</MudText>
+                <MudStack Spacing="3">
+                    <MudNumericField T="int" @bind-Value="_settings.AutoApproveThreshold"
+                                     Label="Auto-Approve Below Score"
+                                     Variant="Variant.Outlined"
+                                     Min="0" Max="100"
+                                     HelperText="Transactions below this score are auto-approved" />
+                    <MudNumericField T="int" @bind-Value="_settings.AutoRejectThreshold"
+                                     Label="Auto-Reject Above Score"
+                                     Variant="Variant.Outlined"
+                                     Min="0" Max="100"
+                                     HelperText="Transactions above this score are auto-rejected" />
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+                        Scores between @_settings.AutoApproveThreshold and @_settings.AutoRejectThreshold 
+                        go to the HITL review queue.
+                    </MudAlert>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Save"
+                       OnClick="SaveSettings" Disabled="@_saving"
+                       Size="Size.Large">
+                @if (_saving)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                }
+                Save Settings
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <MudAlert Severity="Severity.Error" Class="mt-4">@_error</MudAlert>
+    }
+}
+
+@code {
+    private PayGuardAI.Core.Entities.OrganizationSettings? _settings;
+    private bool _loading = true;
+    private bool _saving;
+    private string _error = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _settings = await AdminService.GetOrCreateSettingsAsync("afriex-demo");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SaveSettings()
+    {
+        if (_settings == null) return;
+        _saving = true;
+        _error = string.Empty;
+
+        try
+        {
+            await AdminService.UpdateSettingsAsync(_settings, CurrentUser.UserName);
+            Snackbar.Add("Settings saved successfully!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

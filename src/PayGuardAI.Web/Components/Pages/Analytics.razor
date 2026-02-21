@@ -1,0 +1,191 @@
+@page "/admin/analytics"
+@using Microsoft.AspNetCore.Authorization
+@using PayGuardAI.Core.Services
+@attribute [Authorize]
+@inject IAdminService AdminService
+
+<PageTitle>Usage Analytics — PayGuard AI</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">
+        <MudIcon Icon="@Icons.Material.Filled.Analytics" Class="mr-2" />
+        Usage Analytics
+    </MudText>
+    <MudSelect T="int" Value="_days" ValueChanged="OnPeriodChanged" Dense="true"
+               Variant="Variant.Outlined" Style="max-width:200px;">
+        <MudSelectItem Value="7">Last 7 days</MudSelectItem>
+        <MudSelectItem Value="30">Last 30 days</MudSelectItem>
+        <MudSelectItem Value="90">Last 90 days</MudSelectItem>
+    </MudSelect>
+</MudStack>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_analytics != null)
+{
+    <!-- Summary Cards -->
+    <MudGrid Spacing="4" Class="mb-6">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.Receipt" Size="Size.Large" Color="Color.Primary" />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Transactions (Period)</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight:700;">@_analytics.TransactionsThisPeriod.ToString("N0")</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@_analytics.TotalTransactions.ToString("N0") total</MudText>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Large" Color="Color.Error" />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">High Risk</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight:700;">@_analytics.HighRiskCount.ToString("N0")</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        @((_analytics.TransactionsThisPeriod > 0 ? (100.0 * _analytics.HighRiskCount / _analytics.TransactionsThisPeriod) : 0).ToString("F1"))% of total
+                    </MudText>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.RateReview" Size="Size.Large" Color="Color.Info" />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Reviewed</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight:700;">@_analytics.ReviewedCount.ToString("N0")</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Avg risk: @_analytics.AverageRiskScore.ToString("F1")</MudText>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Large" Color="Color.Success" />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Total Volume</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight:700;">$@_analytics.TotalVolume.ToString("N0")</MudText>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Charts Row -->
+    <MudGrid Spacing="4" Class="mb-6">
+        <!-- Daily Transactions Chart -->
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-4">Daily Transaction Volume</MudText>
+                @if (_analytics.DailyTransactions.Any())
+                {
+                    <MudChart ChartType="ChartType.Line"
+                              ChartSeries="@_dailySeries"
+                              XAxisLabels="@_dailyLabels"
+                              Width="100%" Height="300px"
+                              ChartOptions="_chartOptions" />
+                }
+                else
+                {
+                    <MudText Color="Color.Secondary">No transaction data for this period.</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <!-- Risk Distribution -->
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-4">Risk Distribution</MudText>
+                @if (_analytics.RiskDistribution.Any())
+                {
+                    <MudChart ChartType="ChartType.Donut"
+                              InputData="@_riskData"
+                              InputLabels="@_riskLabels"
+                              Width="100%" Height="300px" />
+                }
+                else
+                {
+                    <MudText Color="Color.Secondary">No risk data yet.</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Top Corridors -->
+    <MudPaper Class="pa-4" Elevation="2">
+        <MudText Typo="Typo.h6" Class="mb-4">Top Corridors</MudText>
+        <MudTable Items="_analytics.TopCorridors" Dense="true" Hover="true">
+            <HeaderContent>
+                <MudTh>Corridor</MudTh>
+                <MudTh>Transactions</MudTh>
+                <MudTh>Volume</MudTh>
+                <MudTh>Share</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Corridor">
+                    <MudText Typo="Typo.body2" Style="font-weight:600;">@context.Corridor</MudText>
+                </MudTd>
+                <MudTd DataLabel="Count">@context.Count.ToString("N0")</MudTd>
+                <MudTd DataLabel="Volume">$@context.Volume.ToString("N0")</MudTd>
+                <MudTd DataLabel="Share">
+                    <MudProgressLinear Value="@GetCorridorPercent(context)" Color="Color.Primary"
+                                       Size="Size.Small" Style="min-width:100px;" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudPaper>
+}
+
+@code {
+    private UsageAnalytics? _analytics;
+    private bool _loading = true;
+    private int _days = 30;
+
+    // Chart data
+    private List<ChartSeries> _dailySeries = [];
+    private string[] _dailyLabels = [];
+    private double[] _riskData = [];
+    private string[] _riskLabels = [];
+    private readonly ChartOptions _chartOptions = new() { YAxisTicks = 5 };
+
+    protected override async Task OnInitializedAsync() => await LoadAnalytics();
+
+    private async Task OnPeriodChanged(int days)
+    {
+        _days = days;
+        await LoadAnalytics();
+    }
+
+    private async Task LoadAnalytics()
+    {
+        _loading = true;
+        try
+        {
+            _analytics = await AdminService.GetUsageAnalyticsAsync("afriex-demo", _days);
+            BuildCharts();
+        }
+        catch { }
+        finally { _loading = false; }
+    }
+
+    private void BuildCharts()
+    {
+        if (_analytics == null) return;
+
+        // Daily line chart
+        _dailyLabels = _analytics.DailyTransactions.Select(d => d.Date.ToString("MMM dd")).ToArray();
+        _dailySeries =
+        [
+            new ChartSeries { Name = "Transactions", Data = _analytics.DailyTransactions.Select(d => (double)d.Count).ToArray() }
+        ];
+
+        // Risk donut
+        _riskLabels = _analytics.RiskDistribution.Select(r => r.Level).ToArray();
+        _riskData = _analytics.RiskDistribution.Select(r => (double)r.Count).ToArray();
+    }
+
+    private double GetCorridorPercent(TopCorridor corridor)
+    {
+        if (_analytics == null || _analytics.TransactionsThisPeriod == 0) return 0;
+        return 100.0 * corridor.Count / _analytics.TransactionsThisPeriod;
+    }
+}
