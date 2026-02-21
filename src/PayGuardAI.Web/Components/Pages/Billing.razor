@@ -2,7 +2,7 @@
 @using PayGuardAI.Core.Entities
 @using PayGuardAI.Core.Services
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
-@inject IStripeService StripeService
+@inject IBillingService BillingService
 @inject NavigationManager Nav
 @inject IConfiguration Config
 @inject ISnackbar Snackbar
@@ -68,7 +68,7 @@ else
                 </MudCardContent>
                 <MudCardActions>
                     <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                               OnClick="OpenPortal" Disabled="@_portalLoading"
+                               OnClick="ManageSubscription" Disabled="@_portalLoading"
                                StartIcon="@Icons.Material.Filled.OpenInNew">
                         @if (_portalLoading)
                         {
@@ -176,7 +176,7 @@ else
         {
             try
             {
-                _subscription = await StripeService.GetSubscriptionAsync("afriex-demo");
+                _subscription = await BillingService.GetSubscriptionAsync("afriex-demo");
             }
             catch { /* no subscription yet is fine */ }
         }
@@ -184,7 +184,7 @@ else
         _loading = false;
     }
 
-    private async Task OpenPortal()
+    private async Task ManageSubscription()
     {
         if (_subscription == null)
         {
@@ -195,13 +195,12 @@ else
         _portalLoading = true;
         try
         {
-            var returnUrl = $"{Config["AppUrl"] ?? Nav.BaseUri.TrimEnd('/')}/billing";
-            var portalUrl = await StripeService.CreatePortalSessionAsync("afriex-demo", returnUrl);
-            Nav.NavigateTo(portalUrl, forceLoad: true);
+            var manageUrl = await BillingService.GetManageSubscriptionUrlAsync("afriex-demo");
+            Nav.NavigateTo(manageUrl, forceLoad: true);
         }
         catch (Exception ex)
         {
-            Snackbar.Add("Could not open billing portal. " + ex.Message, Severity.Error);
+            Snackbar.Add("Could not open subscription management. " + ex.Message, Severity.Error);
         }
         finally
         {
@@ -228,12 +227,13 @@ else
         "trialing" => Color.Info,
         "past_due" => Color.Warning,
         "canceled" => Color.Error,
+        "pending"  => Color.Default,
         _ => Color.Default
     };
 
     private string[] GetCurrentPlanFeatures()
     {
-        var plan = StripeService.GetPlans()
+        var plan = BillingService.GetPlans()
             .FirstOrDefault(p => p.Plan == (_subscription?.Plan ?? BillingPlan.Trial));
         return plan?.Features ?? ["Real-time risk scoring", "HITL review queue", "14-day free trial"];
     }

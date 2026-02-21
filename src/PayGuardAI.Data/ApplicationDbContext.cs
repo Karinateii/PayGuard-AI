@@ -94,7 +94,8 @@ public class ApplicationDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.TenantId).IsUnique();
-            entity.HasIndex(e => e.StripeCustomerId);
+            entity.HasIndex(e => e.ProviderCustomerId);
+            entity.HasIndex(e => e.ProviderSubscriptionId);
             entity.HasIndex(e => e.Status);
         });
 

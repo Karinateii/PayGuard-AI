@@ -143,8 +143,8 @@ builder.Services.AddScoped<IPaymentProviderFactory, PaymentProviderFactory>();
 // Register webhook signature service
 builder.Services.AddSingleton<IWebhookSignatureService, WebhookSignatureService>();
 
-// Register Stripe billing service
-builder.Services.AddScoped<IStripeService, StripeService>();
+// Register Paystack billing service
+builder.Services.AddHttpClient<IBillingService, PaystackBillingService>();
 
 // Add controllers for API endpoints (webhooks)
 builder.Services.AddControllers();

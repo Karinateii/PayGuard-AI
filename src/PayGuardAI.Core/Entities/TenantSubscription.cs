@@ -1,7 +1,8 @@
 namespace PayGuardAI.Core.Entities;
 
 /// <summary>
-/// Tracks a tenant's active Stripe subscription and usage for the current billing period.
+/// Tracks a tenant's active subscription and usage for the current billing period.
+/// Provider-agnostic: works with Paystack, Stripe, or any payment provider.
 /// </summary>
 public class TenantSubscription
 {
@@ -10,16 +11,22 @@ public class TenantSubscription
     /// <summary>The tenant this subscription belongs to.</summary>
     public string TenantId { get; set; } = string.Empty;
 
-    /// <summary>Stripe Customer ID (cus_xxx)</summary>
-    public string StripeCustomerId { get; set; } = string.Empty;
+    /// <summary>Payment provider customer ID (e.g. Paystack CUS_xxx)</summary>
+    public string ProviderCustomerId { get; set; } = string.Empty;
 
-    /// <summary>Stripe Subscription ID (sub_xxx). Null if on free trial with no payment method.</summary>
-    public string? StripeSubscriptionId { get; set; }
+    /// <summary>Payment provider subscription code (e.g. Paystack SUB_xxx). Null if on free trial.</summary>
+    public string? ProviderSubscriptionId { get; set; }
+
+    /// <summary>Payment provider plan code (e.g. Paystack PLN_xxx)</summary>
+    public string? ProviderPlanCode { get; set; }
+
+    /// <summary>Email token required by Paystack to enable/disable subscriptions</summary>
+    public string? ProviderEmailToken { get; set; }
 
     /// <summary>Current plan: Starter, Pro, Enterprise, Trial</summary>
     public BillingPlan Plan { get; set; } = BillingPlan.Trial;
 
-    /// <summary>Current billing period status mirroring Stripe: active, trialing, past_due, canceled</summary>
+    /// <summary>Current billing period status: active, trialing, past_due, canceled</summary>
     public string Status { get; set; } = "trialing";
 
     /// <summary>Transactions processed in the current billing period.</summary>

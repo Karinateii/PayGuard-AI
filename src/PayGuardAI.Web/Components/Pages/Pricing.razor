@@ -1,7 +1,7 @@
 @page "/pricing"
 @using PayGuardAI.Core.Entities
 @using PayGuardAI.Core.Services
-@inject IStripeService StripeService
+@inject IBillingService BillingService
 @inject NavigationManager Nav
 @inject IConfiguration Config
 
@@ -88,14 +88,15 @@
                         </MudExpansionPanel>
                         <MudExpansionPanel Text="Can I change plans later?">
                             Yes — upgrade or downgrade any time from the Billing dashboard. 
-                            Stripe prorates the difference automatically.
+                            The difference is prorated automatically.
                         </MudExpansionPanel>
                         <MudExpansionPanel Text="What counts as a transaction?">
                             Any webhook event processed by PayGuard AI that triggers a risk score. 
                             Duplicate events and health checks don't count.
                         </MudExpansionPanel>
-                        <MudExpansionPanel Text="Is there a discount for annual billing?">
-                            Yes — 2 months free on annual plans. Contact us at billing@payguard.ai.
+                        <MudExpansionPanel Text="What payment methods are supported?">
+                            We accept cards (Visa, Mastercard), bank transfers, and mobile money via Paystack.
+                            All major Nigerian banks are supported.
                         </MudExpansionPanel>
                     </MudExpansionPanels>
                 </MudItem>
@@ -126,7 +127,7 @@
     {
         _billingEnabled = bool.TryParse(Config["FeatureFlags:BillingEnabled"], out var b) && b;
         if (_billingEnabled)
-            _plans = StripeService.GetPlans();
+            _plans = BillingService.GetPlans();
     }
 
     private async Task StartCheckout(BillingPlan plan)
@@ -139,22 +140,19 @@
         try
         {
             var baseUrl = Config["AppUrl"] ?? Nav.BaseUri.TrimEnd('/');
-            var successUrl = $"{baseUrl}/billing?success=true";
-            var cancelUrl  = $"{baseUrl}/pricing";
+            var callbackUrl = $"{baseUrl}/billing?success=true";
 
-            var checkoutUrl = await StripeService.CreateCheckoutSessionAsync(
-                tenantId: "afriex-demo",         // replaced by real tenant ID when OAuth is on
+            var checkoutUrl = await BillingService.CreateCheckoutSessionAsync(
+                tenantId: "afriex-demo",
                 email: "demo@payguard.ai",
                 plan: plan,
-                successUrl: successUrl,
-                cancelUrl: cancelUrl);
+                callbackUrl: callbackUrl);
 
             Nav.NavigateTo(checkoutUrl, forceLoad: true);
         }
         catch (Exception ex)
         {
-            _error = "Could not start checkout. Please check Stripe config or try again.";
-            // Log but don't show internal details to users
+            _error = "Could not start checkout. Please check Paystack config or try again.";
             _ = ex;
         }
         finally
