@@ -104,10 +104,17 @@ public class RiskScoringService : IRiskScoringService
             "Risk analysis complete for transaction {TransactionId}: Score={Score}, Level={Level}, Status={Status}",
             transaction.Id, totalScore, riskLevel, reviewStatus);
 
-        if (riskLevel == RiskLevel.Critical)
+        // Alert on High and Critical risk — compliance team needs to know immediately
+        if (riskLevel >= RiskLevel.High)
         {
-            await _alertingService.AlertAsync(
-                $"Tenant {_tenantContext.TenantId}: Critical transaction {transaction.ExternalId} scored {totalScore}",
+            await _alertingService.AlertTransactionAsync(
+                tenantId: _tenantContext.TenantId,
+                externalId: transaction.ExternalId,
+                riskScore: totalScore,
+                riskLevel: riskLevel.ToString(),
+                amount: transaction.Amount,
+                currency: transaction.SourceCurrency,
+                senderId: transaction.SenderId,
                 cancellationToken);
         }
 

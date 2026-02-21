@@ -113,6 +113,17 @@ builder.Services.AddScoped<IAlertingService, AlertingService>();
 builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<IDatabaseMigrationService, DatabaseMigrationService>();
 
+// Register alerting service — Slack when enabled, plain log fallback otherwise
+var slackEnabled = builder.Configuration.GetValue<bool>("FeatureFlags:SlackAlertsEnabled");
+if (slackEnabled)
+{
+    builder.Services.AddHttpClient<IAlertingService, SlackAlertService>();
+}
+else
+{
+    builder.Services.AddScoped<IAlertingService, AlertingService>();
+}
+
 // Register Prometheus metrics service
 builder.Services.AddSingleton<IMetricsService, PrometheusMetricsService>();
 

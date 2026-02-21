@@ -4,7 +4,7 @@ using PayGuardAI.Core.Services;
 namespace PayGuardAI.Data.Services;
 
 /// <summary>
-/// Default alerting implementation (logs alerts).
+/// Fallback alerting implementation — logs alerts when Slack is disabled.
 /// </summary>
 public class AlertingService : IAlertingService
 {
@@ -18,6 +18,17 @@ public class AlertingService : IAlertingService
     public Task AlertAsync(string message, CancellationToken cancellationToken = default)
     {
         _logger.LogWarning("ALERT: {Message}", message);
+        return Task.CompletedTask;
+    }
+
+    public Task AlertTransactionAsync(
+        string tenantId, string externalId, int riskScore,
+        string riskLevel, decimal amount, string currency, string senderId,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogWarning(
+            "ALERT [TRANSACTION]: Tenant={TenantId} ExternalId={ExternalId} Score={Score} Level={Level} Amount={Amount} {Currency} Sender={Sender}",
+            tenantId, externalId, riskScore, riskLevel, amount, currency, senderId);
         return Task.CompletedTask;
     }
 }
