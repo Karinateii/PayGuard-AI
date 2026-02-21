@@ -74,13 +74,14 @@ public class PaystackBillingService : IBillingService
             throw new InvalidOperationException($"No Paystack plan code configured for plan {plan}. Set Paystack:{plan}PlanCode in config.");
 
         // Paystack uses "initialize transaction" with a plan code to start a subscription.
-        // Amount is set by the plan, so we pass 0 and let the plan override it.
+        // Amount is required by the API even with a plan (plan overrides it).
         var payload = new
         {
             email,
+            amount = 0,
             plan = planCode,
             callback_url = callbackUrl,
-            metadata = JsonSerializer.Serialize(new { tenantId, plan = plan.ToString() })
+            metadata = new { tenantId, plan = plan.ToString() }
         };
 
         var response = await PostAsync<PaystackInitResponse>("/transaction/initialize", payload, ct);

@@ -152,8 +152,7 @@
         }
         catch (Exception ex)
         {
-            _error = "Could not start checkout. Please check Paystack config or try again.";
-            _ = ex;
+            _error = $"Checkout failed: {ex.Message}";
         }
         finally
         {
