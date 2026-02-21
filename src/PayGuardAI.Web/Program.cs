@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
+using PayGuardAI.Core.Entities;
 using PayGuardAI.Core.Services;
 using PayGuardAI.Data;
 using PayGuardAI.Data.Services;
@@ -66,6 +68,20 @@ builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("RequireReviewer", policy => policy.RequireRole("Reviewer", "Manager", "Admin"));
     options.AddPolicy("RequireManager", policy => policy.RequireRole("Manager", "Admin"));
+
+    // Permission-based policies (checked via PermissionAuthorizationHandler)
+    options.AddPolicy("CanViewTransactions", policy => policy.Requirements.Add(new PermissionRequirement(Permission.ViewTransactions)));
+    options.AddPolicy("CanReviewTransactions", policy => policy.Requirements.Add(new PermissionRequirement(Permission.ReviewTransactions)));
+    options.AddPolicy("CanManageRules", policy => policy.Requirements.Add(new PermissionRequirement(Permission.ManageRules)));
+    options.AddPolicy("CanViewReports", policy => policy.Requirements.Add(new PermissionRequirement(Permission.ViewReports)));
+    options.AddPolicy("CanViewAuditLog", policy => policy.Requirements.Add(new PermissionRequirement(Permission.ViewAuditLog)));
+    options.AddPolicy("CanManageTeam", policy => policy.Requirements.Add(new PermissionRequirement(Permission.ManageTeam)));
+    options.AddPolicy("CanManageRoles", policy => policy.Requirements.Add(new PermissionRequirement(Permission.ManageRoles)));
+    options.AddPolicy("CanManageApiKeys", policy => policy.Requirements.Add(new PermissionRequirement(Permission.ManageApiKeys)));
+    options.AddPolicy("CanManageWebhooks", policy => policy.Requirements.Add(new PermissionRequirement(Permission.ManageWebhooks)));
+    options.AddPolicy("CanManageSettings", policy => policy.Requirements.Add(new PermissionRequirement(Permission.ManageSettings)));
+    options.AddPolicy("CanManageBilling", policy => policy.Requirements.Add(new PermissionRequirement(Permission.ManageBilling)));
+    options.AddPolicy("CanManageNotifications", policy => policy.Requirements.Add(new PermissionRequirement(Permission.ManageNotifications)));
 });
 
 // Add rate limiting — global per-tenant + per-API-key
@@ -164,6 +180,10 @@ builder.Services.AddHttpClient<IBillingService, PaystackBillingService>();
 
 // Register admin dashboard service
 builder.Services.AddScoped<IAdminService, AdminService>();
+
+// Register RBAC service for permission-based access control
+builder.Services.AddScoped<IRbacService, RbacService>();
+builder.Services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
 // Register email notification service — real SMTP when enabled, no-op fallback otherwise
 var emailEnabled = builder.Configuration.GetValue<bool>("FeatureFlags:EmailNotificationsEnabled");

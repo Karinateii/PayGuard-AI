@@ -25,6 +25,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
     public DbSet<WebhookEndpoint> WebhookEndpoints => Set<WebhookEndpoint>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
+    public DbSet<CustomRole> CustomRoles => Set<CustomRole>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -116,6 +117,14 @@ public class ApplicationDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.TenantId, e.Email }).IsUnique();
+            entity.HasIndex(e => e.TenantId);
+        });
+
+        // CustomRole configuration
+        modelBuilder.Entity<CustomRole>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.TenantId, e.Name }).IsUnique();
             entity.HasIndex(e => e.TenantId);
         });
 

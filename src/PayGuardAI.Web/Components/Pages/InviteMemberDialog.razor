@@ -10,9 +10,18 @@
                           Placeholder="jane@company.com" />
             <MudSelect T="string" @bind-Value="_role" Label="Role" Required="true"
                        Variant="Variant.Outlined">
-                <MudSelectItem Value="@("Reviewer")">Reviewer — Can review flagged transactions</MudSelectItem>
-                <MudSelectItem Value="@("Manager")">Manager — Can manage rules and review</MudSelectItem>
-                <MudSelectItem Value="@("Admin")">Admin — Full access to all settings</MudSelectItem>
+                @foreach (var role in AvailableRoles)
+                {
+                    <MudSelectItem Value="@role.Name">
+                        @role.Name — @(role.Description ?? "No description")
+                    </MudSelectItem>
+                }
+                @if (AvailableRoles.Count == 0)
+                {
+                    <MudSelectItem Value="@("Reviewer")">Reviewer — Can review flagged transactions</MudSelectItem>
+                    <MudSelectItem Value="@("Manager")">Manager — Can manage rules and review</MudSelectItem>
+                    <MudSelectItem Value="@("Admin")">Admin — Full access to all settings</MudSelectItem>
+                }
             </MudSelect>
         </MudStack>
     </DialogContent>
@@ -28,6 +37,8 @@
 @code {
     [CascadingParameter]
     private IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public List<CustomRole> AvailableRoles { get; set; } = [];
 
     private string _displayName = string.Empty;
     private string _email = string.Empty;

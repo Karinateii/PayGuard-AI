@@ -4,6 +4,7 @@ namespace PayGuardAI.Web.Services;
 
 /// <summary>
 /// Resolves current user identity from the request context.
+/// Provides role and permission information.
 /// </summary>
 public class CurrentUserService
 {
@@ -27,5 +28,24 @@ public class CurrentUserService
     {
         var user = _httpContextAccessor.HttpContext?.User;
         return user?.IsInRole(role) ?? false;
+    }
+
+    /// <summary>Get all roles assigned to the current user.</summary>
+    public IEnumerable<string> GetRoles()
+    {
+        var user = _httpContextAccessor.HttpContext?.User;
+        return user?.FindAll(ClaimTypes.Role).Select(c => c.Value) ?? [];
+    }
+
+    /// <summary>Get the user's primary (highest-privilege) role.</summary>
+    public string PrimaryRole
+    {
+        get
+        {
+            var roles = GetRoles().ToList();
+            if (roles.Contains("Admin")) return "Admin";
+            if (roles.Contains("Manager")) return "Manager";
+            return roles.FirstOrDefault() ?? "Reviewer";
+        }
     }
 }

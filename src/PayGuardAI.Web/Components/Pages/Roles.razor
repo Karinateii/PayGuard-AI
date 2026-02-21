@@ -1,0 +1,279 @@
+@page "/admin/roles"
+@using Microsoft.AspNetCore.Authorization
+@using PayGuardAI.Core.Entities
+@using PayGuardAI.Core.Services
+@attribute [Authorize(Policy = "RequireManager")]
+@inject IRbacService RbacService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
+
+<PageTitle>Role Management — PayGuard AI</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">
+        <MudIcon Icon="@Icons.Material.Filled.AdminPanelSettings" Class="mr-2" />
+        Role Management
+    </MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="OpenCreateDialog">
+        Create Custom Role
+    </MudButton>
+</MudStack>
+
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+    Define custom roles with granular permissions. System roles (Reviewer, Manager, Admin) cannot be modified.
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <MudGrid>
+        @foreach (var role in _roles)
+        {
+            <MudItem xs="12" md="6" lg="4">
+                <MudCard Elevation="2" Class="pa-0" Style="height: 100%;">
+                    <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="@(role.IsSystem ? Color.Primary : Color.Secondary)" Size="Size.Medium">
+                                <MudIcon Icon="@(role.IsSystem ? Icons.Material.Filled.Shield : Icons.Material.Filled.PersonOutline)" />
+                            </MudAvatar>
+                        </CardHeaderAvatar>
+                        <CardHeaderContent>
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudText Typo="Typo.h6">@role.Name</MudText>
+                                @if (role.IsSystem)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">System</MudChip>
+                                }
+                            </MudStack>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                @(role.Description ?? "No description")
+                            </MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            @if (!role.IsSystem)
+                            {
+                                <MudMenu Icon="@Icons.Material.Filled.MoreVert" Dense="true">
+                                    <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="@(() => OpenEditDialog(role))">
+                                        Edit Role
+                                    </MudMenuItem>
+                                    <MudMenuItem Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error"
+                                                 OnClick="@(() => DeleteRole(role))">
+                                        Delete Role
+                                    </MudMenuItem>
+                                </MudMenu>
+                            }
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudDivider />
+                    <MudCardContent>
+                        <MudText Typo="Typo.overline" Color="Color.Secondary" Class="mb-2">
+                            Permissions (@role.GetPermissions().Count)
+                        </MudText>
+                        <MudStack Spacing="1">
+                            @foreach (var group in GetPermissionsByCategory(role.GetPermissions()))
+                            {
+                                <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary" Style="min-width: 80px;">
+                                        @group.Key
+                                    </MudText>
+                                    @foreach (var perm in group.Value)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Primary"
+                                                 Variant="Variant.Text">
+                                            @GetPermissionDisplayName(perm)
+                                        </MudChip>
+                                    }
+                                </MudStack>
+                            }
+                            @if (role.GetPermissions().Count == 0)
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Warning">No permissions assigned</MudText>
+                            }
+                        </MudStack>
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-2">
+                            Created @role.CreatedAt.ToString("MMM dd, yyyy") by @role.CreatedBy
+                        </MudText>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+
+    @* ── Recent RBAC Audit Log ──────────────────────────────────────────── *@
+    <MudText Typo="Typo.h5" Class="mt-8 mb-3">
+        <MudIcon Icon="@Icons.Material.Filled.History" Class="mr-2" />
+        Role Change History
+    </MudText>
+
+    @if (_auditLogs.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">No role changes recorded yet.</MudAlert>
+    }
+    else
+    {
+        <MudTable Items="_auditLogs" Dense="true" Hover="true" Elevation="2">
+            <HeaderContent>
+                <MudTh>When</MudTh>
+                <MudTh>Action</MudTh>
+                <MudTh>Details</MudTh>
+                <MudTh>By</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="When">@context.CreatedAt.ToString("MMM dd HH:mm")</MudTd>
+                <MudTd DataLabel="Action">
+                    <MudChip T="string" Size="Size.Small" Color="@GetActionColor(context.Action)">
+                        @FormatAction(context.Action)
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Details">@context.Notes</MudTd>
+                <MudTd DataLabel="By">@context.PerformedBy</MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+}
+
+@if (!string.IsNullOrWhiteSpace(_error))
+{
+    <MudAlert Severity="Severity.Error" Class="mt-4">@_error</MudAlert>
+}
+
+@code {
+    private List<CustomRole> _roles = [];
+    private List<AuditLog> _auditLogs = [];
+    private List<PermissionInfo> _allPermissions = [];
+    private bool _loading = true;
+    private string _error = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _allPermissions = RbacService.GetAllPermissions();
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            _roles = await RbacService.GetRolesAsync("afriex-demo");
+            _auditLogs = await RbacService.GetRbacAuditLogAsync("afriex-demo");
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    // ── Create Dialog ──────────────────────────────────────────────────────
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters<RoleEditorDialog>
+        {
+            { x => x.AllPermissions, _allPermissions },
+            { x => x.IsEdit, false }
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseOnEscapeKey = true };
+        var dialog = await DialogService.ShowAsync<RoleEditorDialog>("Create Custom Role", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: RoleEditorDialog.RoleFormData formData })
+        {
+            try
+            {
+                await RbacService.CreateRoleAsync("afriex-demo", formData.Name, formData.Description,
+                    formData.SelectedPermissions, CurrentUser.UserName);
+                Snackbar.Add($"Role '{formData.Name}' created!", Severity.Success);
+                await LoadData();
+            }
+            catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        }
+    }
+
+    // ── Edit Dialog ────────────────────────────────────────────────────────
+
+    private async Task OpenEditDialog(CustomRole role)
+    {
+        var parameters = new DialogParameters<RoleEditorDialog>
+        {
+            { x => x.AllPermissions, _allPermissions },
+            { x => x.IsEdit, true },
+            { x => x.RoleName, role.Name },
+            { x => x.RoleDescription, role.Description ?? "" },
+            { x => x.InitialPermissions, role.GetPermissions() }
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseOnEscapeKey = true };
+        var dialog = await DialogService.ShowAsync<RoleEditorDialog>("Edit Role", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: RoleEditorDialog.RoleFormData formData })
+        {
+            try
+            {
+                await RbacService.UpdateRoleAsync(role.Id, formData.Name, formData.Description,
+                    formData.SelectedPermissions, CurrentUser.UserName);
+                Snackbar.Add($"Role '{formData.Name}' updated!", Severity.Success);
+                await LoadData();
+            }
+            catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        }
+    }
+
+    // ── Delete ─────────────────────────────────────────────────────────────
+
+    private async Task DeleteRole(CustomRole role)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Delete Role",
+            $"Are you sure you want to delete the role '{role.Name}'? This cannot be undone.",
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (confirmed == true)
+        {
+            try
+            {
+                await RbacService.DeleteRoleAsync(role.Id, CurrentUser.UserName);
+                Snackbar.Add($"Role '{role.Name}' deleted", Severity.Info);
+                await LoadData();
+            }
+            catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        }
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+
+    private Dictionary<string, List<Permission>> GetPermissionsByCategory(List<Permission> permissions)
+    {
+        return _allPermissions
+            .Where(p => permissions.Contains(p.Permission))
+            .GroupBy(p => p.Category)
+            .ToDictionary(g => g.Key, g => g.Select(p => p.Permission).ToList());
+    }
+
+    private string GetPermissionDisplayName(Permission perm)
+        => _allPermissions.FirstOrDefault(p => p.Permission == perm)?.Name ?? perm.ToString();
+
+    private static Color GetActionColor(string action) => action switch
+    {
+        "ROLE_CREATED" => Color.Success,
+        "ROLE_UPDATED" => Color.Info,
+        "ROLE_DELETED" => Color.Error,
+        "MEMBER_ROLE_CHANGED" => Color.Warning,
+        _ => Color.Default
+    };
+
+    private static string FormatAction(string action) => action switch
+    {
+        "ROLE_CREATED" => "Created",
+        "ROLE_UPDATED" => "Updated",
+        "ROLE_DELETED" => "Deleted",
+        "MEMBER_ROLE_CHANGED" => "Role Changed",
+        _ => action
+    };
+}

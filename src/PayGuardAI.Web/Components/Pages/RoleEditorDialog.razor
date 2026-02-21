@@ -1,0 +1,107 @@
+@using PayGuardAI.Core.Entities
+@using PayGuardAI.Core.Services
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_name" Label="Role Name" Required="true"
+                          Variant="Variant.Outlined" Placeholder="e.g., Compliance Officer"
+                          HelperText="Unique name for this role" />
+            <MudTextField @bind-Value="_description" Label="Description"
+                          Variant="Variant.Outlined" Lines="2"
+                          Placeholder="What can people with this role do?" />
+
+            <MudDivider Class="my-2" />
+
+            <MudText Typo="Typo.subtitle1" Class="mb-1">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Class="mr-1" />
+                Permissions
+            </MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
+                Select which features this role can access.
+            </MudText>
+
+            @foreach (var category in AllPermissions.GroupBy(p => p.Category))
+            {
+                <MudText Typo="Typo.overline" Color="Color.Secondary" Class="mt-2">@category.Key</MudText>
+                @foreach (var perm in category)
+                {
+                    <MudCheckBox T="bool" Dense="true"
+                                 Value="@(_selectedPermissions.Contains(perm.Permission))"
+                                 ValueChanged="@(val => TogglePermission(perm.Permission, val))"
+                                 Label="@perm.Name"
+                                 Color="Color.Primary">
+                    </MudCheckBox>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-8 mt-n2 mb-1">
+                        @perm.Description
+                    </MudText>
+                }
+            }
+
+            <MudDivider Class="my-2" />
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                @_selectedPermissions.Count of @AllPermissions.Count permissions selected
+            </MudText>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   OnClick="Submit" Disabled="@(!IsValid)">
+            @(IsEdit ? "Save Changes" : "Create Role")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public List<PermissionInfo> AllPermissions { get; set; } = [];
+    [Parameter] public bool IsEdit { get; set; }
+    [Parameter] public string RoleName { get; set; } = "";
+    [Parameter] public string RoleDescription { get; set; } = "";
+    [Parameter] public List<Permission> InitialPermissions { get; set; } = [];
+
+    private string _name = string.Empty;
+    private string _description = string.Empty;
+    private readonly HashSet<Permission> _selectedPermissions = [];
+
+    protected override void OnInitialized()
+    {
+        _name = RoleName;
+        _description = RoleDescription;
+        foreach (var perm in InitialPermissions)
+            _selectedPermissions.Add(perm);
+    }
+
+    private bool IsValid => !string.IsNullOrWhiteSpace(_name) && _selectedPermissions.Count > 0;
+
+    private void TogglePermission(Permission perm, bool selected)
+    {
+        if (selected)
+            _selectedPermissions.Add(perm);
+        else
+            _selectedPermissions.Remove(perm);
+    }
+
+    private void Cancel() => MudDialog?.Cancel();
+
+    private void Submit()
+    {
+        var data = new RoleFormData
+        {
+            Name = _name.Trim(),
+            Description = string.IsNullOrWhiteSpace(_description) ? null : _description.Trim(),
+            SelectedPermissions = _selectedPermissions.ToList()
+        };
+        MudDialog?.Close(DialogResult.Ok(data));
+    }
+
+    public class RoleFormData
+    {
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public List<Permission> SelectedPermissions { get; set; } = [];
+    }
+}

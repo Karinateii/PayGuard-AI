@@ -1,4 +1,6 @@
-﻿<MudNavMenu>
+﻿@using Microsoft.AspNetCore.Components.Authorization
+
+<MudNavMenu>
     <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">
         Dashboard
     </MudNavLink>
@@ -34,6 +36,9 @@
     </MudNavLink>
     <MudNavLink Href="/admin/team" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Group">
         Team
+    </MudNavLink>
+    <MudNavLink Href="/admin/roles" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AdminPanelSettings">
+        Roles &amp; Permissions
     </MudNavLink>
     <MudNavLink Href="/admin/api-keys" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Key">
         API Keys
