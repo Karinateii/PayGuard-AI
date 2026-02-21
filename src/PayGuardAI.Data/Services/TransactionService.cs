@@ -250,9 +250,9 @@ public class TransactionService : ITransactionService
         
         // Parse dates
         var createdAtStr = GetStringValue(data, "createdAt");
-        if (!string.IsNullOrEmpty(createdAtStr) && DateTime.TryParse(createdAtStr, out var parsedDate))
+        if (!string.IsNullOrEmpty(createdAtStr) && DateTime.TryParse(createdAtStr, null, System.Globalization.DateTimeStyles.RoundtripKind, out var parsedDate))
         {
-            transaction.CreatedAt = parsedDate;
+            transaction.CreatedAt = parsedDate.Kind == DateTimeKind.Utc ? parsedDate : parsedDate.ToUniversalTime();
         }
         else
         {
