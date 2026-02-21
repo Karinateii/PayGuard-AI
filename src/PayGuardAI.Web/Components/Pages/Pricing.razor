@@ -1,0 +1,165 @@
+@page "/pricing"
+@using PayGuardAI.Core.Entities
+@using PayGuardAI.Core.Services
+@inject IStripeService StripeService
+@inject NavigationManager Nav
+@inject IConfiguration Config
+
+<PageTitle>Pricing — PayGuard AI</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+    <MudText Typo="Typo.h3" Align="Align.Center" Class="mb-2" Style="font-weight:700">
+        Simple, Transparent Pricing
+    </MudText>
+    <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Secondary" Class="mb-8">
+        Start free for 14 days. No credit card required.
+    </MudText>
+
+    @if (_billingEnabled)
+    {
+        <MudGrid Justify="Justify.Center" Spacing="4">
+            @foreach (var plan in _plans)
+            {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudCard Elevation="@(plan.IsPopular ? 8 : 2)" 
+                             Style="@(plan.IsPopular ? "border: 2px solid var(--mud-palette-primary); position:relative;" : "")">
+                        @if (plan.IsPopular)
+                        {
+                            <MudChip T="string" Color="Color.Primary" Size="Size.Small"
+                                     Style="position:absolute; top:-14px; left:50%; transform:translateX(-50%); font-weight:700;">
+                                MOST POPULAR
+                            </MudChip>
+                        }
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h5" Style="font-weight:700">@plan.Name</MudText>
+                                <MudText Typo="Typo.h4" Color="Color.Primary" Style="font-weight:800" Class="mt-1">
+                                    @plan.Price
+                                </MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">@plan.Description</MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudList T="string" Dense="true">
+                                @foreach (var feature in plan.Features)
+                                {
+                                    <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle"
+                                                 IconColor="Color.Success">
+                                        @feature
+                                    </MudListItem>
+                                }
+                            </MudList>
+                            @if (plan.Plan != BillingPlan.Enterprise)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+                                    +$0.10 per 100 transactions over limit
+                                </MudText>
+                            }
+                        </MudCardContent>
+                        <MudCardActions Class="px-4 pb-4">
+                            <MudButton Variant="Variant.Filled"
+                                       Color="@(plan.IsPopular ? Color.Primary : Color.Default)"
+                                       FullWidth="true"
+                                       Size="Size.Large"
+                                       OnClick="@(() => StartCheckout(plan.Plan))"
+                                       Disabled="@_loading">
+                                @if (_loading && _checkingOutPlan == plan.Plan)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
+                                }
+                                Start Free Trial
+                            </MudButton>
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+
+        <MudPaper Elevation="0" Class="mt-10 pa-6" Style="background: var(--mud-palette-surface);">
+            <MudGrid Justify="Justify.Center">
+                <MudItem xs="12" md="8">
+                    <MudText Typo="Typo.h6" Align="Align.Center" Class="mb-4">
+                        Frequently Asked Questions
+                    </MudText>
+                    <MudExpansionPanels>
+                        <MudExpansionPanel Text="What happens after the 14-day trial?">
+                            Your transactions keep flowing. You'll be prompted to add a payment method. 
+                            If you don't, new transactions will be queued until you subscribe.
+                        </MudExpansionPanel>
+                        <MudExpansionPanel Text="Can I change plans later?">
+                            Yes — upgrade or downgrade any time from the Billing dashboard. 
+                            Stripe prorates the difference automatically.
+                        </MudExpansionPanel>
+                        <MudExpansionPanel Text="What counts as a transaction?">
+                            Any webhook event processed by PayGuard AI that triggers a risk score. 
+                            Duplicate events and health checks don't count.
+                        </MudExpansionPanel>
+                        <MudExpansionPanel Text="Is there a discount for annual billing?">
+                            Yes — 2 months free on annual plans. Contact us at billing@payguard.ai.
+                        </MudExpansionPanel>
+                    </MudExpansionPanels>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Info" Class="mt-4">
+            Billing is coming soon. You're currently on the free plan with full access.
+        </MudAlert>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <MudAlert Severity="Severity.Error" Class="mt-4">@_error</MudAlert>
+    }
+</MudContainer>
+
+@code {
+    private IReadOnlyList<PlanInfo> _plans = [];
+    private bool _billingEnabled;
+    private bool _loading;
+    private BillingPlan? _checkingOutPlan;
+    private string _error = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        _billingEnabled = bool.TryParse(Config["FeatureFlags:BillingEnabled"], out var b) && b;
+        if (_billingEnabled)
+            _plans = StripeService.GetPlans();
+    }
+
+    private async Task StartCheckout(BillingPlan plan)
+    {
+        _loading = true;
+        _checkingOutPlan = plan;
+        _error = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            var baseUrl = Config["AppUrl"] ?? Nav.BaseUri.TrimEnd('/');
+            var successUrl = $"{baseUrl}/billing?success=true";
+            var cancelUrl  = $"{baseUrl}/pricing";
+
+            var checkoutUrl = await StripeService.CreateCheckoutSessionAsync(
+                tenantId: "afriex-demo",         // replaced by real tenant ID when OAuth is on
+                email: "demo@payguard.ai",
+                plan: plan,
+                successUrl: successUrl,
+                cancelUrl: cancelUrl);
+
+            Nav.NavigateTo(checkoutUrl, forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            _error = "Could not start checkout. Please check Stripe config or try again.";
+            // Log but don't show internal details to users
+            _ = ex;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

@@ -1,0 +1,240 @@
+@page "/billing"
+@using PayGuardAI.Core.Entities
+@using PayGuardAI.Core.Services
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject IStripeService StripeService
+@inject NavigationManager Nav
+@inject IConfiguration Config
+@inject ISnackbar Snackbar
+
+<PageTitle>Billing — PayGuard AI</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-1" Style="font-weight:700">Billing</MudText>
+<MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-6">
+    Manage your subscription, view usage, and update payment details.
+</MudText>
+
+@if (!_billingEnabled)
+{
+    <MudAlert Severity="Severity.Info">
+        Billing is not yet enabled. You have full access during the beta.
+        <MudLink Href="/pricing" Class="ml-2">View upcoming plans →</MudLink>
+    </MudAlert>
+}
+else if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Class="mb-4" />
+}
+else
+{
+    @if (_success)
+    {
+        <MudAlert Severity="Severity.Success" Class="mb-4" ShowCloseIcon="true" CloseIconClicked="@(() => _success = false)">
+            🎉 Subscription activated! Welcome to PayGuard AI @_subscription?.Plan.
+        </MudAlert>
+    }
+
+    <!-- Current Plan Card -->
+    <MudGrid Spacing="4" Class="mb-6">
+        <MudItem xs="12" md="4">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.overline" Color="Color.Secondary">CURRENT PLAN</MudText>
+                        <MudText Typo="Typo.h5" Style="font-weight:700">
+                            @(_subscription?.Plan.ToString() ?? "Trial")
+                        </MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        <MudChip T="string" 
+                                 Color="@GetStatusColor(_subscription?.Status)"
+                                 Size="Size.Small">
+                            @(_subscription?.Status ?? "trialing")
+                        </MudChip>
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (_subscription?.TrialEndsAt != null && _subscription.Status == "trialing")
+                    {
+                        var daysLeft = (int)(_subscription.TrialEndsAt.Value - DateTime.UtcNow).TotalDays;
+                        <MudAlert Severity="@(daysLeft <= 3 ? Severity.Warning : Severity.Info)" Dense="true" Class="mb-2">
+                            @daysLeft day@(daysLeft == 1 ? "" : "s") left in trial
+                        </MudAlert>
+                    }
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Billing period: @(_subscription?.PeriodStart.ToString("MMM d") ?? "—") — 
+                        @(_subscription?.PeriodEnd.ToString("MMM d, yyyy") ?? "—")
+                    </MudText>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                               OnClick="OpenPortal" Disabled="@_portalLoading"
+                               StartIcon="@Icons.Material.Filled.OpenInNew">
+                        @if (_portalLoading)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1"/>
+                        }
+                        Manage Subscription
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+        <!-- Usage Card -->
+        <MudItem xs="12" md="4">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.overline" Color="Color.Secondary">USAGE THIS PERIOD</MudText>
+                        <MudText Typo="Typo.h5" Style="font-weight:700">
+                            @(_subscription?.TransactionsThisPeriod.ToString("N0") ?? "0")
+                            <MudText Typo="Typo.body1" Style="display:inline; font-weight:400"> / 
+                                @(GetIncludedLabel())
+                            </MudText>
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    @{
+                        var usagePct = GetUsagePercent();
+                    }
+                    <MudProgressLinear Value="@usagePct"
+                                       Color="@(usagePct > 90 ? Color.Error : usagePct > 70 ? Color.Warning : Color.Primary)"
+                                       Rounded="true" Size="Size.Medium" Class="mb-2" />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        @usagePct.ToString("0")% of included transactions used
+                    </MudText>
+                    @if (usagePct > 80 && _subscription?.Plan != BillingPlan.Enterprise)
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                            Approaching limit — <MudLink Href="/pricing">upgrade your plan</MudLink>
+                        </MudAlert>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- Upgrade Card -->
+        @if (_subscription?.Plan != BillingPlan.Enterprise)
+        {
+            <MudItem xs="12" md="4">
+                <MudCard Elevation="2" Style="border: 1px dashed var(--mud-palette-primary);">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.overline" Color="Color.Secondary">UPGRADE</MudText>
+                            <MudText Typo="Typo.h6">Need more transactions?</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                            Upgrade your plan to increase your transaction limit and unlock advanced features.
+                        </MudText>
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                   Href="/pricing" StartIcon="@Icons.Material.Filled.ArrowUpward">
+                            View Plans
+                        </MudButton>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+
+    <!-- Plan Features -->
+    <MudText Typo="Typo.h6" Class="mb-3">Your Plan Includes</MudText>
+    <MudGrid Spacing="2" Class="mb-6">
+        @foreach (var feature in GetCurrentPlanFeatures())
+        {
+            <MudItem xs="12" sm="6" md="4">
+                <MudPaper Elevation="0" Class="pa-3 d-flex align-center"
+                          Style="background: var(--mud-palette-surface);">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Class="mr-2" Size="Size.Small"/>
+                    <MudText Typo="Typo.body2">@feature</MudText>
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private TenantSubscription? _subscription;
+    private bool _loading = true;
+    private bool _portalLoading;
+    private bool _billingEnabled;
+    private bool _success;
+
+    [SupplyParameterFromQuery(Name = "success")]
+    public bool SuccessParam { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _billingEnabled = bool.TryParse(Config["FeatureFlags:BillingEnabled"], out var b) && b;
+        _success = SuccessParam;
+
+        if (_billingEnabled)
+        {
+            try
+            {
+                _subscription = await StripeService.GetSubscriptionAsync("afriex-demo");
+            }
+            catch { /* no subscription yet is fine */ }
+        }
+
+        _loading = false;
+    }
+
+    private async Task OpenPortal()
+    {
+        if (_subscription == null)
+        {
+            Snackbar.Add("No active subscription found. Please subscribe first.", Severity.Warning);
+            return;
+        }
+
+        _portalLoading = true;
+        try
+        {
+            var returnUrl = $"{Config["AppUrl"] ?? Nav.BaseUri.TrimEnd('/')}/billing";
+            var portalUrl = await StripeService.CreatePortalSessionAsync("afriex-demo", returnUrl);
+            Nav.NavigateTo(portalUrl, forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Could not open billing portal. " + ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _portalLoading = false;
+        }
+    }
+
+    private double GetUsagePercent()
+    {
+        if (_subscription == null) return 0;
+        if (_subscription.Plan == BillingPlan.Enterprise) return 0;
+        var limit = _subscription.IncludedTransactions;
+        if (limit <= 0) return 0;
+        return Math.Min(100, (_subscription.TransactionsThisPeriod / (double)limit) * 100);
+    }
+
+    private string GetIncludedLabel() =>
+        _subscription?.Plan == BillingPlan.Enterprise ? "∞" :
+        _subscription?.IncludedTransactions.ToString("N0") ?? "1,000";
+
+    private Color GetStatusColor(string? status) => status switch
+    {
+        "active"   => Color.Success,
+        "trialing" => Color.Info,
+        "past_due" => Color.Warning,
+        "canceled" => Color.Error,
+        _ => Color.Default
+    };
+
+    private string[] GetCurrentPlanFeatures()
+    {
+        var plan = StripeService.GetPlans()
+            .FirstOrDefault(p => p.Plan == (_subscription?.Plan ?? BillingPlan.Trial));
+        return plan?.Features ?? ["Real-time risk scoring", "HITL review queue", "14-day free trial"];
+    }
+}

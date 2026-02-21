@@ -19,6 +19,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<CustomerProfile> CustomerProfiles => Set<CustomerProfile>();
     public DbSet<RiskRule> RiskRules => Set<RiskRule>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<TenantSubscription> TenantSubscriptions => Set<TenantSubscription>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -86,6 +87,15 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(e => e.EntityType);
             entity.HasIndex(e => e.EntityId);
             entity.HasIndex(e => e.CreatedAt);
+        });
+
+        // TenantSubscription configuration
+        modelBuilder.Entity<TenantSubscription>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.TenantId).IsUnique();
+            entity.HasIndex(e => e.StripeCustomerId);
+            entity.HasIndex(e => e.Status);
         });
 
         // Seed default risk rules
