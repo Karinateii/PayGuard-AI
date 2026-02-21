@@ -12,6 +12,7 @@ public static class FeatureFlags
     public const string PostgresEnabledKey = "PostgresEnabled";
     public const string OAuthEnabledKey = "OAuthEnabled";
     public const string FlutterwaveEnabledKey = "FlutterwaveEnabled";
+    public const string SlackAlertsEnabledKey = "SlackAlertsEnabled";
 
     public static bool IsPostgresEnabled(this IConfiguration config)
     {
@@ -31,6 +32,13 @@ public static class FeatureFlags
     {
         var section = config.GetSection(SectionName);
         var value = section[FlutterwaveEnabledKey];
+        return bool.TryParse(value, out var result) && result;
+    }
+
+    public static bool IsSlackAlertsEnabled(this IConfiguration config)
+    {
+        var section = config.GetSection(SectionName);
+        var value = section[SlackAlertsEnabledKey];
         return bool.TryParse(value, out var result) && result;
     }
 }
