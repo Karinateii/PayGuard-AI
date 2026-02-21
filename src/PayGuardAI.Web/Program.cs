@@ -149,6 +149,17 @@ builder.Services.AddHttpClient<IBillingService, PaystackBillingService>();
 // Register admin dashboard service
 builder.Services.AddScoped<IAdminService, AdminService>();
 
+// Register email notification service — real SMTP when enabled, no-op fallback otherwise
+var emailEnabled = builder.Configuration.GetValue<bool>("FeatureFlags:EmailNotificationsEnabled");
+if (emailEnabled)
+{
+    builder.Services.AddScoped<IEmailNotificationService, EmailNotificationService>();
+}
+else
+{
+    builder.Services.AddScoped<IEmailNotificationService, NoOpEmailNotificationService>();
+}
+
 // Add controllers for API endpoints (webhooks)
 builder.Services.AddControllers();
 

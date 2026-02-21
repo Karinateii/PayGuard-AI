@@ -1,0 +1,289 @@
+@page "/admin/notifications"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using PayGuardAI.Core.Entities
+@using PayGuardAI.Core.Services
+@attribute [Authorize(Policy = "RequireManager")]
+@inject PayGuardAI.Data.ApplicationDbContext DbContext
+@inject ITenantContext TenantContext
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Notification Preferences — PayGuard AI</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.NotificationsActive" Class="mr-2" />
+    Notification Preferences
+</MudText>
+
+<MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-6">
+    Configure which email notifications your team receives for compliance events.
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @* ── Add / Edit Preference Card ── *@
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudCard Elevation="2" Class="mb-4">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Team Notification Subscriptions</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   OnClick="AddRecipient" Size="Size.Small">
+                            Add Recipient
+                        </MudButton>
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (_preferences.Count == 0)
+                    {
+                        <MudAlert Severity="Severity.Info" Class="mb-4">
+                            No notification preferences configured yet. Add a recipient to get started.
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <MudTable Items="_preferences" Hover="true" Dense="true" Elevation="0">
+                            <HeaderContent>
+                                <MudTh>Recipient</MudTh>
+                                <MudTh>Risk Alerts</MudTh>
+                                <MudTh>Daily Summary</MudTh>
+                                <MudTh>Reviews</MudTh>
+                                <MudTh>Team Invites</MudTh>
+                                <MudTh>System</MudTh>
+                                <MudTh>Min Score</MudTh>
+                                <MudTh>Actions</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Recipient">
+                                    <MudStack Spacing="0">
+                                        <MudText Typo="Typo.body2" Style="font-weight:600">@context.DisplayName</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Email</MudText>
+                                    </MudStack>
+                                </MudTd>
+                                <MudTd DataLabel="Risk Alerts">
+                                    <MudSwitch T="bool" Value="@context.RiskAlertsEnabled"
+                                               ValueChanged="@(async (bool v) => await TogglePref(context, "RiskAlertsEnabled", v))"
+                                               Color="Color.Error" />
+                                </MudTd>
+                                <MudTd DataLabel="Daily Summary">
+                                    <MudSwitch T="bool" Value="@context.DailySummaryEnabled"
+                                               ValueChanged="@(async (bool v) => await TogglePref(context, "DailySummaryEnabled", v))"
+                                               Color="Color.Primary" />
+                                </MudTd>
+                                <MudTd DataLabel="Reviews">
+                                    <MudSwitch T="bool" Value="@context.ReviewAssignmentsEnabled"
+                                               ValueChanged="@(async (bool v) => await TogglePref(context, "ReviewAssignmentsEnabled", v))"
+                                               Color="Color.Info" />
+                                </MudTd>
+                                <MudTd DataLabel="Team Invites">
+                                    <MudSwitch T="bool" Value="@context.TeamInvitesEnabled"
+                                               ValueChanged="@(async (bool v) => await TogglePref(context, "TeamInvitesEnabled", v))"
+                                               Color="Color.Success" />
+                                </MudTd>
+                                <MudTd DataLabel="System">
+                                    <MudSwitch T="bool" Value="@context.SystemAlertsEnabled"
+                                               ValueChanged="@(async (bool v) => await TogglePref(context, "SystemAlertsEnabled", v))"
+                                               Color="Color.Warning" />
+                                </MudTd>
+                                <MudTd DataLabel="Min Score">
+                                    <MudNumericField T="int" Value="@context.MinimumRiskScoreForAlert"
+                                                     ValueChanged="@(async (int v) => await UpdateMinScore(context, v))"
+                                                     Min="0" Max="100" Margin="Margin.Dense"
+                                                     Variant="Variant.Outlined" Style="max-width:80px;" />
+                                </MudTd>
+                                <MudTd DataLabel="Actions">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                   Color="Color.Error" Size="Size.Small"
+                                                   OnClick="@(() => RemoveRecipient(context))" />
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        @* ── Info Panel ── *@
+        <MudItem xs="12" md="4">
+            <MudCard Elevation="2" Class="mb-4">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-1" />
+                            Notification Types
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudList T="string" Dense="true">
+                        <MudListItem Icon="@Icons.Material.Filled.Warning" IconColor="Color.Error">
+                            <MudText Typo="Typo.body2"><strong>Risk Alerts</strong></MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Immediate email when a critical or high-risk transaction is detected</MudText>
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Summarize" IconColor="Color.Primary">
+                            <MudText Typo="Typo.body2"><strong>Daily Summary</strong></MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">End-of-day report with transaction stats, risk distribution, and review status</MudText>
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Assignment" IconColor="Color.Info">
+                            <MudText Typo="Typo.body2"><strong>Review Assignments</strong></MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Email when a transaction is assigned to you for compliance review</MudText>
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.PersonAdd" IconColor="Color.Success">
+                            <MudText Typo="Typo.body2"><strong>Team Invites</strong></MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Welcome email sent when a new team member is invited</MudText>
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.SettingsSuggest" IconColor="Color.Warning">
+                            <MudText Typo="Typo.body2"><strong>System Alerts</strong></MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Platform health and error notifications</MudText>
+                        </MudListItem>
+                    </MudList>
+                </MudCardContent>
+            </MudCard>
+
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.Settings" Class="mr-1" />
+                            SMTP Configuration
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                        Email uses SMTP — works with SendGrid, AWS SES, Mailgun, or any SMTP provider.
+                    </MudAlert>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Configure via <code>appsettings.json</code>:
+                    </MudText>
+                    <MudPaper Class="pa-3 mt-2" Elevation="0" Style="background:#f5f5f5;font-family:monospace;font-size:12px;">
+                        "Email": @("{") <br/>
+                        &nbsp;&nbsp;"SmtpHost": "smtp.sendgrid.net",<br/>
+                        &nbsp;&nbsp;"SmtpPort": 587,<br/>
+                        &nbsp;&nbsp;"SmtpUser": "apikey",<br/>
+                        &nbsp;&nbsp;"SmtpPassword": "SG.xxx...",<br/>
+                        &nbsp;&nbsp;"FromAddress": "noreply@("@")...",<br/>
+                        &nbsp;&nbsp;"FromName": "PayGuard AI"<br/>
+                        @("}")
+                    </MudPaper>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private List<NotificationPreference> _preferences = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPreferences();
+    }
+
+    private async Task LoadPreferences()
+    {
+        _loading = true;
+        try
+        {
+            var tenantId = TenantContext.TenantId;
+            _preferences = await DbContext.NotificationPreferences
+                .Where(p => p.TenantId == tenantId)
+                .OrderBy(p => p.DisplayName)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load preferences: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task AddRecipient()
+    {
+        var parameters = new DialogParameters<AddNotificationRecipientDialog>();
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<AddNotificationRecipientDialog>("Add Notification Recipient", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: NotificationPreference pref })
+        {
+            pref.TenantId = TenantContext.TenantId;
+
+            // Check for duplicate
+            var exists = await DbContext.NotificationPreferences
+                .AnyAsync(p => p.TenantId == pref.TenantId && p.Email == pref.Email);
+            if (exists)
+            {
+                Snackbar.Add("This email is already subscribed.", Severity.Warning);
+                return;
+            }
+
+            DbContext.NotificationPreferences.Add(pref);
+            await DbContext.SaveChangesAsync();
+            Snackbar.Add($"Added {pref.DisplayName}", Severity.Success);
+            await LoadPreferences();
+        }
+    }
+
+    private async Task TogglePref(NotificationPreference pref, string property, bool value)
+    {
+        switch (property)
+        {
+            case nameof(NotificationPreference.RiskAlertsEnabled):
+                pref.RiskAlertsEnabled = value; break;
+            case nameof(NotificationPreference.DailySummaryEnabled):
+                pref.DailySummaryEnabled = value; break;
+            case nameof(NotificationPreference.ReviewAssignmentsEnabled):
+                pref.ReviewAssignmentsEnabled = value; break;
+            case nameof(NotificationPreference.TeamInvitesEnabled):
+                pref.TeamInvitesEnabled = value; break;
+            case nameof(NotificationPreference.SystemAlertsEnabled):
+                pref.SystemAlertsEnabled = value; break;
+        }
+        pref.UpdatedAt = DateTime.UtcNow;
+        await DbContext.SaveChangesAsync();
+        Snackbar.Add("Preference updated", Severity.Success);
+    }
+
+    private async Task UpdateMinScore(NotificationPreference pref, int value)
+    {
+        pref.MinimumRiskScoreForAlert = Math.Clamp(value, 0, 100);
+        pref.UpdatedAt = DateTime.UtcNow;
+        await DbContext.SaveChangesAsync();
+        Snackbar.Add("Minimum risk score updated", Severity.Success);
+    }
+
+    private async Task RemoveRecipient(NotificationPreference pref)
+    {
+        bool? confirm = await DialogService.ShowMessageBox(
+            "Remove Recipient",
+            $"Remove {pref.DisplayName} ({pref.Email}) from notifications?",
+            yesText: "Remove", cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            DbContext.NotificationPreferences.Remove(pref);
+            await DbContext.SaveChangesAsync();
+            Snackbar.Add($"Removed {pref.DisplayName}", Severity.Success);
+            await LoadPreferences();
+        }
+    }
+
+    private async Task SendTestEmail(NotificationPreference pref)
+    {
+        Snackbar.Add($"Test email would be sent to {pref.Email}", Severity.Info);
+    }
+}

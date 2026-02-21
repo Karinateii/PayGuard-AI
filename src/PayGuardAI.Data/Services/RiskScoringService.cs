@@ -14,6 +14,7 @@ public class RiskScoringService : IRiskScoringService
     private readonly ApplicationDbContext _context;
     private readonly ILogger<RiskScoringService> _logger;
     private readonly IAlertingService _alertingService;
+    private readonly IEmailNotificationService _emailNotificationService;
     private readonly ITenantContext _tenantContext;
 
     // Risk level thresholds
@@ -28,11 +29,13 @@ public class RiskScoringService : IRiskScoringService
         ApplicationDbContext context,
         ILogger<RiskScoringService> logger,
         IAlertingService alertingService,
+        IEmailNotificationService emailNotificationService,
         ITenantContext tenantContext)
     {
         _context = context;
         _logger = logger;
         _alertingService = alertingService;
+        _emailNotificationService = emailNotificationService;
         _tenantContext = tenantContext;
     }
 
@@ -108,6 +111,17 @@ public class RiskScoringService : IRiskScoringService
         if (riskLevel >= RiskLevel.High)
         {
             await _alertingService.AlertTransactionAsync(
+                tenantId: _tenantContext.TenantId,
+                externalId: transaction.ExternalId,
+                riskScore: totalScore,
+                riskLevel: riskLevel.ToString(),
+                amount: transaction.Amount,
+                currency: transaction.SourceCurrency,
+                senderId: transaction.SenderId,
+                cancellationToken);
+
+            // Send email alert in parallel with Slack
+            await _emailNotificationService.SendRiskAlertEmailAsync(
                 tenantId: _tenantContext.TenantId,
                 externalId: transaction.ExternalId,
                 riskScore: totalScore,

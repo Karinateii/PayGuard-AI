@@ -1,0 +1,68 @@
+@using PayGuardAI.Core.Entities
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Class="mr-2" />
+            Add Notification Recipient
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_name" Label="Display Name" Required="true"
+                          Placeholder="e.g. Jane Smith" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_email" Label="Email Address" Required="true"
+                          InputType="InputType.Email"
+                          Placeholder="e.g. jane@company.com" Variant="Variant.Outlined" />
+            <MudDivider />
+            <MudText Typo="Typo.subtitle2">Notification Types</MudText>
+            <MudSwitch @bind-Value="_riskAlerts" Label="Risk Alerts" Color="Color.Error" />
+            <MudSwitch @bind-Value="_dailySummary" Label="Daily Summary" Color="Color.Primary" />
+            <MudSwitch @bind-Value="_reviewAssignments" Label="Review Assignments" Color="Color.Info" />
+            <MudSwitch @bind-Value="_teamInvites" Label="Team Invites" Color="Color.Success" />
+            <MudSwitch @bind-Value="_systemAlerts" Label="System Alerts" Color="Color.Warning" />
+            <MudNumericField @bind-Value="_minScore" Label="Min Risk Score for Alerts"
+                             Min="0" Max="100" Variant="Variant.Outlined"
+                             HelperText="Only send risk alerts for scores at or above this value" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   Disabled="@(string.IsNullOrWhiteSpace(_name) || string.IsNullOrWhiteSpace(_email))"
+                   OnClick="Submit">
+            Add Recipient
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private string _name = string.Empty;
+    private string _email = string.Empty;
+    private bool _riskAlerts = true;
+    private bool _dailySummary = true;
+    private bool _reviewAssignments = true;
+    private bool _teamInvites = true;
+    private bool _systemAlerts = true;
+    private int _minScore = 50;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Submit()
+    {
+        var pref = new NotificationPreference
+        {
+            DisplayName = _name.Trim(),
+            Email = _email.Trim().ToLowerInvariant(),
+            RiskAlertsEnabled = _riskAlerts,
+            DailySummaryEnabled = _dailySummary,
+            ReviewAssignmentsEnabled = _reviewAssignments,
+            TeamInvitesEnabled = _teamInvites,
+            SystemAlertsEnabled = _systemAlerts,
+            MinimumRiskScoreForAlert = _minScore
+        };
+        MudDialog.Close(DialogResult.Ok(pref));
+    }
+}
