@@ -4,7 +4,7 @@ namespace PayGuardAI.Web.Services;
 
 /// <summary>
 /// Resolves current user identity from the request context.
-/// Provides role and permission information.
+/// Provides role, permission, and tenant information.
 /// </summary>
 public class CurrentUserService
 {
@@ -21,6 +21,16 @@ public class CurrentUserService
         {
             var user = _httpContextAccessor.HttpContext?.User;
             return user?.Identity?.Name ?? "unknown";
+        }
+    }
+
+    /// <summary>Get the tenant ID from the current user's claims.</summary>
+    public string TenantId
+    {
+        get
+        {
+            var user = _httpContextAccessor.HttpContext?.User;
+            return user?.FindFirst("tenant_id")?.Value ?? "afriex-demo";
         }
     }
 

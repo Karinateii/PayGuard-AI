@@ -3,6 +3,7 @@
 @using PayGuardAI.Core.Services
 @attribute [Authorize(Policy = "RequireManager")]
 @inject IAdminService AdminService
+@inject PayGuardAI.Core.Services.ITenantContext TenantContext
 
 <PageTitle>Usage Analytics — PayGuard AI</PageTitle>
 
@@ -160,7 +161,7 @@ else if (_analytics != null)
         _loading = true;
         try
         {
-            _analytics = await AdminService.GetUsageAnalyticsAsync("afriex-demo", _days);
+            _analytics = await AdminService.GetUsageAnalyticsAsync(TenantContext.TenantId, _days);
             BuildCharts();
         }
         catch { }

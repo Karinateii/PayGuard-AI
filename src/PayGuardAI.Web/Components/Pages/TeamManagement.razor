@@ -8,6 +8,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
+@inject PayGuardAI.Core.Services.ITenantContext TenantContext
 
 <PageTitle>Team Management — PayGuard AI</PageTitle>
 
@@ -98,8 +99,8 @@ else
         _loading = true;
         try
         {
-            _members = await AdminService.GetTeamMembersAsync("afriex-demo");
-            _availableRoles = await RbacService.GetRolesAsync("afriex-demo");
+            _members = await AdminService.GetTeamMembersAsync(TenantContext.TenantId);
+            _availableRoles = await RbacService.GetRolesAsync(TenantContext.TenantId);
         }
         catch (Exception ex) { _error = ex.Message; }
         finally { _loading = false; }
@@ -119,7 +120,7 @@ else
         {
             try
             {
-                await AdminService.InviteTeamMemberAsync("afriex-demo", newMember.Email, newMember.DisplayName, newMember.Role);
+                await AdminService.InviteTeamMemberAsync(TenantContext.TenantId, newMember.Email, newMember.DisplayName, newMember.Role);
                 Snackbar.Add($"Invitation sent to {newMember.Email}!", Severity.Success);
                 await LoadMembers();
             }

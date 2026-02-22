@@ -8,6 +8,11 @@ public class RiskFactor
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     
+    /// <summary>
+    /// Tenant this risk factor belongs to.
+    /// </summary>
+    public string TenantId { get; set; } = string.Empty;
+    
     public Guid RiskAnalysisId { get; set; }
     
     /// <summary>

@@ -8,6 +8,11 @@ public class Transaction
     public Guid Id { get; set; } = Guid.NewGuid();
     
     /// <summary>
+    /// Tenant this transaction belongs to.
+    /// </summary>
+    public string TenantId { get; set; } = string.Empty;
+    
+    /// <summary>
     /// External transaction ID from Afriex.
     /// </summary>
     public string ExternalId { get; set; } = string.Empty;

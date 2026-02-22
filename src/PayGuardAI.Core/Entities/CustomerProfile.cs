@@ -9,6 +9,11 @@ public class CustomerProfile
     public Guid Id { get; set; } = Guid.NewGuid();
     
     /// <summary>
+    /// Tenant this customer profile belongs to.
+    /// </summary>
+    public string TenantId { get; set; } = string.Empty;
+    
+    /// <summary>
     /// External customer ID from Afriex.
     /// </summary>
     public string ExternalId { get; set; } = string.Empty;

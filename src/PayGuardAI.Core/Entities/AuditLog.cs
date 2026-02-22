@@ -8,6 +8,11 @@ public class AuditLog
     public Guid Id { get; set; } = Guid.NewGuid();
     
     /// <summary>
+    /// Tenant this audit log belongs to.
+    /// </summary>
+    public string TenantId { get; set; } = string.Empty;
+    
+    /// <summary>
     /// Action performed (e.g., "TRANSACTION_ANALYZED", "REVIEW_APPROVED").
     /// </summary>
     public string Action { get; set; } = string.Empty;

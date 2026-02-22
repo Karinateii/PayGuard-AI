@@ -64,6 +64,7 @@ public class RbacService : IRbacService
         // Audit log
         _db.AuditLogs.Add(new AuditLog
         {
+            TenantId = tenantId,
             Action = "ROLE_CREATED",
             EntityType = "CustomRole",
             EntityId = role.Id.ToString(),
@@ -104,6 +105,7 @@ public class RbacService : IRbacService
         // Audit log
         _db.AuditLogs.Add(new AuditLog
         {
+            TenantId = role.TenantId,
             Action = "ROLE_UPDATED",
             EntityType = "CustomRole",
             EntityId = role.Id.ToString(),
@@ -136,6 +138,7 @@ public class RbacService : IRbacService
         // Audit log
         _db.AuditLogs.Add(new AuditLog
         {
+            TenantId = role.TenantId,
             Action = "ROLE_DELETED",
             EntityType = "CustomRole",
             EntityId = role.Id.ToString(),
@@ -211,6 +214,7 @@ public class RbacService : IRbacService
         // Audit log
         _db.AuditLogs.Add(new AuditLog
         {
+            TenantId = member.TenantId,
             Action = "MEMBER_ROLE_CHANGED",
             EntityType = "TeamMember",
             EntityId = member.Id.ToString(),

@@ -1,16 +1,32 @@
 using Microsoft.EntityFrameworkCore;
 using PayGuardAI.Core.Entities;
+using PayGuardAI.Core.Services;
 
 namespace PayGuardAI.Data;
 
 /// <summary>
 /// Application database context for PayGuard AI.
+/// Applies tenant-scoped global query filters on all entities with TenantId.
 /// </summary>
 public class ApplicationDbContext : DbContext
 {
+    private readonly string _tenantId;
+
+    public ApplicationDbContext(
+        DbContextOptions<ApplicationDbContext> options,
+        ITenantContext tenantContext)
+        : base(options)
+    {
+        _tenantId = tenantContext.TenantId;
+    }
+
+    /// <summary>
+    /// Constructor for migrations and test scenarios where no tenant context is available.
+    /// </summary>
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
         : base(options)
     {
+        _tenantId = "afriex-demo"; // fallback for migrations
     }
 
     public DbSet<Transaction> Transactions => Set<Transaction>();
@@ -31,6 +47,25 @@ public class ApplicationDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        // ─── Global tenant query filters ───
+        // Every query is automatically scoped to the current tenant.
+        // Use IgnoreQueryFilters() for cross-tenant admin queries.
+        modelBuilder.Entity<Transaction>().HasQueryFilter(e => e.TenantId == _tenantId);
+        modelBuilder.Entity<RiskAnalysis>().HasQueryFilter(e => e.TenantId == _tenantId);
+        modelBuilder.Entity<RiskFactor>().HasQueryFilter(e => e.TenantId == _tenantId);
+        modelBuilder.Entity<CustomerProfile>().HasQueryFilter(e => e.TenantId == _tenantId);
+        modelBuilder.Entity<RiskRule>().HasQueryFilter(e => e.TenantId == _tenantId || e.TenantId == "");
+        modelBuilder.Entity<AuditLog>().HasQueryFilter(e => e.TenantId == _tenantId);
+        modelBuilder.Entity<TenantSubscription>().HasQueryFilter(e => e.TenantId == _tenantId);
+        modelBuilder.Entity<OrganizationSettings>().HasQueryFilter(e => e.TenantId == _tenantId);
+        modelBuilder.Entity<TeamMember>().HasQueryFilter(e => e.TenantId == _tenantId);
+        modelBuilder.Entity<ApiKey>().HasQueryFilter(e => e.TenantId == _tenantId);
+        modelBuilder.Entity<WebhookEndpoint>().HasQueryFilter(e => e.TenantId == _tenantId);
+        modelBuilder.Entity<NotificationPreference>().HasQueryFilter(e => e.TenantId == _tenantId);
+        modelBuilder.Entity<CustomRole>().HasQueryFilter(e => e.TenantId == _tenantId);
+
+        // ─── Entity configuration ───
+
         // Transaction configuration
         modelBuilder.Entity<Transaction>(entity =>
         {
@@ -38,6 +73,7 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(e => e.ExternalId).IsUnique();
             entity.HasIndex(e => e.SenderId);
             entity.HasIndex(e => e.CreatedAt);
+            entity.HasIndex(e => e.TenantId);
             entity.Property(e => e.Amount).HasPrecision(18, 4);
         });
 
@@ -48,6 +84,7 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(e => e.TransactionId).IsUnique();
             entity.HasIndex(e => e.RiskLevel);
             entity.HasIndex(e => e.ReviewStatus);
+            entity.HasIndex(e => e.TenantId);
             
             entity.HasOne(e => e.Transaction)
                   .WithOne(t => t.RiskAnalysis)
@@ -60,6 +97,7 @@ public class ApplicationDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.RiskAnalysisId);
+            entity.HasIndex(e => e.TenantId);
             
             entity.HasOne(e => e.RiskAnalysis)
                   .WithMany(r => r.RiskFactors)
@@ -72,6 +110,7 @@ public class ApplicationDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.ExternalId).IsUnique();
+            entity.HasIndex(e => e.TenantId);
             entity.Property(e => e.TotalVolume).HasPrecision(18, 4);
             entity.Property(e => e.AverageTransactionAmount).HasPrecision(18, 4);
             entity.Property(e => e.MaxTransactionAmount).HasPrecision(18, 4);
@@ -83,6 +122,7 @@ public class ApplicationDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.RuleCode).IsUnique();
             entity.HasIndex(e => e.IsEnabled);
+            entity.HasIndex(e => e.TenantId);
             entity.Property(e => e.Threshold).HasPrecision(18, 4);
         });
 
@@ -93,6 +133,7 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(e => e.EntityType);
             entity.HasIndex(e => e.EntityId);
             entity.HasIndex(e => e.CreatedAt);
+            entity.HasIndex(e => e.TenantId);
         });
 
         // TenantSubscription configuration

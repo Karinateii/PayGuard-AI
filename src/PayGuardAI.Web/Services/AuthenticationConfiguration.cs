@@ -152,6 +152,10 @@ public static class AuthenticationConfiguration
                         {
                             identity.AddClaim(new Claim(ClaimTypes.Name, userEmail));
                         }
+
+                        // Add tenant claim — future: look up from TeamMember table by email
+                        var defaultTenantId = config["MultiTenancy:DefaultTenantId"] ?? "afriex-demo";
+                        identity.AddClaim(new Claim("tenant_id", defaultTenantId));
                     }
                     
                     return Task.CompletedTask;

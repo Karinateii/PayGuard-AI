@@ -6,6 +6,7 @@
 @inject IBillingService BillingService
 @inject NavigationManager Nav
 @inject IConfiguration Config
+@inject PayGuardAI.Core.Services.ITenantContext TenantContext
 
 <PageTitle>Pricing — PayGuard AI</PageTitle>
 
@@ -145,7 +146,7 @@
             var callbackUrl = $"{baseUrl}/billing?success=true";
 
             var checkoutUrl = await BillingService.CreateCheckoutSessionAsync(
-                tenantId: "afriex-demo",
+                tenantId: TenantContext.TenantId,
                 email: "demo@payguard.ai",
                 plan: plan,
                 callbackUrl: callbackUrl);

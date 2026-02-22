@@ -48,6 +48,7 @@ public class TransactionService : ITransactionService
 
         // Parse the webhook payload
         var transaction = ParseWebhookPayload(payload);
+        transaction.TenantId = _tenantContext.TenantId;
         
         // Check for duplicate
         var existing = await _context.Transactions

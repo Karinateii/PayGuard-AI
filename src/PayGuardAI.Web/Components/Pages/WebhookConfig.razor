@@ -5,6 +5,7 @@
 @inject PayGuardAI.Core.Services.IAdminService AdminService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject PayGuardAI.Core.Services.ITenantContext TenantContext
 
 <PageTitle>Webhook Configuration — PayGuard AI</PageTitle>
 
@@ -118,7 +119,7 @@ else
     private async Task LoadEndpoints()
     {
         _loading = true;
-        try { _endpoints = await AdminService.GetWebhookEndpointsAsync("afriex-demo"); }
+        try { _endpoints = await AdminService.GetWebhookEndpointsAsync(TenantContext.TenantId); }
         catch { }
         finally { _loading = false; }
     }
@@ -134,7 +135,7 @@ else
         {
             try
             {
-                ep.TenantId = "afriex-demo";
+                ep.TenantId = TenantContext.TenantId;
                 await AdminService.AddWebhookEndpointAsync(ep);
                 Snackbar.Add("Webhook endpoint added!", Severity.Success);
                 await LoadEndpoints();

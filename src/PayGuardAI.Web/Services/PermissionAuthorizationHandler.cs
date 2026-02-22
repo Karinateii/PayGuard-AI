@@ -48,9 +48,10 @@ public class PermissionAuthorizationHandler : AuthorizationHandler<PermissionReq
 
         using var scope = _scopeFactory.CreateScope();
         var rbacService = scope.ServiceProvider.GetRequiredService<IRbacService>();
+        var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>();
 
-        // Check each role the user has — if any role grants the permission, succeed
-        const string tenantId = "afriex-demo"; // TODO: resolve from TenantContext when multi-tenant OAuth is live
+        // Resolve tenant from the scoped TenantContext (set by TenantResolutionMiddleware)
+        var tenantId = tenantContext.TenantId;
         foreach (var role in roles)
         {
             try

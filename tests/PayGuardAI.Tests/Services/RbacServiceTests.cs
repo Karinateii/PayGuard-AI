@@ -20,7 +20,12 @@ public class RbacServiceTests : IDisposable
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
-        _db = new ApplicationDbContext(options);
+
+        // Create a mock ITenantContext so the global query filter matches our test TenantId
+        var tenantContext = new Mock<ITenantContext>();
+        tenantContext.Setup(t => t.TenantId).Returns(TenantId);
+
+        _db = new ApplicationDbContext(options, tenantContext.Object);
         _db.Database.EnsureCreated();
 
         var logger = Mock.Of<ILogger<RbacService>>();

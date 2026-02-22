@@ -7,6 +7,7 @@
 @inject IDialogService DialogService
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
 @inject IJSRuntime JS
+@inject PayGuardAI.Core.Services.ITenantContext TenantContext
 
 <PageTitle>API Keys — PayGuard AI</PageTitle>
 
@@ -105,7 +106,7 @@ else
     private async Task LoadKeys()
     {
         _loading = true;
-        try { _keys = await AdminService.GetApiKeysAsync("afriex-demo"); }
+        try { _keys = await AdminService.GetApiKeysAsync(TenantContext.TenantId); }
         catch { /* logged by service */ }
         finally { _loading = false; }
     }
@@ -129,7 +130,7 @@ else
         {
             try
             {
-                var (_, rawKey) = await AdminService.GenerateApiKeyAsync("afriex-demo", keyName, CurrentUser.UserName);
+                var (_, rawKey) = await AdminService.GenerateApiKeyAsync(TenantContext.TenantId, keyName, CurrentUser.UserName);
                 _newlyGeneratedKey = rawKey;
                 Snackbar.Add("API key generated! Copy it now — it won't be shown again.", Severity.Warning);
                 await LoadKeys();

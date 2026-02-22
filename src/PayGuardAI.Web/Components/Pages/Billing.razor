@@ -6,6 +6,7 @@
 @inject NavigationManager Nav
 @inject IConfiguration Config
 @inject ISnackbar Snackbar
+@inject PayGuardAI.Core.Services.ITenantContext TenantContext
 
 <PageTitle>Billing — PayGuard AI</PageTitle>
 
@@ -176,7 +177,7 @@ else
         {
             try
             {
-                _subscription = await BillingService.GetSubscriptionAsync("afriex-demo");
+                _subscription = await BillingService.GetSubscriptionAsync(TenantContext.TenantId);
             }
             catch { /* no subscription yet is fine */ }
         }
@@ -195,7 +196,7 @@ else
         _portalLoading = true;
         try
         {
-            var manageUrl = await BillingService.GetManageSubscriptionUrlAsync("afriex-demo");
+            var manageUrl = await BillingService.GetManageSubscriptionUrlAsync(TenantContext.TenantId);
             Nav.NavigateTo(manageUrl, forceLoad: true);
         }
         catch (Exception ex)

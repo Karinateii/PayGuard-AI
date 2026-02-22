@@ -7,6 +7,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
+@inject PayGuardAI.Core.Services.ITenantContext TenantContext
 
 <PageTitle>Role Management — PayGuard AI</PageTitle>
 
@@ -165,8 +166,8 @@ else
         _loading = true;
         try
         {
-            _roles = await RbacService.GetRolesAsync("afriex-demo");
-            _auditLogs = await RbacService.GetRbacAuditLogAsync("afriex-demo");
+            _roles = await RbacService.GetRolesAsync(TenantContext.TenantId);
+            _auditLogs = await RbacService.GetRbacAuditLogAsync(TenantContext.TenantId);
         }
         catch (Exception ex) { _error = ex.Message; }
         finally { _loading = false; }
@@ -189,7 +190,7 @@ else
         {
             try
             {
-                await RbacService.CreateRoleAsync("afriex-demo", formData.Name, formData.Description,
+                await RbacService.CreateRoleAsync(TenantContext.TenantId, formData.Name, formData.Description,
                     formData.SelectedPermissions, CurrentUser.UserName);
                 Snackbar.Add($"Role '{formData.Name}' created!", Severity.Success);
                 await LoadData();

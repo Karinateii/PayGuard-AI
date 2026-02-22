@@ -284,13 +284,13 @@ app.UseSerilogRequestLogging(options =>
 app.UseMiddleware<SecurityHeadersMiddleware>();    // Security headers on every response
 app.UseMiddleware<InputValidationMiddleware>();     // Reject oversized / malicious payloads
 app.UseMiddleware<RequestLoggingMiddleware>();
-app.UseMiddleware<TenantResolutionMiddleware>();
 app.UseMiddleware<ApiKeyAuthenticationMiddleware>(); // Validate X-API-Key for /api/ endpoints
-app.UseMiddleware<IpWhitelistMiddleware>();          // Enforce per-tenant IP whitelist
 
 app.UseSession();
 app.UseRateLimiter();
 app.UseAuthentication();
+app.UseMiddleware<TenantResolutionMiddleware>();   // Resolve tenant from claims/header (AFTER auth)
+app.UseMiddleware<IpWhitelistMiddleware>();          // Enforce per-tenant IP whitelist
 app.UseAuthorization();
 
 app.UseAntiforgery();

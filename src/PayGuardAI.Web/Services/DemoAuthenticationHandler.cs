@@ -47,10 +47,13 @@ public class DemoAuthenticationHandler : AuthenticationHandler<AuthenticationSch
         var userName = _configuration["Auth:DefaultUser"] ?? "compliance_officer@payguard.ai";
         var roles = _configuration["Auth:DefaultRoles"] ?? "Reviewer,Manager";
 
+        var tenantId = _configuration["MultiTenancy:DefaultTenantId"] ?? "afriex-demo";
+
         var claims = new List<Claim>
         {
             new(ClaimTypes.Name, userName),
-            new(ClaimTypes.NameIdentifier, userName)
+            new(ClaimTypes.NameIdentifier, userName),
+            new("tenant_id", tenantId)
         };
 
         foreach (var role in roles.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))

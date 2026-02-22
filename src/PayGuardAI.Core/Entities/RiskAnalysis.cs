@@ -7,6 +7,11 @@ public class RiskAnalysis
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     
+    /// <summary>
+    /// Tenant this risk analysis belongs to.
+    /// </summary>
+    public string TenantId { get; set; } = string.Empty;
+    
     public Guid TransactionId { get; set; }
     
     /// <summary>

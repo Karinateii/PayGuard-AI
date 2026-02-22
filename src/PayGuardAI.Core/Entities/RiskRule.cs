@@ -9,6 +9,11 @@ public class RiskRule
     public Guid Id { get; set; } = Guid.NewGuid();
     
     /// <summary>
+    /// Tenant this rule belongs to. Empty string means global/shared rule.
+    /// </summary>
+    public string TenantId { get; set; } = string.Empty;
+    
+    /// <summary>
     /// Unique rule identifier (e.g., "HIGH_AMOUNT", "VELOCITY_24H").
     /// </summary>
     public string RuleCode { get; set; } = string.Empty;

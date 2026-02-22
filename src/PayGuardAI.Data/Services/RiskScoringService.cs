@@ -60,6 +60,7 @@ public class RiskScoringService : IRiskScoringService
             var factor = await EvaluateRuleAsync(rule, transaction, customerProfile, cancellationToken);
             if (factor != null)
             {
+                factor.TenantId = _tenantContext.TenantId;
                 riskFactors.Add(factor);
                 totalScore += factor.ScoreContribution;
             }
@@ -89,6 +90,7 @@ public class RiskScoringService : IRiskScoringService
         var analysis = new RiskAnalysis
         {
             TransactionId = transaction.Id,
+            TenantId = _tenantContext.TenantId,
             RiskScore = totalScore,
             RiskLevel = riskLevel,
             ReviewStatus = reviewStatus,
@@ -335,6 +337,7 @@ public class RiskScoringService : IRiskScoringService
             profile = new CustomerProfile
             {
                 ExternalId = customerId,
+                TenantId = _tenantContext.TenantId,
                 TotalTransactions = 0,
                 TotalVolume = 0,
                 RiskTier = CustomerRiskTier.Unknown

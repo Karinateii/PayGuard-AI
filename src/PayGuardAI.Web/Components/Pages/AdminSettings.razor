@@ -4,6 +4,7 @@
 @inject PayGuardAI.Core.Services.IAdminService AdminService
 @inject ISnackbar Snackbar
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
+@inject PayGuardAI.Core.Services.ITenantContext TenantContext
 
 <PageTitle>Organization Settings — PayGuard AI</PageTitle>
 
@@ -113,7 +114,7 @@ else if (_settings != null)
     {
         try
         {
-            _settings = await AdminService.GetOrCreateSettingsAsync("afriex-demo");
+            _settings = await AdminService.GetOrCreateSettingsAsync(TenantContext.TenantId);
         }
         catch (Exception ex)
         {

@@ -246,6 +246,7 @@ public class ReviewService : IReviewService
     {
         var auditLog = new AuditLog
         {
+            TenantId = _tenantContext.TenantId,
             Action = action,
             EntityType = entityType,
             EntityId = entityId,
