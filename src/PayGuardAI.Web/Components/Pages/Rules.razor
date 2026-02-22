@@ -10,7 +10,7 @@
 
 <PageTitle>Risk Rules - PayGuard AI</PageTitle>
 
-<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4" Style="flex-wrap: wrap; gap: 12px;">
     <MudText Typo="Typo.h4">
         <MudIcon Icon="@Icons.Material.Filled.Rule" Class="mr-2" />
         Risk Rule Configuration
@@ -100,28 +100,28 @@ else
             These thresholds determine how the cumulative risk score maps to risk levels:
         </MudText>
         <MudGrid>
-            <MudItem xs="3">
+            <MudItem xs="6" sm="3">
                 <MudPaper Class="pa-3" Style="background-color: var(--mud-palette-success); color: white;">
                     <MudText Typo="Typo.subtitle2">Low Risk</MudText>
                     <MudText Typo="Typo.h5">0 - 25</MudText>
                     <MudText Typo="Typo.caption">Auto-approved if ≤ 25</MudText>
                 </MudPaper>
             </MudItem>
-            <MudItem xs="3">
+            <MudItem xs="6" sm="3">
                 <MudPaper Class="pa-3" Style="background-color: var(--mud-palette-warning); color: white;">
                     <MudText Typo="Typo.subtitle2">Medium Risk</MudText>
                     <MudText Typo="Typo.h5">26 - 50</MudText>
                     <MudText Typo="Typo.caption">Requires review</MudText>
                 </MudPaper>
             </MudItem>
-            <MudItem xs="3">
+            <MudItem xs="6" sm="3">
                 <MudPaper Class="pa-3" Style="background-color: var(--mud-palette-error); color: white;">
                     <MudText Typo="Typo.subtitle2">High Risk</MudText>
                     <MudText Typo="Typo.h5">51 - 75</MudText>
                     <MudText Typo="Typo.caption">Priority review</MudText>
                 </MudPaper>
             </MudItem>
-            <MudItem xs="3">
+            <MudItem xs="6" sm="3">
                 <MudPaper Class="pa-3" Style="background-color: var(--mud-palette-dark); color: white;">
                     <MudText Typo="Typo.subtitle2">Critical</MudText>
                     <MudText Typo="Typo.h5">76 - 100</MudText>

@@ -10,7 +10,7 @@
 
 <PageTitle>Role Management — PayGuard AI</PageTitle>
 
-<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4" Style="flex-wrap: wrap; gap: 12px;">
     <MudText Typo="Typo.h4">
         <MudIcon Icon="@Icons.Material.Filled.AdminPanelSettings" Class="mr-2" />
         Role Management
@@ -75,21 +75,23 @@ else
                         <MudText Typo="Typo.overline" Color="Color.Secondary" Class="mb-2">
                             Permissions (@role.GetPermissions().Count)
                         </MudText>
-                        <MudStack Spacing="1">
+                        <MudStack Spacing="2">
                             @foreach (var group in GetPermissionsByCategory(role.GetPermissions()))
                             {
-                                <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary" Style="min-width: 80px;">
+                                <div>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1" Style="font-weight: 600;">
                                         @group.Key
                                     </MudText>
-                                    @foreach (var perm in group.Value)
-                                    {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Primary"
-                                                 Variant="Variant.Text">
-                                            @GetPermissionDisplayName(perm)
-                                        </MudChip>
-                                    }
-                                </MudStack>
+                                    <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                        @foreach (var perm in group.Value)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Primary"
+                                                     Variant="Variant.Text">
+                                                @GetPermissionDisplayName(perm)
+                                            </MudChip>
+                                        }
+                                    </div>
+                                </div>
                             }
                             @if (role.GetPermissions().Count == 0)
                             {
@@ -119,7 +121,7 @@ else
     }
     else
     {
-        <MudTable Items="_auditLogs" Dense="true" Hover="true" Elevation="2">
+        <MudTable Items="_auditLogs" Dense="true" Hover="true" Elevation="2" Breakpoint="Breakpoint.Sm">
             <HeaderContent>
                 <MudTh>When</MudTh>
                 <MudTh>Action</MudTh>

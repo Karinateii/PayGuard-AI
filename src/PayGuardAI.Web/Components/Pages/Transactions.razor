@@ -121,7 +121,7 @@
                     <MudText Typo="Typo.body2" Class="mb-3" Color="Color.Primary">
                         @_selectedTransaction.RiskAnalysis.Explanation
                     </MudText>
-                    <MudTable Items="@_selectedTransaction.RiskAnalysis.RiskFactors" Dense="true">
+                    <MudTable Items="@_selectedTransaction.RiskAnalysis.RiskFactors" Dense="true" Breakpoint="Breakpoint.Sm">
                         <HeaderContent>
                             <MudTh>Category</MudTh>
                             <MudTh>Rule</MudTh>
@@ -278,7 +278,7 @@ else
             </MudItem>
         </MudGrid>
         <!-- Action Buttons -->
-        <MudStack Row="true" Spacing="2" Class="mb-3">
+        <MudStack Row="true" Spacing="2" Class="mb-3" Style="flex-wrap: wrap;">
             <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
                        StartIcon="@Icons.Material.Filled.FilterAlt" OnClick="@LoadTransactions">
                 Apply Filters
@@ -302,7 +302,7 @@ else
         else
         {
             <MudTable Items="@_transactions" Hover="true" Dense="true" OnRowClick="@OnRowClick" T="Transaction"
-                      @bind-RowsPerPage="_rowsPerPage">
+                      @bind-RowsPerPage="_rowsPerPage" Breakpoint="Breakpoint.Sm">
                 <HeaderContent>
                     <MudTh>External ID</MudTh>
                     <MudTh>Type</MudTh>
@@ -344,7 +344,7 @@ else
     
     <!-- Quick View Drawer -->
     <MudDrawer @bind-Open="_drawerOpen" Anchor="Anchor.End" Elevation="4" 
-               Width="@GetDrawerWidth()" Variant="DrawerVariant.Temporary" Responsive="true">
+               Width="@GetDrawerWidth()" Variant="DrawerVariant.Temporary">
         @if (_selectedTransaction != null)
         {
             <MudDrawerHeader>
@@ -711,7 +711,7 @@ else
         await LoadTransactions();
     }
 
-    private string GetDrawerWidth() => "100%";  // Responsive: full width on mobile, MudDrawer will constrain on large screens
+    private string GetDrawerWidth() => "min(520px, 100vw)";  // 520px on desktop, full viewport on mobile
 
     private Color GetRiskColor(RiskLevel? level) => level switch
     {

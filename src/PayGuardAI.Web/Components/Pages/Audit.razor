@@ -71,7 +71,7 @@
         <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
             Showing @FilteredLogs.Count() of @_auditLogs.Count entries
         </MudText>
-        <MudTable Items="@FilteredLogs" Hover="true" Dense="true">
+        <MudTable Items="@FilteredLogs" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm">
             <HeaderContent>
                 <MudTh>Timestamp</MudTh>
                 <MudTh>Action</MudTh>

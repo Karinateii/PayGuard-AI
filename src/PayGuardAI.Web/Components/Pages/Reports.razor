@@ -84,13 +84,13 @@
                     <MudIcon Icon="@Icons.Material.Filled.PieChart" Class="mr-2" />
                     Risk Level Distribution
                 </MudText>
-                <div style="height: 300px;">
+                <div style="max-width: 300px; margin: 0 auto;">
                     <MudChart ChartType="ChartType.Donut" 
                               InputData="@_riskChartData" 
                               InputLabels="@_riskChartLabels"
-                              Width="300px" Height="300px" />
+                              Width="100%" Height="300px" />
                 </div>
-                <MudStack Row="true" Justify="Justify.Center" Class="mt-3" Spacing="2">
+                <MudStack Row="true" Justify="Justify.Center" Class="mt-3" Spacing="2" Style="flex-wrap: wrap;">
                     @foreach (var dist in _riskDistribution.Where(d => d.Count > 0))
                     {
                         <MudChip T="string" Size="Size.Small" Color="@GetRiskColor(dist.Level)">
@@ -124,7 +124,7 @@
                 }
                 <MudDivider Class="my-3" />
                 <MudText Typo="Typo.subtitle2">Response Times</MudText>
-                <MudStack Row="true" Class="mt-2" Spacing="2">
+                <MudStack Row="true" Class="mt-2" Spacing="2" Style="flex-wrap: wrap;">
                     @foreach (var activity in _reviewActivity.Where(a => a.AvgResponseTime != "N/A"))
                     {
                         <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(activity.Status)">

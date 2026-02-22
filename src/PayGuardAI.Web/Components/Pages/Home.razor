@@ -88,7 +88,7 @@ else
         <MudItem xs="12" md="6">
             <MudPaper Class="pa-4" Elevation="2">
                 <MudText Typo="Typo.h6" Class="mb-3">Today's Activity</MudText>
-                <MudStack Row="true" Justify="Justify.SpaceAround">
+                <MudStack Row="true" Justify="Justify.SpaceAround" Style="flex-wrap: wrap; gap: 16px;">
                     <MudStack AlignItems="AlignItems.Center">
                         <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" />
                         <MudText Typo="Typo.h5">@_stats.ApprovedToday</MudText>
@@ -111,7 +111,7 @@ else
         <MudItem xs="12" md="6">
             <MudPaper Class="pa-4" Elevation="2">
                 <MudText Typo="Typo.h6" Class="mb-3">Quick Actions</MudText>
-                <MudStack Row="true" Spacing="3">
+                <MudStack Row="true" Spacing="3" Style="flex-wrap: wrap; gap: 8px;">
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" 
                                StartIcon="@Icons.Material.Filled.RateReview" Href="/reviews">
                         Review Queue (@_stats.PendingReviews)
@@ -127,7 +127,7 @@ else
 
     <!-- Recent High-Risk Transactions -->
     <MudPaper Class="pa-4 mt-4" Elevation="2">
-        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3" Style="flex-wrap: wrap; gap: 8px;">
             <MudText Typo="Typo.h6">
                 <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Class="mr-2" />
                 Recent High-Risk Transactions
@@ -137,7 +137,7 @@ else
 
         @if (_recentHighRisk.Any())
         {
-            <MudTable Items="@_recentHighRisk" Hover="true" Dense="true">
+            <MudTable Items="@_recentHighRisk" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm">
                 <HeaderContent>
                     <MudTh>ID</MudTh>
                     <MudTh>Amount</MudTh>

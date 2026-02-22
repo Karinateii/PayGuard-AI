@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -58,20 +59,29 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Demo logout endpoint - clears session and redirects to login
+    /// Unified logout endpoint — handles both Demo and OAuth sign-out
     /// </summary>
-    [HttpGet("demo-logout")]
+    [HttpGet("logout")]
     [AllowAnonymous]
-    public IActionResult DemoLogout()
+    public async Task<IActionResult> Logout()
     {
-        _logger.LogInformation("[AUTH-CONTROLLER] Demo logout requested");
-        
-        // Clear session
+        _logger.LogInformation("[AUTH-CONTROLLER] Logout requested");
+
+        // Always clear session data
         HttpContext.Session.Clear();
-        
-        _logger.LogInformation("[AUTH-CONTROLLER] Session cleared, redirecting to /login");
-        
-        // Redirect to login page
+
+        // If OAuth is enabled, sign out from both the cookie and OIDC schemes
+        var isOAuth = _configuration.IsOAuthEnabled();
+        if (isOAuth)
+        {
+            _logger.LogInformation("[AUTH-CONTROLLER] Clearing OAuth cookies");
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            // Note: We do NOT sign out from the OIDC provider (Google) itself — that
+            // would log the user out of their Google account entirely. We only clear
+            // our application cookies so they must re-authenticate with PayGuard AI.
+        }
+
+        _logger.LogInformation("[AUTH-CONTROLLER] Session + cookies cleared, redirecting to /login");
         return Redirect("/login");
     }
 }

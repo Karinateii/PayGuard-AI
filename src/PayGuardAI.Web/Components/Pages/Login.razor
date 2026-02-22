@@ -8,58 +8,69 @@
 
 <PageTitle>Login - PayGuard AI</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center" Style="min-height: 100vh;">
-    <MudPaper Elevation="3" Class="pa-8" Style="width: 100%;">
-        <div class="text-center mb-6">
-            <MudIcon Icon="@Icons.Material.Filled.Security" Size="Size.Large" Color="Color.Primary" />
-            <MudText Typo="Typo.h4" Class="mt-4">PayGuard AI</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary">Cross-Border Payment Risk Monitoring</MudText>
-        </div>
+<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #0d1b2a 0%, #1b2838 50%, #1a3a5c 100%);">
+    <MudContainer MaxWidth="MaxWidth.ExtraSmall">
+        <MudPaper Elevation="8" Class="pa-8 pa-sm-10 rounded-lg" Style="border-top: 4px solid var(--mud-palette-primary);">
+            <div class="text-center mb-6">
+                <MudAvatar Color="Color.Primary" Size="Size.Large" Class="mx-auto mb-4" Style="width: 72px; height: 72px;">
+                    <MudIcon Icon="@Icons.Material.Filled.Security" Size="Size.Large" />
+                </MudAvatar>
+                <MudText Typo="Typo.h4" Style="font-weight: 700;">PayGuard AI</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-1">
+                    Cross-Border Payment Risk Monitoring
+                </MudText>
+            </div>
 
-        @if (_isOAuthEnabled)
-        {
-            <MudButton Variant="Variant.Filled" 
-                       Color="Color.Primary" 
-                       FullWidth="true"
-                       Size="Size.Large"
-                       StartIcon="@Icons.Material.Filled.Login"
-                       OnClick="HandleOAuthLogin">
-                Sign in with Google
-            </MudButton>
-
-            <MudText Typo="Typo.caption" Align="Align.Center" Class="mt-4" Color="Color.Secondary">
-                Secure OAuth 2.0 authentication powered by Google
-            </MudText>
-        }
-        else
-        {
-            <MudAlert Severity="Severity.Info" Class="mb-4">
-                Demo mode is active. OAuth authentication is disabled.
-            </MudAlert>
-
-            <form method="post" action="/api/Auth/demo-login">
-                <MudButton Variant="Variant.Filled" 
-                           Color="Color.Primary" 
+            @if (_isOAuthEnabled)
+            {
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
                            FullWidth="true"
                            Size="Size.Large"
-                           StartIcon="@Icons.Material.Filled.Home"
-                           ButtonType="ButtonType.Submit">
-                    Continue to Dashboard
+                           StartIcon="@Icons.Material.Filled.Login"
+                           Class="mt-4 py-3"
+                           Style="font-size: 1rem; letter-spacing: 0.5px;"
+                           OnClick="HandleOAuthLogin">
+                    Sign in with Google
                 </MudButton>
-            </form>
 
-            <MudText Typo="Typo.caption" Align="Align.Center" Class="mt-4" Color="Color.Secondary">
-                To enable OAuth, set FeatureFlags:OAuthEnabled to true in appsettings.json
+                <MudText Typo="Typo.caption" Align="Align.Center" Class="mt-4" Color="Color.Secondary">
+                    <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Class="mr-1" Style="vertical-align: middle;" />
+                    Secure OAuth 2.0 authentication
+                </MudText>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Info" Class="mb-4" Variant="Variant.Outlined" Dense="true">
+                    Demo mode — OAuth authentication is disabled.
+                </MudAlert>
+
+                <form method="post" action="/api/Auth/demo-login">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               FullWidth="true"
+                               Size="Size.Large"
+                               StartIcon="@Icons.Material.Filled.Home"
+                               Class="py-3"
+                               Style="font-size: 1rem; letter-spacing: 0.5px;"
+                               ButtonType="ButtonType.Submit">
+                        Continue to Dashboard
+                    </MudButton>
+                </form>
+
+                <MudText Typo="Typo.caption" Align="Align.Center" Class="mt-4" Color="Color.Secondary">
+                    Set <code>FeatureFlags:OAuthEnabled</code> to enable OAuth
+                </MudText>
+            }
+
+            <MudDivider Class="my-6" />
+
+            <MudText Typo="Typo.caption" Align="Align.Center" Color="Color.Secondary">
+                © @DateTime.Now.Year PayGuard AI — All rights reserved.
             </MudText>
-        }
-
-        <MudDivider Class="my-6" />
-
-        <MudText Typo="Typo.caption" Align="Align.Center" Color="Color.Secondary">
-            © @DateTime.Now.Year PayGuard AI. All rights reserved.
-        </MudText>
-    </MudPaper>
-</MudContainer>
+        </MudPaper>
+    </MudContainer>
+</div>
 
 @code {
     private bool _isOAuthEnabled;

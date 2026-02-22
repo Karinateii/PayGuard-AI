@@ -61,7 +61,7 @@
                 <NavMenu />
             </MudDrawer>
 
-            <MudMainContent Class="pt-16 px-4" @onclick="CloseDrawer">
+            <MudMainContent Class="pt-16 px-4">
                 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-4">
                     @Body
                 </MudContainer>
@@ -70,23 +70,8 @@
     </Authorized>
     <NotAuthorized>
         <MudLayout>
-            <MudAppBar Elevation="1" Dense="true">
-                <MudText Typo="Typo.h5" Class="ml-2 ml-sm-3 d-flex align-center flex-wrap-nowrap">
-                    <MudIcon Icon="@Icons.Material.Filled.Security" Class="mr-1 mr-sm-2 d-none d-sm-flex" Size="Size.Medium" />
-                    <span style="font-size: 0.95rem; font-weight: 600;">PayGuard AI</span>
-                </MudText>
-                <MudSpacer />
-                <MudTooltip Text="@(_isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode")">
-                    <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" 
-                                   Color="Color.Inherit" 
-                                   OnClick="@ToggleTheme" />
-                </MudTooltip>
-            </MudAppBar>
-
-            <MudMainContent Class="pt-16 px-4" style="cursor: pointer;">
-                <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-4">
-                    @Body
-                </MudContainer>
+            <MudMainContent>
+                @Body
             </MudMainContent>
         </MudLayout>
     </NotAuthorized>
@@ -162,11 +147,6 @@
         _drawerOpen = !_drawerOpen;
     }
 
-    private void CloseDrawer()
-    {
-        if (_drawerOpen) _drawerOpen = false;
-    }
-
     private void ToggleTheme()
     {
         _isDarkMode = !_isDarkMode;
@@ -201,6 +181,6 @@
 
     private void SignOut()
     {
-        NavigationManager.NavigateTo("/api/Auth/demo-logout", forceLoad: true);
+        NavigationManager.NavigateTo("/api/Auth/logout", forceLoad: true);
     }
 }

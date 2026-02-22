@@ -11,7 +11,7 @@
 
 <PageTitle>Team Management — PayGuard AI</PageTitle>
 
-<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4" Style="flex-wrap: wrap; gap: 12px;">
     <MudText Typo="Typo.h4">
         <MudIcon Icon="@Icons.Material.Filled.Group" Class="mr-2" />
         Team Management
@@ -29,7 +29,7 @@
 }
 else
 {
-    <MudTable Items="_members" Hover="true" Elevation="2" Dense="true">
+    <MudTable Items="_members" Hover="true" Elevation="2" Dense="true" Breakpoint="Breakpoint.Sm">
         <HeaderContent>
             <MudTh>Name</MudTh>
             <MudTh>Email</MudTh>

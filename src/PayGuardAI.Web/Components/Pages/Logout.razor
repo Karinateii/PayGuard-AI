@@ -8,7 +8,7 @@
 @code {
     protected override void OnInitialized()
     {
-        // Redirect to logout API endpoint
-        Navigation.NavigateTo("/api/Auth/demo-logout", forceLoad: true);
+        // Redirect to unified logout endpoint (handles both Demo and OAuth)
+        Navigation.NavigateTo("/api/Auth/logout", forceLoad: true);
     }
 }
