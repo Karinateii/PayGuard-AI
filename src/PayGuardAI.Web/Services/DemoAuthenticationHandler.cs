@@ -42,16 +42,10 @@ public class DemoAuthenticationHandler : AuthenticationHandler<AuthenticationSch
         
         Logger.LogInformation("[AUTH] User is authenticated - creating claims principal");
 
-        var userHeader = Request.Headers["X-Demo-User"].FirstOrDefault();
-        var rolesHeader = Request.Headers["X-Demo-Roles"].FirstOrDefault();
-
-        var userName = string.IsNullOrWhiteSpace(userHeader)
-            ? _configuration["Auth:DefaultUser"] ?? "demo@payguard.ai"
-            : userHeader;
-
-        var roles = string.IsNullOrWhiteSpace(rolesHeader)
-            ? _configuration["Auth:DefaultRoles"] ?? "Reviewer,Manager"
-            : rolesHeader;
+        // User and roles come ONLY from config — never from request headers
+        // (headers could be spoofed for privilege escalation)
+        var userName = _configuration["Auth:DefaultUser"] ?? "compliance_officer@payguard.ai";
+        var roles = _configuration["Auth:DefaultRoles"] ?? "Reviewer,Manager";
 
         var claims = new List<Claim>
         {

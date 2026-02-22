@@ -95,9 +95,9 @@ public class SecurityIntegrationTests
     }
 
     [Fact]
-    public async Task SimulateEndpoint_ShouldStillBeAccessible()
+    public async Task SimulateEndpoint_ShouldRequireAuthentication()
     {
-        // Simulate endpoint should bypass API key and IP whitelist checks
+        // Simulate endpoint should require authentication (no longer [AllowAnonymous])
         var request = new
         {
             Amount = 100,
@@ -113,8 +113,8 @@ public class SecurityIntegrationTests
 
         var response = await _client.PostAsync("/api/webhooks/simulate", content);
 
-        // Should succeed (200) — the simulate endpoint creates a valid transaction
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        // Unauthenticated request should be redirected to login (302)
+        response.StatusCode.Should().Be(HttpStatusCode.Found);
     }
 
     [Fact]

@@ -1,12 +1,11 @@
 @page "/rules"
 @using Microsoft.AspNetCore.Authorization
-@attribute [Authorize]
+@attribute [Authorize(Policy = "RequireManager")]
 @inject PayGuardAI.Data.ApplicationDbContext DbContext
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
 @using Microsoft.EntityFrameworkCore
-@attribute [Microsoft.AspNetCore.Authorization.Authorize(Policy = "RequireManager")]
 
 <PageTitle>Risk Rules - PayGuard AI</PageTitle>
 

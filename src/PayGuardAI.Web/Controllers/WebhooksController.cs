@@ -183,7 +183,7 @@ public class WebhooksController : ControllerBase
     /// No external API calls required.
     /// </summary>
     [HttpPost("simulate")]
-    [AllowAnonymous]
+    [Authorize]
     public async Task<IActionResult> SimulateTransaction(
         [FromBody] SimulateTransactionRequest request,
         CancellationToken cancellationToken)

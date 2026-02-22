@@ -1,6 +1,6 @@
 @page "/audit"
 @using Microsoft.AspNetCore.Authorization
-@attribute [Authorize]
+@attribute [Authorize(Policy = "RequireManager")]
 @inject PayGuardAI.Data.ApplicationDbContext DbContext
 @using Microsoft.EntityFrameworkCore
 

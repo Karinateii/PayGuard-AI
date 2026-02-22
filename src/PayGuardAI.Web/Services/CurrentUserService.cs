@@ -20,7 +20,7 @@ public class CurrentUserService
         get
         {
             var user = _httpContextAccessor.HttpContext?.User;
-            return user?.Identity?.Name ?? "demo@payguard.ai";
+            return user?.Identity?.Name ?? "unknown";
         }
     }
 

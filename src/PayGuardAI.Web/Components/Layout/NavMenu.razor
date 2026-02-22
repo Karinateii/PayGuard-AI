@@ -13,44 +13,50 @@
     <MudNavLink Href="/reviews" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.RateReview">
         Pending Reviews
     </MudNavLink>
-    <MudNavLink Href="/rules" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Rule">
-        Risk Rules
-    </MudNavLink>
     <MudNavLink Href="/reports" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Assessment">
         Compliance Reports
-    </MudNavLink>
-    <MudNavLink Href="/audit" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.History">
-        Audit Log
     </MudNavLink>
     <MudDivider Class="my-2" />
     <MudNavLink Href="/pricing" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Paid">
         Pricing
     </MudNavLink>
-    <MudNavLink Href="/billing" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CreditCard">
-        Billing
-    </MudNavLink>
-    <MudDivider Class="my-2" />
-    <MudText Typo="Typo.overline" Class="ml-4 mt-1" Color="Color.Secondary">Admin</MudText>
-    <MudNavLink Href="/admin/settings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Settings">
-        Organization
-    </MudNavLink>
-    <MudNavLink Href="/admin/team" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Group">
-        Team
-    </MudNavLink>
-    <MudNavLink Href="/admin/roles" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AdminPanelSettings">
-        Roles &amp; Permissions
-    </MudNavLink>
-    <MudNavLink Href="/admin/api-keys" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Key">
-        API Keys
-    </MudNavLink>
-    <MudNavLink Href="/admin/webhooks" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Webhook">
-        Webhooks
-    </MudNavLink>
-    <MudNavLink Href="/admin/analytics" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Analytics">
-        Analytics
-    </MudNavLink>
-    <MudNavLink Href="/admin/notifications" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.NotificationsActive">
-        Notifications
-    </MudNavLink>
+
+    @* ── Manager / Admin only ─────────────────────────────────────── *@
+    <AuthorizeView Roles="Manager,Admin">
+        <Authorized>
+            <MudNavLink Href="/rules" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Rule">
+                Risk Rules
+            </MudNavLink>
+            <MudNavLink Href="/billing" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CreditCard">
+                Billing
+            </MudNavLink>
+            <MudNavLink Href="/audit" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.History">
+                Audit Log
+            </MudNavLink>
+            <MudDivider Class="my-2" />
+            <MudText Typo="Typo.overline" Class="ml-4 mt-1" Color="Color.Secondary">Admin</MudText>
+            <MudNavLink Href="/admin/settings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Settings">
+                Organization
+            </MudNavLink>
+            <MudNavLink Href="/admin/team" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Group">
+                Team
+            </MudNavLink>
+            <MudNavLink Href="/admin/roles" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AdminPanelSettings">
+                Roles &amp; Permissions
+            </MudNavLink>
+            <MudNavLink Href="/admin/api-keys" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Key">
+                API Keys
+            </MudNavLink>
+            <MudNavLink Href="/admin/webhooks" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Webhook">
+                Webhooks
+            </MudNavLink>
+            <MudNavLink Href="/admin/analytics" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Analytics">
+                Analytics
+            </MudNavLink>
+            <MudNavLink Href="/admin/notifications" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.NotificationsActive">
+                Notifications
+            </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
 </MudNavMenu>
 

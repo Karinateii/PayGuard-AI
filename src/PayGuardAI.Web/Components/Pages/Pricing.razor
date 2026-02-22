@@ -1,6 +1,8 @@
 @page "/pricing"
+@using Microsoft.AspNetCore.Authorization
 @using PayGuardAI.Core.Entities
 @using PayGuardAI.Core.Services
+@attribute [Authorize]
 @inject IBillingService BillingService
 @inject NavigationManager Nav
 @inject IConfiguration Config
