@@ -15,6 +15,7 @@ public class TransactionService : ITransactionService
 {
     private readonly ApplicationDbContext _context;
     private readonly IRiskScoringService _riskScoringService;
+    private readonly IBillingService _billingService;
     private readonly ILogger<TransactionService> _logger;
     private readonly IMemoryCache _cache;
     private readonly ITenantContext _tenantContext;
@@ -26,6 +27,7 @@ public class TransactionService : ITransactionService
     public TransactionService(
         ApplicationDbContext context,
         IRiskScoringService riskScoringService,
+        IBillingService billingService,
         ILogger<TransactionService> logger,
         IMemoryCache cache,
         ITenantContext tenantContext,
@@ -33,6 +35,7 @@ public class TransactionService : ITransactionService
     {
         _context = context;
         _riskScoringService = riskScoringService;
+        _billingService = billingService;
         _logger = logger;
         _cache = cache;
         _tenantContext = tenantContext;
@@ -69,6 +72,18 @@ public class TransactionService : ITransactionService
         var outcome = riskAnalysis.ReviewStatus == ReviewStatus.AutoApproved ? "auto_approved" : "flagged";
         _metrics.RecordTransactionProcessed(riskAnalysis.RiskLevel.ToString().ToLower(), outcome);
         _metrics.RecordRiskScore(riskAnalysis.RiskScore);
+
+        // Record billing usage (increments TransactionsThisPeriod counter)
+        try
+        {
+            var tenantId = _tenantContext.TenantId;
+            await _billingService.RecordTransactionUsageAsync(tenantId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Billing tracking should never block transaction processing
+            _logger.LogWarning(ex, "Failed to record billing usage for transaction {TransactionId}", transaction.Id);
+        }
 
         _logger.LogInformation(
             "Transaction {TransactionId} risk analysis complete: Score={RiskScore}, Level={RiskLevel}, Outcome={Outcome}",
