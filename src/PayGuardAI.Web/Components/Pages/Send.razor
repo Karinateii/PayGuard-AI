@@ -1,8 +1,12 @@
 @page "/send"
 @using Microsoft.AspNetCore.Authorization
-@using System.Net.Http.Json
+@using Microsoft.AspNetCore.SignalR
+@using PayGuardAI.Core.Services
+@using PayGuardAI.Web.Hubs
 @attribute [Authorize]
-@inject NavigationManager Navigation
+@inject ITransactionService TransactionService
+@inject IHubContext<TransactionHub> HubContext
+@inject ILogger<Send> Logger
 @inject ISnackbar Snackbar
 
 <PageTitle>Simulate Transaction - PayGuard AI</PageTitle>
@@ -204,42 +208,69 @@
         StateHasChanged();
         try
         {
-            var baseUrl = Navigation.BaseUri.TrimEnd('/');
-            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-            var request = new
+            var transactionId = Guid.NewGuid().ToString();
+            var destCurrency = GetCurrencyForCountry(_destinationCountry);
+            var srcCurrency = "USD";
+            var senderId = string.IsNullOrWhiteSpace(_senderId) ? $"sender-{Guid.NewGuid().ToString()[..8]}" : _senderId;
+
+            var payload = $$"""
             {
-                amount = _amount,
-                sourceCountry = _sourceCountry,
-                destinationCountry = _destinationCountry,
-                transactionType = _transactionType,
-                senderId = string.IsNullOrWhiteSpace(_senderId) ? (string?)null : _senderId
-            };
-            var response = await client.PostAsJsonAsync(baseUrl + "/api/webhooks/simulate", request);
-            if (response.IsSuccessStatusCode)
-            {
-                var json = await response.Content.ReadFromJsonAsync<SimApiResponse>();
-                if (json != null && json.Success)
-                {
-                    _lastResult = new SimResult
-                    {
-                        TransactionId = json.TransactionId ?? "",
-                        Amount = json.Amount ?? _amount,
-                        SourceCountry = json.SourceCountry ?? _sourceCountry,
-                        DestinationCountry = json.DestinationCountry ?? _destinationCountry,
-                        RiskScore = json.RiskScore ?? 0,
-                        RiskLevel = json.RiskLevel ?? "Unknown",
-                        ReviewStatus = json.ReviewStatus ?? "Pending",
-                        Explanation = json.Explanation ?? ""
-                    };
-                    _history.Add(_lastResult);
-                    Snackbar.Add("Transaction processed! Risk: " + _lastResult.RiskLevel + " (Score: " + _lastResult.RiskScore + ")",
-                        GetSnackbarSeverity(_lastResult.RiskLevel));
+                "event": "transaction.completed",
+                "data": {
+                    "id": "{{transactionId}}",
+                    "type": "{{_transactionType}}",
+                    "status": "COMPLETED",
+                    "amount": {{_amount}},
+                    "sourceCurrency": "{{srcCurrency}}",
+                    "destinationCurrency": "{{destCurrency}}",
+                    "senderId": "{{senderId}}",
+                    "receiverId": "receiver-{{Guid.NewGuid().ToString()[..8]}}",
+                    "sourceCountry": "{{_sourceCountry}}",
+                    "destinationCountry": "{{_destinationCountry}}",
+                    "createdAt": "{{DateTime.UtcNow:O}}"
                 }
-                else { Snackbar.Add("Simulation failed", Severity.Error); }
             }
-            else { Snackbar.Add("Error: " + response.StatusCode, Severity.Error); }
+            """;
+
+            var transaction = await TransactionService.ProcessWebhookAsync(payload);
+
+            // Broadcast to SignalR
+            if (transaction.RiskAnalysis != null)
+            {
+                var notification = new TransactionNotification(
+                    transaction.Id,
+                    transaction.ExternalId,
+                    transaction.Amount,
+                    transaction.SourceCountry,
+                    transaction.DestinationCountry,
+                    transaction.RiskAnalysis.RiskScore,
+                    transaction.RiskAnalysis.RiskLevel,
+                    transaction.RiskAnalysis.ReviewStatus,
+                    transaction.RiskAnalysis.Explanation ?? "Risk analysis complete"
+                );
+                await HubContext.Clients.All.SendAsync("NewTransaction", notification);
+            }
+
+            _lastResult = new SimResult
+            {
+                TransactionId = transaction.Id.ToString(),
+                Amount = transaction.Amount,
+                SourceCountry = transaction.SourceCountry,
+                DestinationCountry = transaction.DestinationCountry,
+                RiskScore = transaction.RiskAnalysis?.RiskScore ?? 0,
+                RiskLevel = transaction.RiskAnalysis?.RiskLevel.ToString() ?? "Unknown",
+                ReviewStatus = transaction.RiskAnalysis?.ReviewStatus.ToString() ?? "Pending",
+                Explanation = transaction.RiskAnalysis?.Explanation ?? ""
+            };
+            _history.Add(_lastResult);
+            Snackbar.Add("Transaction processed! Risk: " + _lastResult.RiskLevel + " (Score: " + _lastResult.RiskScore + ")",
+                GetSnackbarSeverity(_lastResult.RiskLevel));
         }
-        catch (Exception ex) { Snackbar.Add("Error: " + ex.Message, Severity.Error); }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "[SIMULATE] Error simulating transaction");
+            Snackbar.Add("Error: " + ex.Message, Severity.Error);
+        }
         finally { _sending = false; StateHasChanged(); }
     }
 
@@ -276,6 +307,14 @@
         "High" or "Critical" => Severity.Error, _ => Severity.Info
     };
 
+    private static string GetCurrencyForCountry(string country) => country switch
+    {
+        "NG" => "NGN", "US" => "USD", "GB" => "GBP", "KE" => "KES",
+        "GH" => "GHS", "ZA" => "ZAR", "TZ" => "TZS", "UG" => "UGX",
+        "CA" => "CAD", "DE" => "EUR", "KP" => "KPW", "SY" => "SYP",
+        _ => "USD"
+    };
+
     private class SimResult
     {
         public string TransactionId { get; set; } = "";
@@ -286,18 +325,5 @@
         public string RiskLevel { get; set; } = "";
         public string ReviewStatus { get; set; } = "";
         public string Explanation { get; set; } = "";
-    }
-
-    private class SimApiResponse
-    {
-        public bool Success { get; set; }
-        public string? TransactionId { get; set; }
-        public decimal? Amount { get; set; }
-        public string? SourceCountry { get; set; }
-        public string? DestinationCountry { get; set; }
-        public int? RiskScore { get; set; }
-        public string? RiskLevel { get; set; }
-        public string? ReviewStatus { get; set; }
-        public string? Explanation { get; set; }
     }
 }
