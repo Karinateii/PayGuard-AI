@@ -134,9 +134,19 @@ var usePostgres = builder.Configuration.IsPostgresEnabled();
 
 if (usePostgres)
 {
+    var pgConnString = builder.Configuration.GetConnectionString("PostgresConnection") 
+        ?? "Host=localhost;Port=5432;Database=payguard_dev;Username=postgres;Password=postgres";
+    
+    // Railway provides postgresql:// URL format — convert to ADO.NET format for Npgsql
+    if (pgConnString.StartsWith("postgresql://") || pgConnString.StartsWith("postgres://"))
+    {
+        var uri = new Uri(pgConnString);
+        var userInfo = uri.UserInfo.Split(':');
+        pgConnString = $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Prefer;Trust Server Certificate=true";
+    }
+    
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
-        options.UseNpgsql(builder.Configuration.GetConnectionString("PostgresConnection") 
-            ?? "Host=localhost;Port=5432;Database=payguard_dev;Username=postgres;Password=postgres"));
+        options.UseNpgsql(pgConnString));
 }
 else
 {
