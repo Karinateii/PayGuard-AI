@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Mail;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
@@ -11,18 +13,15 @@ namespace PayGuardAI.Data.Services;
 public class MagicLinkService : IMagicLinkService
 {
     private readonly ApplicationDbContext _db;
-    private readonly IEmailNotificationService _email;
     private readonly IConfiguration _config;
     private readonly ILogger<MagicLinkService> _logger;
 
     public MagicLinkService(
         ApplicationDbContext db,
-        IEmailNotificationService email,
         IConfiguration config,
         ILogger<MagicLinkService> logger)
     {
         _db = db;
-        _email = email;
         _config = config;
         _logger = logger;
     }
@@ -75,10 +74,12 @@ public class MagicLinkService : IMagicLinkService
         var appUrl = _config["AppUrl"]?.TrimEnd('/') ?? "http://localhost:5054";
         var magicLinkUrl = $"{appUrl}/api/Auth/magic-link/verify?token={Uri.EscapeDataString(token)}";
 
-        // Send email (or log in dev mode)
-        var emailEnabled = bool.TryParse(_config["FeatureFlags:EmailNotificationsEnabled"], out var en) && en;
+        // Magic links always send directly via SMTP (auth-critical, not optional notifications).
+        // Only fall back to logging if SMTP is not configured at all.
+        var smtpHost = _config["Email:SmtpHost"] ?? "";
+        var smtpPass = _config["Email:SmtpPassword"] ?? "";
 
-        if (emailEnabled)
+        if (!string.IsNullOrEmpty(smtpHost) && !string.IsNullOrEmpty(smtpPass))
         {
             var html = $"""
                 <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
@@ -95,13 +96,20 @@ public class MagicLinkService : IMagicLinkService
                 </div>
                 """;
 
-            await _email.SendNotificationEmailAsync(email, "", "Sign in to PayGuard AI", html, ct);
-            _logger.LogInformation("Magic link sent to {Email}", email);
+            try
+            {
+                await SendSmtpEmailAsync(email, "Sign in to PayGuard AI", html, ct);
+                _logger.LogInformation("Magic link sent to {Email}", email);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send magic link email to {Email}. Link: {Url}", email, magicLinkUrl);
+            }
         }
         else
         {
-            // Dev mode: log the link so the developer can click it
-            _logger.LogWarning("📧 MAGIC LINK (email disabled): {Url}", magicLinkUrl);
+            // No SMTP configured: log the link so the developer can click it
+            _logger.LogWarning("📧 MAGIC LINK (SMTP not configured): {Url}", magicLinkUrl);
         }
 
         return true;
@@ -144,5 +152,32 @@ public class MagicLinkService : IMagicLinkService
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
         return Convert.ToHexStringLower(bytes);
+    }
+
+    /// <summary>
+    /// Send email directly via SMTP — bypasses notification feature flag
+    /// because magic links are auth-critical.
+    /// </summary>
+    private async Task SendSmtpEmailAsync(string toEmail, string subject, string htmlBody, CancellationToken ct)
+    {
+        var smtpHost = _config["Email:SmtpHost"] ?? "smtp.resend.com";
+        var smtpPort = int.TryParse(_config["Email:SmtpPort"], out var p) ? p : 587;
+        var smtpUser = _config["Email:SmtpUser"] ?? "resend";
+        var smtpPass = _config["Email:SmtpPassword"] ?? "";
+        var fromAddr = _config["Email:FromAddress"] ?? "noreply@payguard.ai";
+        var fromName = _config["Email:FromName"] ?? "PayGuard AI";
+
+        using var message = new MailMessage();
+        message.From = new MailAddress(fromAddr, fromName);
+        message.To.Add(new MailAddress(toEmail));
+        message.Subject = subject;
+        message.Body = htmlBody;
+        message.IsBodyHtml = true;
+
+        using var client = new SmtpClient(smtpHost, smtpPort);
+        client.Credentials = new NetworkCredential(smtpUser, smtpPass);
+        client.EnableSsl = true;
+
+        await client.SendMailAsync(message, ct);
     }
 }
