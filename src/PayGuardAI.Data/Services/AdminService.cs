@@ -57,9 +57,11 @@ public class AdminService : IAdminService
     public async Task<List<TeamMember>> GetTeamMembersAsync(string tenantId, CancellationToken ct = default)
         => await _db.TeamMembers.Where(m => m.TenantId == tenantId).OrderBy(m => m.DisplayName).ToListAsync(ct);
 
-    public async Task<TeamMember> InviteTeamMemberAsync(string tenantId, string email, string displayName, string role, CancellationToken ct = default)
+    public async Task<(TeamMember member, bool emailSent)> InviteTeamMemberAsync(string tenantId, string email, string displayName, string role, CancellationToken ct = default)
     {
-        var existing = await _db.TeamMembers.FirstOrDefaultAsync(m => m.TenantId == tenantId && m.Email == email, ct);
+        email = email.Trim().ToLowerInvariant();
+
+        var existing = await _db.TeamMembers.FirstOrDefaultAsync(m => m.TenantId == tenantId && m.Email.ToLower() == email, ct);
         if (existing != null)
             throw new InvalidOperationException($"A team member with email {email} already exists.");
 
@@ -76,10 +78,14 @@ public class AdminService : IAdminService
         _logger.LogInformation("Invited team member {Email} as {Role} for tenant {TenantId}", email, role, tenantId);
 
         // Send a magic link email so the new member can sign in immediately
+        var emailSent = false;
         try
         {
-            await _magicLink.SendMagicLinkAsync(email, "team-invite", ct);
-            _logger.LogInformation("Invite magic link sent to {Email}", email);
+            emailSent = await _magicLink.SendMagicLinkAsync(email, "team-invite", ct);
+            if (emailSent)
+                _logger.LogInformation("Invite magic link sent to {Email}", email);
+            else
+                _logger.LogWarning("Magic link email was not sent to {Email} — check Resend API key and domain verification", email);
         }
         catch (Exception ex)
         {
@@ -87,7 +93,7 @@ public class AdminService : IAdminService
             _logger.LogWarning(ex, "Failed to send invite email to {Email} — member was still added", email);
         }
 
-        return member;
+        return (member, emailSent);
     }
 
     public async Task UpdateTeamMemberRoleAsync(Guid memberId, string newRole, CancellationToken ct = default)

@@ -136,12 +136,19 @@ else
         {
             try
             {
-                await AdminService.InviteTeamMemberAsync(TenantContext.TenantId, newMember.Email, newMember.DisplayName, newMember.Role);
-                Snackbar.Add(
-                    _emailEnabled
-                        ? $"Invitation sent to {newMember.Email}! They'll receive a sign-in link."
-                        : $"Team member {newMember.DisplayName} added. Email not configured — share the login URL with them directly.",
-                    Severity.Success);
+                var (_, emailSent) = await AdminService.InviteTeamMemberAsync(TenantContext.TenantId, newMember.Email, newMember.DisplayName, newMember.Role);
+                if (emailSent)
+                {
+                    Snackbar.Add($"Invitation sent to {newMember.Email}! They'll receive a sign-in link.", Severity.Success);
+                }
+                else if (_emailEnabled)
+                {
+                    Snackbar.Add($"Team member added, but the invite email failed to send. They can request a magic link from the login page.", Severity.Warning);
+                }
+                else
+                {
+                    Snackbar.Add($"Team member {newMember.DisplayName} added. Email not configured — share the login URL with them directly.", Severity.Info);
+                }
                 await LoadMembers();
             }
             catch (Exception ex)

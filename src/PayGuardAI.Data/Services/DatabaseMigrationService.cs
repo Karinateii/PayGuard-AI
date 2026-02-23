@@ -441,14 +441,14 @@ public class DatabaseMigrationService : IDatabaseMigrationService
 
             var exists = await _context.TeamMembers
                 .IgnoreQueryFilters()
-                .AnyAsync(t => t.Email == email && t.TenantId == tenantId);
+                .AnyAsync(t => t.Email.ToLower() == email.ToLower() && t.TenantId == tenantId);
 
             if (!exists)
             {
                 _context.TeamMembers.Add(new PayGuardAI.Core.Entities.TeamMember
                 {
                     TenantId = tenantId,
-                    Email = email,
+                    Email = email.Trim().ToLowerInvariant(),
                     DisplayName = "Platform Owner",
                     Role = "SuperAdmin",
                     Status = "active"

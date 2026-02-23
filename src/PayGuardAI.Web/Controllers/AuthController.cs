@@ -101,10 +101,10 @@ public class AuthController : ControllerBase
             return Redirect("/login?error=invalid_link");
         }
 
-        // Look up the TeamMember to get tenant and role
+        // Look up the TeamMember to get tenant and role (case-insensitive for PostgreSQL)
         var teamMember = await _db.TeamMembers
             .IgnoreQueryFilters()
-            .Where(t => t.Email == email && t.Status == "active")
+            .Where(t => t.Email.ToLower() == email.ToLower() && t.Status == "active")
             .OrderByDescending(t => t.CreatedAt)
             .FirstOrDefaultAsync();
 

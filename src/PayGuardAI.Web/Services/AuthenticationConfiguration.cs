@@ -160,7 +160,7 @@ public static class AuthenticationConfiguration
                             // Auto-create SuperAdmin TeamMember if one doesn't exist yet
                             var hasSuperAdmin = await db.TeamMembers
                                 .IgnoreQueryFilters()
-                                .AnyAsync(t => t.Email == userEmail
+                                .AnyAsync(t => t.Email.ToLower() == userEmail.ToLower()
                                             && t.TenantId == defaultTenantId
                                             && t.Role == "SuperAdmin");
                             if (!hasSuperAdmin)
@@ -168,7 +168,7 @@ public static class AuthenticationConfiguration
                                 db.TeamMembers.Add(new PayGuardAI.Core.Entities.TeamMember
                                 {
                                     TenantId = defaultTenantId,
-                                    Email = userEmail,
+                                    Email = userEmail.Trim().ToLowerInvariant(),
                                     DisplayName = "Platform Owner",
                                     Role = "SuperAdmin",
                                     Status = "active"
@@ -183,7 +183,7 @@ public static class AuthenticationConfiguration
                             // ── Regular user: look up TeamMember by email ────────
                             var teamMember = await db.TeamMembers
                                 .IgnoreQueryFilters()
-                                .Where(t => t.Email == userEmail && t.Status == "active")
+                                .Where(t => t.Email.ToLower() == userEmail.ToLower() && t.Status == "active")
                                 .OrderByDescending(t => t.Role == "SuperAdmin" ? 1 : 0)
                                 .ThenBy(t => t.CreatedAt)
                                 .FirstOrDefaultAsync();

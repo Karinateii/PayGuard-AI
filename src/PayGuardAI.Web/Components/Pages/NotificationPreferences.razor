@@ -227,7 +227,7 @@ else
 
             // Check for duplicate
             var exists = await DbContext.NotificationPreferences
-                .AnyAsync(p => p.TenantId == pref.TenantId && p.Email == pref.Email);
+                .AnyAsync(p => p.TenantId == pref.TenantId && p.Email.ToLower() == pref.Email.ToLower());
             if (exists)
             {
                 Snackbar.Add("This email is already subscribed.", Severity.Warning);

@@ -33,10 +33,10 @@ public class MagicLinkService : IMagicLinkService
     {
         email = email.Trim().ToLowerInvariant();
 
-        // Check the user actually exists in some org
+        // Check the user actually exists in some org (case-insensitive for PostgreSQL)
         var teamMember = await _db.TeamMembers
             .IgnoreQueryFilters()
-            .AnyAsync(t => t.Email == email && t.Status == "active", ct);
+            .AnyAsync(t => t.Email.ToLower() == email && t.Status == "active", ct);
 
         if (!teamMember)
         {
@@ -112,12 +112,14 @@ public class MagicLinkService : IMagicLinkService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to send magic link email to {Email}. Link: {Url}", email, magicLinkUrl);
+                return false; // Caller can check this to show appropriate feedback
             }
         }
         else
         {
             // No API key configured: log the link so the developer can click it
             _logger.LogWarning("📧 MAGIC LINK (email not configured): {Url}", magicLinkUrl);
+            return false;
         }
 
         return true;

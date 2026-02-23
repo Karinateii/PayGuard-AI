@@ -175,7 +175,7 @@ public class EmailNotificationService : IEmailNotificationService
 
         // Check if this reviewer has review notifications enabled
         var pref = await _context.NotificationPreferences
-            .FirstOrDefaultAsync(p => p.TenantId == tenantId && p.Email == reviewerEmail, cancellationToken);
+            .FirstOrDefaultAsync(p => p.TenantId == tenantId && p.Email.ToLower() == reviewerEmail.ToLower(), cancellationToken);
 
         if (pref != null && !pref.ReviewAssignmentsEnabled)
         {
