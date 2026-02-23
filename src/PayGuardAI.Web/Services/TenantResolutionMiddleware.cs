@@ -28,11 +28,16 @@ public class TenantResolutionMiddleware
     {
         var defaultTenant = _configuration["MultiTenancy:DefaultTenantId"] ?? "afriex-demo";
 
-        // 1. Check authenticated user's tenant claim (most authoritative)
-        var claimTenant = context.User?.FindFirst(TenantClaimType)?.Value;
-        if (!string.IsNullOrWhiteSpace(claimTenant))
+        // 0. Check session for SuperAdmin tenant impersonation (highest priority)
+        var impersonatedTenant = context.Session.GetString("ImpersonateTenantId");
+        if (!string.IsNullOrWhiteSpace(impersonatedTenant))
         {
-            tenantContext.TenantId = claimTenant;
+            tenantContext.TenantId = impersonatedTenant;
+        }
+        // 1. Check authenticated user's tenant claim (most authoritative)
+        else if (!string.IsNullOrWhiteSpace(context.User?.FindFirst(TenantClaimType)?.Value))
+        {
+            tenantContext.TenantId = context.User!.FindFirst(TenantClaimType)!.Value;
         }
         // 2. Check header (for API-key authenticated requests)
         else if (context.Request.Headers.TryGetValue(TenantHeader, out var headerTenant)

@@ -5,6 +5,7 @@
 @inject ITenantOnboardingService OnboardingService
 @inject ITenantContext TenantContext
 @inject NavigationManager NavigationManager
+@inject IHttpContextAccessor HttpContextAccessor
 @inject ISnackbar Snackbar
 @inject ILogger<TenantAdmin> Logger
 
@@ -232,6 +233,8 @@
 
     private void SwitchToTenant(TenantSummary tenant)
     {
+        // Persist in session so it survives forceLoad navigation
+        HttpContextAccessor.HttpContext?.Session.SetString("ImpersonateTenantId", tenant.TenantId);
         TenantContext.TenantId = tenant.TenantId;
         Snackbar.Add($"Switched to \"{tenant.OrganizationName}\" ({tenant.TenantId})", Severity.Info);
         NavigationManager.NavigateTo("/", forceLoad: true);

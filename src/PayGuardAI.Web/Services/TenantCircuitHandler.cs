@@ -21,15 +21,18 @@ public class TenantCircuitHandler : CircuitHandler
     private readonly ITenantContext _tenantContext;
     private readonly AuthenticationStateProvider _authStateProvider;
     private readonly IConfiguration _configuration;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public TenantCircuitHandler(
         ITenantContext tenantContext,
         AuthenticationStateProvider authStateProvider,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHttpContextAccessor httpContextAccessor)
     {
         _tenantContext = tenantContext;
         _authStateProvider = authStateProvider;
         _configuration = configuration;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public override async Task OnCircuitOpenedAsync(Circuit circuit, CancellationToken ct)
@@ -49,6 +52,14 @@ public class TenantCircuitHandler : CircuitHandler
     {
         try
         {
+            // Check session for SuperAdmin tenant impersonation first
+            var impersonated = _httpContextAccessor.HttpContext?.Session.GetString("ImpersonateTenantId");
+            if (!string.IsNullOrEmpty(impersonated))
+            {
+                _tenantContext.TenantId = impersonated;
+                return;
+            }
+
             var authState = await _authStateProvider.GetAuthenticationStateAsync();
             var user = authState.User;
 
@@ -59,13 +70,11 @@ public class TenantCircuitHandler : CircuitHandler
             }
             else
             {
-                // Fall back to config default (same as TenantResolutionMiddleware)
                 _tenantContext.TenantId = _configuration["MultiTenancy:DefaultTenantId"] ?? "afriex-demo";
             }
         }
         catch
         {
-            // If auth state is not available yet, use default
             _tenantContext.TenantId = _configuration["MultiTenancy:DefaultTenantId"] ?? "afriex-demo";
         }
     }
