@@ -147,7 +147,8 @@
                       RowsPerPage="10"
                       Filter="new Func<TenantSummary, bool>(FilterFunc)"
                       RowStyle="cursor: pointer;"
-                      OnRowClick="OnRowClicked">
+                      OnRowClick="@OnRowClicked"
+                      T="TenantSummary">
                 <ToolBarContent>
                     <MudText Typo="Typo.h6">All Tenants</MudText>
                     <MudSpacer />

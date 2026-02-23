@@ -282,14 +282,7 @@ public partial class TenantOnboardingService : ITenantOnboardingService
             .ToListAsync(ct);
         _db.NotificationPreferences.RemoveRange(notifPrefs);
 
-        // 10. Magic link tokens
-        var magicLinks = await _db.MagicLinkTokens
-            .IgnoreQueryFilters()
-            .Where(m => m.TenantId == tenantId)
-            .ToListAsync(ct);
-        _db.MagicLinkTokens.RemoveRange(magicLinks);
-
-        // 10b. Custom roles
+        // 10. Custom roles
         var customRoles = await _db.CustomRoles
             .IgnoreQueryFilters()
             .Where(r => r.TenantId == tenantId)
