@@ -74,6 +74,56 @@ public static class AuthenticationConfiguration
             options.LoginPath = "/login";
             options.LogoutPath = "/logout";
             options.AccessDeniedPath = "/access-denied";
+
+            // Re-validate the user's role on every request so that role changes
+            // and account deletions take effect immediately — not after re-login.
+            options.Events = new CookieAuthenticationEvents
+            {
+                OnValidatePrincipal = async context =>
+                {
+                    var email = context.Principal?.FindFirst(ClaimTypes.Email)?.Value
+                                ?? context.Principal?.FindFirst(ClaimTypes.Name)?.Value;
+
+                    if (string.IsNullOrEmpty(email))
+                        return;
+
+                    var db = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
+                    var member = await db.TeamMembers
+                        .IgnoreQueryFilters()
+                        .Where(t => t.Email.ToLower() == email.ToLower() && t.Status == "active")
+                        .OrderByDescending(t => t.CreatedAt)
+                        .FirstOrDefaultAsync();
+
+                    if (member is null)
+                    {
+                        // User was deleted or deactivated — reject the cookie
+                        context.RejectPrincipal();
+                        await context.HttpContext.SignOutAsync(
+                            CookieAuthenticationDefaults.AuthenticationScheme);
+                        return;
+                    }
+
+                    // Check if the role in the cookie still matches the DB
+                    var currentRole = context.Principal?.FindFirst(ClaimTypes.Role)?.Value;
+                    if (currentRole != member.Role)
+                    {
+                        // Role changed — rebuild claims with the new role
+                        var identity = context.Principal!.Identity as ClaimsIdentity;
+                        if (identity != null)
+                        {
+                            var oldRoleClaim = identity.FindFirst(ClaimTypes.Role);
+                            if (oldRoleClaim != null) identity.RemoveClaim(oldRoleClaim);
+                            identity.AddClaim(new Claim(ClaimTypes.Role, member.Role));
+
+                            var oldTenantClaim = identity.FindFirst("tenant_id");
+                            if (oldTenantClaim != null) identity.RemoveClaim(oldTenantClaim);
+                            identity.AddClaim(new Claim("tenant_id", member.TenantId));
+
+                            context.ShouldRenew = true; // Re-issue the cookie
+                        }
+                    }
+                }
+            };
         })
         .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
         {

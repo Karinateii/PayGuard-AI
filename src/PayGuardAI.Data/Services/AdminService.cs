@@ -100,15 +100,57 @@ public class AdminService : IAdminService
     {
         var member = await _db.TeamMembers.FindAsync([memberId], ct)
             ?? throw new InvalidOperationException("Team member not found.");
+
+        // Guard: prevent demoting the last Admin/SuperAdmin in the org
+        var wasAdmin = member.Role is "Admin" or "SuperAdmin";
+        var willBeAdmin = newRole is "Admin" or "SuperAdmin";
+
+        if (wasAdmin && !willBeAdmin)
+        {
+            var adminCount = await _db.TeamMembers
+                .CountAsync(m => m.TenantId == member.TenantId
+                              && (m.Role == "Admin" || m.Role == "SuperAdmin")
+                              && m.Status == "active", ct);
+            if (adminCount <= 1)
+            {
+                throw new InvalidOperationException(
+                    "Cannot demote the last admin. Promote another member to Admin first.");
+            }
+        }
+
         member.Role = newRole;
         await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Updated team member {MemberId} role to {Role}", memberId, newRole);
     }
 
-    public async Task RemoveTeamMemberAsync(Guid memberId, CancellationToken ct = default)
+    public async Task RemoveTeamMemberAsync(Guid memberId, string? currentUserEmail = null, CancellationToken ct = default)
     {
         var member = await _db.TeamMembers.FindAsync([memberId], ct)
             ?? throw new InvalidOperationException("Team member not found.");
+
+        // Guard 1: Prevent self-deletion
+        if (!string.IsNullOrEmpty(currentUserEmail) &&
+            string.Equals(member.Email, currentUserEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "You cannot remove yourself. Ask another admin to remove your account.");
+        }
+
+        // Guard 2: Prevent deleting the last Admin/SuperAdmin in the org
+        var isAdminRole = member.Role is "Admin" or "SuperAdmin";
+        if (isAdminRole)
+        {
+            var adminCount = await _db.TeamMembers
+                .CountAsync(m => m.TenantId == member.TenantId
+                              && (m.Role == "Admin" || m.Role == "SuperAdmin")
+                              && m.Status == "active", ct);
+            if (adminCount <= 1)
+            {
+                throw new InvalidOperationException(
+                    "Cannot remove the last admin. Promote another member to Admin first.");
+            }
+        }
+
         _db.TeamMembers.Remove(member);
         await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Removed team member {MemberId} ({Email})", memberId, member.Email);

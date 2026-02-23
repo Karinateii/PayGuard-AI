@@ -171,6 +171,13 @@ else
 
     private async Task RemoveMember(TeamMember member)
     {
+        // Prevent self-deletion in the UI as well
+        if (string.Equals(member.Email, CurrentUser.UserName, StringComparison.OrdinalIgnoreCase))
+        {
+            Snackbar.Add("You cannot remove yourself. Ask another admin to remove your account.", Severity.Warning);
+            return;
+        }
+
         var confirmed = await DialogService.ShowMessageBox(
             "Remove Team Member",
             $"Are you sure you want to remove {member.DisplayName} ({member.Email})?",
@@ -179,7 +186,7 @@ else
         {
             try
             {
-                await AdminService.RemoveTeamMemberAsync(member.Id);
+                await AdminService.RemoveTeamMemberAsync(member.Id, CurrentUser.UserName);
                 Snackbar.Add($"Removed {member.DisplayName}", Severity.Info);
                 await LoadMembers();
             }
