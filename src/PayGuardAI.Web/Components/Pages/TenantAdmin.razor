@@ -3,6 +3,8 @@
 @using PayGuardAI.Core.Services
 @attribute [Authorize(Roles = "SuperAdmin")]
 @inject ITenantOnboardingService OnboardingService
+@inject ITenantContext TenantContext
+@inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 @inject ILogger<TenantAdmin> Logger
 
@@ -130,6 +132,14 @@
                         </MudText>
                     </MudTd>
                     <MudTd DataLabel="Actions" Style="text-align: center;">
+                        <MudTooltip Text="Switch to this tenant">
+                            <MudIconButton Icon="@Icons.Material.Filled.SwapHoriz"
+                                           Color="@(context.TenantId == TenantContext.TenantId ? Color.Default : Color.Info)"
+                                           Size="Size.Small"
+                                           Disabled="@(context.TenantId == TenantContext.TenantId)"
+                                           aria-label="Switch to tenant"
+                                           OnClick="() => SwitchToTenant(context)" />
+                        </MudTooltip>
                         @if (context.Status == "disabled")
                         {
                             <MudIconButton Icon="@Icons.Material.Filled.PlayArrow"
@@ -219,4 +229,11 @@
         "past_due" => Color.Warning,
         _ => Color.Default
     };
+
+    private void SwitchToTenant(TenantSummary tenant)
+    {
+        TenantContext.TenantId = tenant.TenantId;
+        Snackbar.Add($"Switched to \"{tenant.OrganizationName}\" ({tenant.TenantId})", Severity.Info);
+        NavigationManager.NavigateTo("/", forceLoad: true);
+    }
 }
