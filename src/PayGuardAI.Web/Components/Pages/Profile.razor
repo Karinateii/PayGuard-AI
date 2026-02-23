@@ -28,7 +28,7 @@
     else if (_member == null)
     {
         <MudAlert Severity="Severity.Warning" Variant="Variant.Filled">
-            Could not load your profile for "@_lookupEmail" in tenant "@TenantContext.TenantId".
+            Could not load your profile for "@_lookupEmail" in tenant "@_homeTenantId".
             <MudButton Variant="Variant.Text" Color="Color.Inherit" OnClick="LoadProfile" Class="ml-2">Retry</MudButton>
         </MudAlert>
     }
@@ -104,7 +104,7 @@
                     <MudField Label="Organization" Variant="Variant.Outlined">@_organizationName</MudField>
                 </MudItem>
                 <MudItem xs="12" sm="6">
-                    <MudField Label="Tenant ID" Variant="Variant.Outlined">@TenantContext.TenantId</MudField>
+                    <MudField Label="Tenant ID" Variant="Variant.Outlined">@_homeTenantId</MudField>
                 </MudItem>
                 <MudItem xs="12" sm="6">
                     <MudField Label="Last Login" Variant="Variant.Outlined">
@@ -148,6 +148,7 @@
     private string _editName = string.Empty;
     private string _organizationName = string.Empty;
     private string _lookupEmail = string.Empty;
+    private string _homeTenantId = string.Empty;
     private bool _isLoading = true;
     private bool _isSaving;
 
@@ -169,31 +170,26 @@
                      ?? user?.FindFirst("email")?.Value
                      ?? user?.Identity?.Name;
 
-            Logger.LogInformation("Profile loading for email: {Email}, TenantId: {TenantId}", email, TenantContext.TenantId);
+            // The user's home tenant (from their auth claim), not the impersonated one
+            _homeTenantId = user?.FindFirst("tenant_id")?.Value ?? TenantContext.TenantId;
+            var homeTenantId = _homeTenantId;
+
+            Logger.LogInformation("Profile loading for email: {Email}, HomeTenant: {Home}, CurrentTenant: {Current}",
+                email, homeTenantId, TenantContext.TenantId);
 
             if (string.IsNullOrEmpty(email)) return;
 
             _lookupEmail = email;
 
             await using var db = await DbFactory.CreateDbContextAsync();
-            db.SetTenantId(TenantContext.TenantId);
 
-            // Try exact match first, then case-insensitive
+            // Always look up the user's profile from their HOME tenant, not the impersonated one
+            db.SetTenantId(homeTenantId);
+
             _member = await db.TeamMembers
                 .FirstOrDefaultAsync(m => m.Email == email)
                 ?? await db.TeamMembers
                     .FirstOrDefaultAsync(m => m.Email.ToLower() == email.ToLower());
-
-            // If still not found and we're impersonating, try across tenants
-            if (_member == null)
-            {
-                Logger.LogWarning("TeamMember not found for {Email} in tenant {TenantId}, trying IgnoreQueryFilters",
-                    email, TenantContext.TenantId);
-                _member = await db.TeamMembers
-                    .IgnoreQueryFilters()
-                    .FirstOrDefaultAsync(m => m.Email.ToLower() == email.ToLower()
-                                           && m.TenantId == TenantContext.TenantId);
-            }
 
             if (_member != null)
             {
@@ -201,11 +197,12 @@
             }
             else
             {
-                Logger.LogWarning("No TeamMember found for {Email} in any lookup path", email);
+                Logger.LogWarning("No TeamMember found for {Email} in home tenant {HomeTenant}", email, homeTenantId);
             }
 
+            // Org name: show home tenant's org when impersonating
             var settings = await db.OrganizationSettings.FirstOrDefaultAsync();
-            _organizationName = settings?.OrganizationName ?? TenantContext.TenantId;
+            _organizationName = settings?.OrganizationName ?? homeTenantId;
         }
         catch (Exception ex)
         {
@@ -224,8 +221,11 @@
         _isSaving = true;
         try
         {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var homeTenantId = authState.User?.FindFirst("tenant_id")?.Value ?? TenantContext.TenantId;
+
             await using var db = await DbFactory.CreateDbContextAsync();
-            db.SetTenantId(TenantContext.TenantId);
+            db.SetTenantId(homeTenantId);
 
             var member = await db.TeamMembers.FindAsync(_member.Id);
             if (member != null)
