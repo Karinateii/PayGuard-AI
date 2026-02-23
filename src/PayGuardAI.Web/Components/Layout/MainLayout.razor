@@ -51,12 +51,15 @@
                 
                 <MudMenu Icon="@Icons.Material.Filled.Person" Color="Color.Inherit" Dense="true" Class="mr-2">
                     <MudMenuItem>
-                        <MudChip T="string" Size="Size.Small" Color="Color.Default">
-                            @CurrentUser.UserName
-                        </MudChip>
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">@CurrentUser.UserName</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@CurrentUser.PrimaryRole</MudText>
+                        </MudStack>
                     </MudMenuItem>
                     <MudDivider />
+                    <MudMenuItem Icon="@Icons.Material.Filled.Person" Href="/profile">My Profile</MudMenuItem>
                     <MudMenuItem Icon="@Icons.Material.Filled.Security" Href="/mfa/setup">Setup MFA</MudMenuItem>
+                    <MudDivider />
                     <MudMenuItem Icon="@Icons.Material.Filled.Logout" OnClick="@SignOut">Sign Out</MudMenuItem>
                 </MudMenu>
                 

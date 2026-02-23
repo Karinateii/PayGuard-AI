@@ -1,0 +1,229 @@
+@page "/profile"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
+@attribute [Authorize]
+@inject IDbContextFactory<PayGuardAI.Data.ApplicationDbContext> DbFactory
+@inject ITenantContext TenantContext
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ISnackbar Snackbar
+@inject ILogger<Profile> Logger
+
+<PageTitle>My Profile - PayGuard AI</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-6">
+    <MudText Typo="Typo.h4" Class="mb-4" Style="font-weight: 700;">
+        <MudIcon Icon="@Icons.Material.Filled.Person" Class="mr-2" Style="vertical-align: middle;" />
+        My Profile
+    </MudText>
+
+    @if (_isLoading)
+    {
+        <MudPaper Elevation="2" Class="pa-8 rounded-lg">
+            <div class="d-flex justify-center">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
+            </div>
+        </MudPaper>
+    }
+    else if (_member == null)
+    {
+        <MudAlert Severity="Severity.Warning" Variant="Variant.Filled">
+            Could not load your profile. Please try signing out and back in.
+        </MudAlert>
+    }
+    else
+    {
+        @* ── Profile Card ──────────────────────────────────────────── *@
+        <MudPaper Elevation="2" Class="pa-6 rounded-lg mb-4">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="4" Class="mb-4">
+                <MudAvatar Size="Size.Large" Color="Color.Primary" Style="font-size: 1.5rem; width: 72px; height: 72px;">
+                    @(_member.DisplayName?.FirstOrDefault().ToString().ToUpper() ?? "?")
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.h5" Style="font-weight: 700;">@_member.DisplayName</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">@_member.Email</MudText>
+                    <MudStack Row="true" Spacing="1" Class="mt-1">
+                        <MudChip T="string" Size="Size.Small" Color="@GetRoleColor(_member.Role)" Variant="Variant.Filled">
+                            @_member.Role
+                        </MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">
+                            @_organizationName
+                        </MudChip>
+                    </MudStack>
+                </div>
+            </MudStack>
+
+            <MudDivider Class="mb-4" />
+
+            @* ── Edit Display Name ────────────────────────────────── *@
+            <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mb-2">Display Name</MudText>
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudTextField @bind-Value="_editName"
+                              Label="Display Name"
+                              Variant="Variant.Outlined"
+                              Immediate="true"
+                              FullWidth="true" />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Disabled="@(_editName == _member.DisplayName || string.IsNullOrWhiteSpace(_editName) || _isSaving)"
+                           OnClick="SaveDisplayName"
+                           StartIcon="@Icons.Material.Filled.Save">
+                    @if (_isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                    Save
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+
+        @* ── Account Details ───────────────────────────────────────── *@
+        <MudPaper Elevation="2" Class="pa-6 rounded-lg mb-4">
+            <MudText Typo="Typo.h6" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-1" Style="vertical-align: middle;" />
+                Account Details
+            </MudText>
+
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudField Label="Email" Variant="Variant.Outlined">@_member.Email</MudField>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudField Label="Role" Variant="Variant.Outlined">
+                        <MudChip T="string" Size="Size.Small" Color="@GetRoleColor(_member.Role)">@_member.Role</MudChip>
+                    </MudField>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudField Label="Status" Variant="Variant.Outlined">
+                        <MudChip T="string" Size="Size.Small"
+                                 Color="@(_member.Status == "active" ? Color.Success : Color.Warning)"
+                                 Variant="Variant.Filled">
+                            @_member.Status
+                        </MudChip>
+                    </MudField>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudField Label="Organization" Variant="Variant.Outlined">@_organizationName</MudField>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudField Label="Tenant ID" Variant="Variant.Outlined">@TenantContext.TenantId</MudField>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudField Label="Last Login" Variant="Variant.Outlined">
+                        @(_member.LastLoginAt?.ToString("MMMM dd, yyyy h:mm tt") ?? "First session")
+                    </MudField>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudField Label="Member Since" Variant="Variant.Outlined">
+                        @_member.CreatedAt.ToString("MMMM dd, yyyy")
+                    </MudField>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        @* ── Security ──────────────────────────────────────────────── *@
+        <MudPaper Elevation="2" Class="pa-6 rounded-lg">
+            <MudText Typo="Typo.h6" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Security" Class="mr-1" Style="vertical-align: middle;" />
+                Security
+            </MudText>
+
+            <MudList T="string" Dense="true">
+                <MudListItem Icon="@Icons.Material.Filled.VpnKey" Href="/mfa/setup">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Style="width: 100%;">
+                        <div>
+                            <MudText Typo="Typo.body1" Style="font-weight: 600;">Two-Factor Authentication</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Add an extra layer of security with an authenticator app
+                            </MudText>
+                        </div>
+                        <MudIcon Icon="@Icons.Material.Filled.ChevronRight" />
+                    </MudStack>
+                </MudListItem>
+            </MudList>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private PayGuardAI.Core.Entities.TeamMember? _member;
+    private string _editName = string.Empty;
+    private string _organizationName = string.Empty;
+    private bool _isLoading = true;
+    private bool _isSaving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProfile();
+    }
+
+    private async Task LoadProfile()
+    {
+        _isLoading = true;
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var email = authState.User?.Identity?.Name;
+
+            if (string.IsNullOrEmpty(email)) return;
+
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenantId(TenantContext.TenantId);
+
+            _member = await db.TeamMembers
+                .FirstOrDefaultAsync(m => m.Email == email);
+
+            if (_member != null)
+            {
+                _editName = _member.DisplayName;
+            }
+
+            var settings = await db.OrganizationSettings.FirstOrDefaultAsync();
+            _organizationName = settings?.OrganizationName ?? TenantContext.TenantId;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading profile");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SaveDisplayName()
+    {
+        if (_member == null || string.IsNullOrWhiteSpace(_editName)) return;
+
+        _isSaving = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenantId(TenantContext.TenantId);
+
+            var member = await db.TeamMembers.FindAsync(_member.Id);
+            if (member != null)
+            {
+                member.DisplayName = _editName.Trim();
+                await db.SaveChangesAsync();
+                _member.DisplayName = member.DisplayName;
+                Snackbar.Add("Display name updated!", Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error saving display name");
+            Snackbar.Add("Failed to update display name.", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private static Color GetRoleColor(string role) => role switch
+    {
+        "SuperAdmin" => Color.Error,
+        "Admin" => Color.Primary,
+        "Manager" => Color.Info,
+        "Reviewer" => Color.Default,
+        _ => Color.Default
+    };
+}
