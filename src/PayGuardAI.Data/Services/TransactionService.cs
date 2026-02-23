@@ -44,10 +44,18 @@ public class TransactionService : ITransactionService
 
     public async Task<Transaction> ProcessWebhookAsync(string payload, CancellationToken cancellationToken = default)
     {
-        // Reject transactions for disabled tenants
-        if (_tenantContext.IsDisabled)
+        // Check subscription status directly from DB (can't rely on middleware flag
+        // because Blazor Server circuits don't re-run middleware on each interaction)
+        var tenantId = _tenantContext.TenantId;
+        var subStatus = await _context.TenantSubscriptions
+            .IgnoreQueryFilters()
+            .Where(s => s.TenantId == tenantId)
+            .Select(s => s.Status)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (subStatus == "disabled")
         {
-            _logger.LogWarning("Transaction rejected: tenant {TenantId} is disabled", _tenantContext.TenantId);
+            _logger.LogWarning("Transaction rejected: tenant {TenantId} is disabled", tenantId);
             throw new InvalidOperationException(
                 "Your organization's PayGuard service is currently suspended. " +
                 "Transactions are not being processed. Please contact your platform administrator.");
@@ -86,7 +94,6 @@ public class TransactionService : ITransactionService
         // Record billing usage (increments TransactionsThisPeriod counter)
         try
         {
-            var tenantId = _tenantContext.TenantId;
             await _billingService.RecordTransactionUsageAsync(tenantId, cancellationToken);
         }
         catch (Exception ex)
