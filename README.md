@@ -463,7 +463,7 @@ Configure the default user in `appsettings.json`:
 {
   "Auth": {
     "DefaultUser": "compliance_officer@payguard.ai",
-    "DefaultRoles": "Reviewer,Manager"
+    "DefaultRoles": "Reviewer,Manager,Admin"
   }
 }
 ```

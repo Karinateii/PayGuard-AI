@@ -134,7 +134,7 @@ public static class AuthenticationConfiguration
 
                     // Add default roles — Google doesn't provide roles, so we assign them
                     var config = context.HttpContext.RequestServices.GetRequiredService<IConfiguration>();
-                    var defaultRoles = config["Auth:DefaultRoles"] ?? "Reviewer,Manager";
+                    var defaultRoles = config["Auth:DefaultRoles"] ?? "Reviewer,Manager,Admin";
                     
                     if (context.Principal?.Identity is ClaimsIdentity identity)
                     {

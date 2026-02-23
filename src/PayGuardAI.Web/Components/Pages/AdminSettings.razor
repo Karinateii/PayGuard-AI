@@ -98,10 +98,17 @@ else if (_settings != null)
         </MudItem>
     </MudGrid>
 
-    @if (!string.IsNullOrWhiteSpace(_error))
-    {
-        <MudAlert Severity="Severity.Error" Class="mt-4">@_error</MudAlert>
-    }
+}
+
+@if (!string.IsNullOrWhiteSpace(_error))
+{
+    <MudAlert Severity="Severity.Error" Class="mt-4">@_error</MudAlert>
+}
+else if (!_loading && _settings == null)
+{
+    <MudAlert Severity="Severity.Warning" Class="mt-4">
+        Unable to load organization settings. Please try refreshing the page.
+    </MudAlert>
 }
 
 @code {

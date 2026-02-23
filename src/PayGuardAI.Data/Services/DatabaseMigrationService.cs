@@ -74,8 +74,6 @@ public class DatabaseMigrationService : IDatabaseMigrationService
             ("WebhookEndpoints",        "TenantId", "afriex-demo"),
             ("NotificationPreferences", "TenantId", "afriex-demo"),
             ("CustomRoles",             "TenantId", "afriex-demo"),
-            // Onboarding flag — defaults to false (0) for existing tenants
-            ("OrganizationSettings",    "OnboardingCompleted", "0"),
         };
 
         foreach (var (table, column, defaultValue) in columnMigrations)
@@ -142,6 +140,80 @@ public class DatabaseMigrationService : IDatabaseMigrationService
                 _logger.LogDebug(ex, "Skipping column migration for {Table}.{Column} (table may not exist yet)", table, column);
             }
         }
+
+        // ── Boolean columns need the correct native type (not TEXT) ──
+        await AddBooleanColumnIfMissing(dbType, "OrganizationSettings", "OnboardingCompleted");
+    }
+
+    /// <summary>
+    /// Adds a boolean column with correct native type: BOOLEAN (PostgreSQL) or INTEGER (SQLite).
+    /// Defaults to false/0 for existing rows.
+    /// </summary>
+    private async Task AddBooleanColumnIfMissing(string dbType, string table, string column)
+    {
+        try
+        {
+            bool exists = false;
+
+            if (dbType == "PostgreSQL")
+            {
+                var checkSql = $"SELECT COUNT(*) FROM information_schema.columns WHERE table_name = '{table}' AND column_name = '{column}'";
+                await using var cmd = _context.Database.GetDbConnection().CreateCommand();
+                await _context.Database.OpenConnectionAsync();
+                cmd.CommandText = checkSql;
+                exists = Convert.ToInt64(await cmd.ExecuteScalarAsync()) > 0;
+
+                if (!exists)
+                {
+                    await _context.Database.ExecuteSqlRawAsync(
+                        $"""ALTER TABLE "{table}" ADD COLUMN "{column}" BOOLEAN NOT NULL DEFAULT false""");
+                    _logger.LogInformation("Added boolean column {Column} to {Table}", column, table);
+                }
+                else
+                {
+                    // Column might exist as wrong type (TEXT) from a previous migration — fix it
+                    var typeSql = $"SELECT data_type FROM information_schema.columns WHERE table_name = '{table}' AND column_name = '{column}'";
+                    cmd.CommandText = typeSql;
+                    var dataType = (await cmd.ExecuteScalarAsync())?.ToString();
+                    if (dataType == "text")
+                    {
+                        // Drop and re-add with correct type
+                        var dropSql = $"ALTER TABLE \"{table}\" DROP COLUMN \"{column}\"";
+                        var addSql = $"ALTER TABLE \"{table}\" ADD COLUMN \"{column}\" BOOLEAN NOT NULL DEFAULT false";
+                        await _context.Database.ExecuteSqlRawAsync(dropSql);
+                        await _context.Database.ExecuteSqlRawAsync(addSql);
+                        _logger.LogInformation("Fixed column type for {Column} in {Table}: TEXT → BOOLEAN", column, table);
+                    }
+                }
+            }
+            else
+            {
+                // SQLite
+                await using var cmd = _context.Database.GetDbConnection().CreateCommand();
+                await _context.Database.OpenConnectionAsync();
+                cmd.CommandText = $"PRAGMA table_info({table})";
+                await using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    if (reader.GetString(1).Equals(column, StringComparison.OrdinalIgnoreCase))
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+
+                if (!exists)
+                {
+                    await _context.Database.ExecuteSqlRawAsync(
+                        $"ALTER TABLE {table} ADD COLUMN {column} INTEGER NOT NULL DEFAULT 0");
+                    _logger.LogInformation("Added boolean column {Column} to {Table}", column, table);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipping boolean column migration for {Table}.{Column}", table, column);
+        }
     }
 
     public string GetActiveDatabaseType()
@@ -160,21 +232,18 @@ public class DatabaseMigrationService : IDatabaseMigrationService
     {
         try
         {
-            var falseValue = dbType == "PostgreSQL" ? "false" : "0";
-            var trueValue = dbType == "PostgreSQL" ? "true" : "1";
-
+            // Mark ALL existing tenants as onboarded — they were created before the
+            // onboarding wizard existed, so forcing them through it would be disruptive.
             var updateSql = dbType == "PostgreSQL"
-                ? $"""
+                ? """
                    UPDATE "OrganizationSettings"
-                   SET "OnboardingCompleted" = {trueValue}
-                   WHERE "OrganizationName" != 'My Organization'
-                     AND "OnboardingCompleted" = {falseValue}
+                   SET "OnboardingCompleted" = true
+                   WHERE "OnboardingCompleted" = false
                    """
-                : $"""
+                : """
                    UPDATE OrganizationSettings
-                   SET OnboardingCompleted = {trueValue}
-                   WHERE OrganizationName != 'My Organization'
-                     AND OnboardingCompleted = {falseValue}
+                   SET OnboardingCompleted = 1
+                   WHERE OnboardingCompleted = 0
                    """;
 
             var rows = await _context.Database.ExecuteSqlRawAsync(updateSql);
