@@ -21,8 +21,8 @@
         Pricing
     </MudNavLink>
 
-    @* ── Manager / Admin only ─────────────────────────────────────── *@
-    <AuthorizeView Roles="Manager,Admin">
+    @* ── Manager+ only ────────────────────────────────────────────── *@
+    <AuthorizeView Roles="Manager,Admin,SuperAdmin">
         <Authorized>
             <MudNavLink Href="/rules" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Rule">
                 Risk Rules
@@ -33,6 +33,12 @@
             <MudNavLink Href="/audit" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.History">
                 Audit Log
             </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+
+    @* ── Admin+ only ──────────────────────────────────────────────── *@
+    <AuthorizeView Roles="Admin,SuperAdmin">
+        <Authorized>
             <MudDivider Class="my-2" />
             <MudText Typo="Typo.overline" Class="ml-4 mt-1" Color="Color.Secondary">Admin</MudText>
             <MudNavLink Href="/admin/settings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Settings">
@@ -56,8 +62,14 @@
             <MudNavLink Href="/admin/notifications" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.NotificationsActive">
                 Notifications
             </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+
+    @* ── Platform Owner only ──────────────────────────────────────── *@
+    <AuthorizeView Roles="SuperAdmin">
+        <Authorized>
             <MudDivider Class="my-2" />
-            <MudText Typo="Typo.overline" Class="ml-4 mt-1" Color="Color.Secondary">Super Admin</MudText>
+            <MudText Typo="Typo.overline" Class="ml-4 mt-1" Color="Color.Secondary">Platform</MudText>
             <MudNavLink Href="/super-admin/tenants" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Business">
                 Tenant Management
             </MudNavLink>

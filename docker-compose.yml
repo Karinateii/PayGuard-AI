@@ -17,7 +17,7 @@ services:
       - FeatureFlags__OAuthEnabled=false
       - FeatureFlags__FlutterwaveEnabled=false
       - Auth__DefaultUser=compliance_officer@payguard.ai
-      - Auth__DefaultRoles=Reviewer,Manager,Admin
+      - Auth__DefaultRoles=Reviewer,Manager,Admin,SuperAdmin
     volumes:
       - ./data:/app/data
     healthcheck:

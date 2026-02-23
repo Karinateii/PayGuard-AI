@@ -77,8 +77,10 @@ builder.Services.AddPayGuardAuthentication(builder.Configuration);
 
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("RequireReviewer", policy => policy.RequireRole("Reviewer", "Manager", "Admin"));
-    options.AddPolicy("RequireManager", policy => policy.RequireRole("Manager", "Admin"));
+    options.AddPolicy("RequireReviewer", policy => policy.RequireRole("Reviewer", "Manager", "Admin", "SuperAdmin"));
+    options.AddPolicy("RequireManager", policy => policy.RequireRole("Manager", "Admin", "SuperAdmin"));
+    options.AddPolicy("RequireAdmin", policy => policy.RequireRole("Admin", "SuperAdmin"));
+    options.AddPolicy("RequireSuperAdmin", policy => policy.RequireRole("SuperAdmin"));
 
     // Permission-based policies (checked via PermissionAuthorizationHandler)
     options.AddPolicy("CanViewTransactions", policy => policy.Requirements.Add(new PermissionRequirement(Permission.ViewTransactions)));
