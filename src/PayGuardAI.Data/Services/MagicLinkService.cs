@@ -83,7 +83,10 @@ public class MagicLinkService : IMagicLinkService
 
         if (!string.IsNullOrEmpty(resendApiKey) && resendApiKey.StartsWith("re_"))
         {
-            var fromAddr = _config["Email:FromAddress"] ?? "onboarding@resend.dev";
+            // Use the configured from address, but fall back to Resend's shared
+            // test domain which works immediately without domain verification.
+            var configuredFrom = _config["Email:FromAddress"];
+            var fromAddr = !string.IsNullOrEmpty(configuredFrom) ? configuredFrom : "onboarding@resend.dev";
             var fromName = _config["Email:FromName"] ?? "PayGuard AI";
 
             var html = $"""
