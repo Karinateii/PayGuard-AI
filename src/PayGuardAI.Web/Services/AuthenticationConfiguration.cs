@@ -141,11 +141,14 @@ public static class AuthenticationConfiguration
                     if (context.Principal?.Identity is ClaimsIdentity identity)
                     {
                         // Look up the user's org from TeamMembers by email
+                        // Prioritize SuperAdmin roles first so the platform owner always
+                        // lands in their home tenant, even if they also exist in customer orgs.
                         var db = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
                         var teamMember = await db.TeamMembers
                             .IgnoreQueryFilters()
                             .Where(t => t.Email == userEmail && t.Status == "active")
-                            .OrderByDescending(t => t.CreatedAt)
+                            .OrderByDescending(t => t.Role == "SuperAdmin" ? 1 : 0)
+                            .ThenBy(t => t.CreatedAt)
                             .FirstOrDefaultAsync();
 
                         if (teamMember != null)
