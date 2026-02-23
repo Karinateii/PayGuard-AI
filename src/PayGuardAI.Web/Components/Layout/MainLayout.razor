@@ -5,8 +5,10 @@
 @inject ISnackbar Snackbar
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
 @inject ITenantContext TenantContext
+@inject PayGuardAI.Data.ApplicationDbContext Db
 @implements IAsyncDisposable
 @using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.EntityFrameworkCore
 @using PayGuardAI.Web.Hubs
 @using PayGuardAI.Core.Entities
 
@@ -24,6 +26,13 @@
                     <MudIcon Icon="@Icons.Material.Filled.Security" Class="mr-1 mr-sm-2 d-none d-sm-flex" Size="Size.Medium" />
                     <span style="font-size: 0.95rem; font-weight: 600;">PayGuard AI</span>
                 </MudText>
+                @if (!string.IsNullOrEmpty(_organizationName) && _organizationName != "My Organization")
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined" Class="ml-3 d-none d-sm-flex">
+                        <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Small" Class="mr-1" />
+                        @_organizationName
+                    </MudChip>
+                }
                 <MudSpacer />
                 <MudText Typo="Typo.body2" Class="mr-4 d-none d-md-flex">Cross-Border Fintech Hackathon 2026</MudText>
                 @if (_hubConnection?.State == HubConnectionState.Connected)
@@ -56,8 +65,9 @@
             </MudAppBar>
 
             <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
-                <MudDrawerHeader>
-                    <MudText Typo="Typo.h6">Navigation</MudText>
+                <MudDrawerHeader Class="d-flex flex-column" Style="padding-bottom: 8px;">
+                    <MudText Typo="Typo.h6" Class="mb-0">@(_organizationName ?? "PayGuard AI")</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@TenantContext.TenantId</MudText>
                 </MudDrawerHeader>
                 <NavMenu />
             </MudDrawer>
@@ -82,11 +92,26 @@
     private bool _drawerOpen = true;
     private bool _isDarkMode = true;
     private int _notificationCount = 0;
+    private string? _organizationName;
     private HubConnection? _hubConnection;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadOrganizationName();
         await SetupSignalRConnection();
+    }
+
+    private async Task LoadOrganizationName()
+    {
+        try
+        {
+            var settings = await Db.OrganizationSettings.FirstOrDefaultAsync();
+            _organizationName = settings?.OrganizationName;
+        }
+        catch
+        {
+            _organizationName = null;
+        }
     }
 
     private async Task SetupSignalRConnection()
