@@ -42,6 +42,9 @@ public class DatabaseMigrationService : IDatabaseMigrationService
 
             // Mark existing tenants as onboarded so they aren't redirected
             await MarkExistingTenantsOnboardedAsync(dbType);
+
+            // Ensure the platform owner has a TeamMember record for auth lookup
+            await EnsurePlatformOwnerTeamMemberAsync();
             
             _logger.LogInformation("Database ready: {DatabaseType}", dbType);
         }
@@ -295,6 +298,42 @@ public class DatabaseMigrationService : IDatabaseMigrationService
         var usePostgresStr = featureFlagsSection["PostgresEnabled"];
         var usePostgres = bool.TryParse(usePostgresStr, out var result) && result;
         return usePostgres ? "PostgreSQL" : "SQLite";
+    }
+
+    /// <summary>
+    /// Ensures the platform owner (from Auth:DefaultUser config) has a TeamMember
+    /// record in the default tenant. Without this, the email→tenant lookup in the
+    /// auth handlers would not find them and they'd fall back to config defaults.
+    /// </summary>
+    private async Task EnsurePlatformOwnerTeamMemberAsync()
+    {
+        try
+        {
+            var email = _configuration["Auth:DefaultUser"] ?? "compliance_officer@payguard.ai";
+            var tenantId = _configuration["MultiTenancy:DefaultTenantId"] ?? "afriex-demo";
+
+            var exists = await _context.TeamMembers
+                .IgnoreQueryFilters()
+                .AnyAsync(t => t.Email == email && t.TenantId == tenantId);
+
+            if (!exists)
+            {
+                _context.TeamMembers.Add(new PayGuardAI.Core.Entities.TeamMember
+                {
+                    TenantId = tenantId,
+                    Email = email,
+                    DisplayName = "Platform Owner",
+                    Role = "SuperAdmin",
+                    Status = "active"
+                });
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Created TeamMember for platform owner {Email} in tenant {Tenant}", email, tenantId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipping platform owner TeamMember creation (table may not exist yet)");
+        }
     }
 
     /// <summary>

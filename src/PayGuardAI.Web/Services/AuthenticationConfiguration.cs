@@ -2,7 +2,9 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using PayGuardAI.Data;
 using PayGuardAI.Web.Models;
 
 namespace PayGuardAI.Web.Services;
@@ -119,7 +121,7 @@ public static class AuthenticationConfiguration
                     context.HandleResponse();
                     return Task.CompletedTask;
                 },
-                OnTokenValidated = context =>
+                OnTokenValidated = async context =>
                 {
                     var loggerFactory = context.HttpContext.RequestServices
                         .GetRequiredService<ILoggerFactory>();
@@ -138,27 +140,41 @@ public static class AuthenticationConfiguration
                     
                     if (context.Principal?.Identity is ClaimsIdentity identity)
                     {
-                        // Add roles if not already present
-                        if (!identity.HasClaim(c => c.Type == ClaimTypes.Role))
+                        // Look up the user's org from TeamMembers by email
+                        var db = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
+                        var teamMember = await db.TeamMembers
+                            .IgnoreQueryFilters()
+                            .Where(t => t.Email == userEmail && t.Status == "active")
+                            .OrderByDescending(t => t.CreatedAt)
+                            .FirstOrDefaultAsync();
+
+                        if (teamMember != null)
                         {
+                            // Use the org-specific role from TeamMembers
+                            identity.AddClaim(new Claim(ClaimTypes.Role, teamMember.Role));
+                            identity.AddClaim(new Claim("tenant_id", teamMember.TenantId));
+                            logger.LogInformation("Mapped user {Email} to tenant {Tenant} with role {Role}",
+                                userEmail, teamMember.TenantId, teamMember.Role);
+                        }
+                        else
+                        {
+                            // Fallback: user not in any org — assign default tenant + roles
                             foreach (var role in defaultRoles.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                             {
                                 identity.AddClaim(new Claim(ClaimTypes.Role, role));
                             }
+                            var defaultTenantId = config["MultiTenancy:DefaultTenantId"] ?? "afriex-demo";
+                            identity.AddClaim(new Claim("tenant_id", defaultTenantId));
+                            logger.LogWarning("No TeamMember found for {Email}, using default tenant {Tenant}",
+                                userEmail, defaultTenantId);
                         }
-                        
+
                         // Ensure Name claim is set (some providers use different claim types)
                         if (!identity.HasClaim(c => c.Type == ClaimTypes.Name))
                         {
                             identity.AddClaim(new Claim(ClaimTypes.Name, userEmail));
                         }
-
-                        // Add tenant claim — future: look up from TeamMember table by email
-                        var defaultTenantId = config["MultiTenancy:DefaultTenantId"] ?? "afriex-demo";
-                        identity.AddClaim(new Claim("tenant_id", defaultTenantId));
                     }
-                    
-                    return Task.CompletedTask;
                 },
                 OnRedirectToIdentityProvider = context =>
                 {

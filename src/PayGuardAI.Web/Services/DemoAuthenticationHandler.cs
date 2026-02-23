@@ -2,7 +2,9 @@ using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using PayGuardAI.Data;
 
 namespace PayGuardAI.Web.Services;
 
@@ -13,18 +15,21 @@ namespace PayGuardAI.Web.Services;
 public class DemoAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
     private readonly IConfiguration _configuration;
+    private readonly ApplicationDbContext _db;
 
     public DemoAuthenticationHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
         UrlEncoder encoder,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        ApplicationDbContext db)
         : base(options, logger, encoder)
     {
         _configuration = configuration;
+        _db = db;
     }
 
-    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+    protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         var path = Context.Request.Path;
         Logger.LogInformation("[AUTH] Checking authentication for path: {Path}", path);
@@ -37,35 +42,53 @@ public class DemoAuthenticationHandler : AuthenticationHandler<AuthenticationSch
         if (isAuthenticated != "true")
         {
             Logger.LogInformation("[AUTH] Not authenticated - returning NoResult");
-            return Task.FromResult(AuthenticateResult.NoResult());
+            return AuthenticateResult.NoResult();
         }
         
         Logger.LogInformation("[AUTH] User is authenticated - creating claims principal");
 
-        // User and roles come ONLY from config — never from request headers
-        // (headers could be spoofed for privilege escalation)
         var userName = _configuration["Auth:DefaultUser"] ?? "compliance_officer@payguard.ai";
-        var roles = _configuration["Auth:DefaultRoles"] ?? "Reviewer,Manager,Admin,SuperAdmin";
 
-        var tenantId = _configuration["MultiTenancy:DefaultTenantId"] ?? "afriex-demo";
+        // Look up the user's org from TeamMembers by email
+        var teamMember = await _db.TeamMembers
+            .IgnoreQueryFilters()
+            .Where(t => t.Email == userName && t.Status == "active")
+            .OrderByDescending(t => t.CreatedAt)
+            .FirstOrDefaultAsync();
 
         var claims = new List<Claim>
         {
             new(ClaimTypes.Name, userName),
-            new(ClaimTypes.NameIdentifier, userName),
-            new("tenant_id", tenantId)
+            new(ClaimTypes.NameIdentifier, userName)
         };
 
-        foreach (var role in roles.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        if (teamMember != null)
         {
-            claims.Add(new Claim(ClaimTypes.Role, role));
+            // Route to the user's actual org with their assigned role
+            claims.Add(new Claim("tenant_id", teamMember.TenantId));
+            claims.Add(new Claim(ClaimTypes.Role, teamMember.Role));
+            Logger.LogInformation("[AUTH] Mapped {User} to tenant {Tenant} role {Role}",
+                userName, teamMember.TenantId, teamMember.Role);
+        }
+        else
+        {
+            // Fallback: user not in any org — use config defaults
+            var tenantId = _configuration["MultiTenancy:DefaultTenantId"] ?? "afriex-demo";
+            var roles = _configuration["Auth:DefaultRoles"] ?? "Reviewer,Manager,Admin,SuperAdmin";
+            claims.Add(new Claim("tenant_id", tenantId));
+            foreach (var role in roles.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                claims.Add(new Claim(ClaimTypes.Role, role));
+            }
+            Logger.LogInformation("[AUTH] No TeamMember for {User}, using default tenant {Tenant}",
+                userName, tenantId);
         }
 
         var identity = new ClaimsIdentity(claims, Scheme.Name);
         var principal = new ClaimsPrincipal(identity);
         var ticket = new AuthenticationTicket(principal, Scheme.Name);
 
-        return Task.FromResult(AuthenticateResult.Success(ticket));
+        return AuthenticateResult.Success(ticket);
     }
 
     protected override Task HandleChallengeAsync(AuthenticationProperties properties)
