@@ -34,6 +34,11 @@ public interface ITenantOnboardingService
     Task SetTenantStatusAsync(string tenantId, bool isEnabled, CancellationToken ct = default);
 
     /// <summary>
+    /// Permanently delete a tenant and ALL of their data.
+    /// </summary>
+    Task DeleteTenantAsync(string tenantId, CancellationToken ct = default);
+
+    /// <summary>
     /// Update organization settings during onboarding (cross-tenant, no auth context required).
     /// </summary>
     Task UpdateOnboardingSettingsAsync(
@@ -69,6 +74,9 @@ public class TenantSummary
     public string Status { get; set; } = "active";
     public int TeamMemberCount { get; set; }
     public int TransactionCount { get; set; }
+    public int RiskRuleCount { get; set; }
+    public int ApiKeyCount { get; set; }
+    public DateTime? TrialEndsAt { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? LastActivityAt { get; set; }
 }

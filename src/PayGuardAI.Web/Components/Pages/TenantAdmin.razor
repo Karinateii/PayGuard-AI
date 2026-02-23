@@ -6,6 +6,7 @@
 @inject ITenantContext TenantContext
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 @inject ILogger<TenantAdmin> Logger
 
 <PageTitle>Tenant Management - PayGuard AI</PageTitle>
@@ -48,28 +49,91 @@
         <MudGrid Class="mb-4">
             <MudItem xs="12" sm="3">
                 <MudPaper Elevation="2" Class="pa-4 rounded-lg">
-                    <MudText Typo="Typo.overline" Color="Color.Secondary">TOTAL TENANTS</MudText>
-                    <MudText Typo="Typo.h4" Style="font-weight: 700;">@_tenants.Count</MudText>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.Business" Color="Color.Primary" />
+                        <div>
+                            <MudText Typo="Typo.overline" Color="Color.Secondary">TOTAL TENANTS</MudText>
+                            <MudText Typo="Typo.h4" Style="font-weight: 700;">@_tenants.Count</MudText>
+                        </div>
+                    </MudStack>
                 </MudPaper>
             </MudItem>
             <MudItem xs="12" sm="3">
                 <MudPaper Elevation="2" Class="pa-4 rounded-lg">
-                    <MudText Typo="Typo.overline" Color="Color.Secondary">ACTIVE</MudText>
-                    <MudText Typo="Typo.h4" Style="font-weight: 700;" Color="Color.Success">
-                        @_tenants.Count(t => t.Status is "active" or "trialing")
-                    </MudText>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" />
+                        <div>
+                            <MudText Typo="Typo.overline" Color="Color.Secondary">ACTIVE</MudText>
+                            <MudText Typo="Typo.h4" Style="font-weight: 700;" Color="Color.Success">
+                                @_tenants.Count(t => t.Status is "active" or "trialing")
+                            </MudText>
+                        </div>
+                    </MudStack>
                 </MudPaper>
             </MudItem>
             <MudItem xs="12" sm="3">
                 <MudPaper Elevation="2" Class="pa-4 rounded-lg">
-                    <MudText Typo="Typo.overline" Color="Color.Secondary">TOTAL USERS</MudText>
-                    <MudText Typo="Typo.h4" Style="font-weight: 700;">@_tenants.Sum(t => t.TeamMemberCount)</MudText>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.People" Color="Color.Info" />
+                        <div>
+                            <MudText Typo="Typo.overline" Color="Color.Secondary">TOTAL USERS</MudText>
+                            <MudText Typo="Typo.h4" Style="font-weight: 700;">@_tenants.Sum(t => t.TeamMemberCount)</MudText>
+                        </div>
+                    </MudStack>
                 </MudPaper>
             </MudItem>
             <MudItem xs="12" sm="3">
                 <MudPaper Elevation="2" Class="pa-4 rounded-lg">
-                    <MudText Typo="Typo.overline" Color="Color.Secondary">TOTAL TRANSACTIONS</MudText>
-                    <MudText Typo="Typo.h4" Style="font-weight: 700;">@_tenants.Sum(t => t.TransactionCount)</MudText>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.Receipt" Color="Color.Warning" />
+                        <div>
+                            <MudText Typo="Typo.overline" Color="Color.Secondary">TOTAL TRANSACTIONS</MudText>
+                            <MudText Typo="Typo.h4" Style="font-weight: 700;">@_tenants.Sum(t => t.TransactionCount)</MudText>
+                        </div>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        @* ── Second Row: Disabled / Trials Expiring ────────────────── *@
+        <MudGrid Class="mb-4">
+            <MudItem xs="12" sm="4">
+                <MudPaper Elevation="2" Class="pa-4 rounded-lg">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.Block" Color="Color.Error" />
+                        <div>
+                            <MudText Typo="Typo.overline" Color="Color.Secondary">DISABLED</MudText>
+                            <MudText Typo="Typo.h4" Style="font-weight: 700;" Color="Color.Error">
+                                @_tenants.Count(t => t.Status == "disabled")
+                            </MudText>
+                        </div>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudPaper Elevation="2" Class="pa-4 rounded-lg">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.Timer" Color="Color.Info" />
+                        <div>
+                            <MudText Typo="Typo.overline" Color="Color.Secondary">ON TRIAL</MudText>
+                            <MudText Typo="Typo.h4" Style="font-weight: 700;" Color="Color.Info">
+                                @_tenants.Count(t => t.Status == "trialing")
+                            </MudText>
+                        </div>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudPaper Elevation="2" Class="pa-4 rounded-lg">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Success" />
+                        <div>
+                            <MudText Typo="Typo.overline" Color="Color.Secondary">AVG TXN / TENANT</MudText>
+                            <MudText Typo="Typo.h4" Style="font-weight: 700;">
+                                @(_tenants.Count > 0 ? (_tenants.Sum(t => t.TransactionCount) / _tenants.Count).ToString("N0") : "0")
+                            </MudText>
+                        </div>
+                    </MudStack>
                 </MudPaper>
             </MudItem>
         </MudGrid>
@@ -80,22 +144,43 @@
                       Hover="true"
                       Breakpoint="Breakpoint.Sm"
                       Dense="true"
-                      RowsPerPage="10">
+                      RowsPerPage="10"
+                      Filter="new Func<TenantSummary, bool>(FilterFunc)"
+                      RowStyle="cursor: pointer;"
+                      OnRowClick="OnRowClicked">
+                <ToolBarContent>
+                    <MudText Typo="Typo.h6">All Tenants</MudText>
+                    <MudSpacer />
+                    <MudTextField @bind-Value="_searchString"
+                                  Placeholder="Search tenants…"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  IconSize="Size.Medium"
+                                  Immediate="true"
+                                  Class="mt-0" />
+                </ToolBarContent>
                 <HeaderContent>
-                    <MudTh>Organization</MudTh>
-                    <MudTh>Tenant ID</MudTh>
+                    <MudTh><MudTableSortLabel SortBy="new Func<TenantSummary, object>(x => x.OrganizationName)">Organization</MudTableSortLabel></MudTh>
+                    <MudTh><MudTableSortLabel SortBy="new Func<TenantSummary, object>(x => x.TenantId)">Tenant ID</MudTableSortLabel></MudTh>
                     <MudTh>Admin</MudTh>
-                    <MudTh>Plan</MudTh>
-                    <MudTh>Status</MudTh>
-                    <MudTh Style="text-align: center;">Team</MudTh>
-                    <MudTh Style="text-align: center;">Transactions</MudTh>
-                    <MudTh>Created</MudTh>
+                    <MudTh><MudTableSortLabel SortBy="new Func<TenantSummary, object>(x => x.Plan)">Plan</MudTableSortLabel></MudTh>
+                    <MudTh><MudTableSortLabel SortBy="new Func<TenantSummary, object>(x => x.Status)">Status</MudTableSortLabel></MudTh>
+                    <MudTh Style="text-align: center;"><MudTableSortLabel SortBy="new Func<TenantSummary, object>(x => x.TeamMemberCount)">Team</MudTableSortLabel></MudTh>
+                    <MudTh Style="text-align: center;"><MudTableSortLabel SortBy="new Func<TenantSummary, object>(x => x.TransactionCount)">Transactions</MudTableSortLabel></MudTh>
+                    <MudTh><MudTableSortLabel SortBy="new Func<TenantSummary, object>(x => x.CreatedAt)">Created</MudTableSortLabel></MudTh>
                     <MudTh>Last Activity</MudTh>
                     <MudTh Style="text-align: center;">Actions</MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Organization">
-                        <MudText Typo="Typo.body2" Style="font-weight: 600;">@context.OrganizationName</MudText>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                            <MudAvatar Size="Size.Small"
+                                       Color="@(context.Status == "disabled" ? Color.Default : Color.Primary)"
+                                       Style="font-size: 0.7rem;">
+                                @context.OrganizationName[..1].ToUpper()
+                            </MudAvatar>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">@context.OrganizationName</MudText>
+                        </MudStack>
                     </MudTd>
                     <MudTd DataLabel="Tenant ID">
                         <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Default">
@@ -113,7 +198,8 @@
                     <MudTd DataLabel="Status">
                         <MudChip T="string" Size="Size.Small"
                                  Color="@GetStatusColor(context.Status)"
-                                 Variant="Variant.Filled">
+                                 Variant="Variant.Filled"
+                                 Icon="@GetStatusIcon(context.Status)">
                             @context.Status
                         </MudChip>
                     </MudTd>
@@ -132,30 +218,49 @@
                         </MudText>
                     </MudTd>
                     <MudTd DataLabel="Actions" Style="text-align: center;">
-                        <MudTooltip Text="Switch to this tenant">
-                            <MudIconButton Icon="@Icons.Material.Filled.SwapHoriz"
-                                           Color="@(context.TenantId == TenantContext.TenantId ? Color.Default : Color.Info)"
-                                           Size="Size.Small"
-                                           Disabled="@(context.TenantId == TenantContext.TenantId)"
-                                           aria-label="Switch to tenant"
-                                           OnClick="() => SwitchToTenant(context)" />
-                        </MudTooltip>
-                        @if (context.Status == "disabled")
-                        {
-                            <MudIconButton Icon="@Icons.Material.Filled.PlayArrow"
-                                           Color="Color.Success"
-                                           Size="Size.Small"
-                                           aria-label="Enable tenant"
-                                           OnClick="() => ToggleTenantStatus(context, true)" />
-                        }
-                        else
-                        {
-                            <MudIconButton Icon="@Icons.Material.Filled.Pause"
-                                           Color="Color.Warning"
-                                           Size="Size.Small"
-                                           aria-label="Disable tenant"
-                                           OnClick="() => ToggleTenantStatus(context, false)" />
-                        }
+                        <MudStack Row="true" Justify="Justify.Center" Spacing="0">
+                            <MudTooltip Text="Switch to this tenant">
+                                <MudIconButton Icon="@Icons.Material.Filled.SwapHoriz"
+                                               Color="@(context.TenantId == TenantContext.TenantId ? Color.Default : Color.Info)"
+                                               Size="Size.Small"
+                                               Disabled="@(context.TenantId == TenantContext.TenantId)"
+                                               aria-label="Switch to tenant"
+                                               OnClick="@(() => SwitchToTenant(context))"
+                                               OnClickStopPropagation="true" />
+                            </MudTooltip>
+                            @if (context.Status == "disabled")
+                            {
+                                <MudTooltip Text="Re-enable this tenant">
+                                    <MudIconButton Icon="@Icons.Material.Filled.PlayArrow"
+                                                   Color="Color.Success"
+                                                   Size="Size.Small"
+                                                   Disabled="@(_togglingTenantId == context.TenantId)"
+                                                   aria-label="Enable tenant"
+                                                   OnClick="@(() => ToggleTenantStatus(context, true))"
+                                                   OnClickStopPropagation="true" />
+                                </MudTooltip>
+                            }
+                            else
+                            {
+                                <MudTooltip Text="Disable this tenant (blocks access)">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Pause"
+                                                   Color="Color.Warning"
+                                                   Size="Size.Small"
+                                                   Disabled="@(_togglingTenantId == context.TenantId)"
+                                                   aria-label="Disable tenant"
+                                                   OnClick="@(() => ToggleTenantStatus(context, false))"
+                                                   OnClickStopPropagation="true" />
+                                </MudTooltip>
+                            }
+                            <MudTooltip Text="View tenant details">
+                                <MudIconButton Icon="@Icons.Material.Filled.Info"
+                                               Color="Color.Default"
+                                               Size="Size.Small"
+                                               aria-label="View details"
+                                               OnClick="@(() => ShowTenantDetails(context))"
+                                               OnClickStopPropagation="true" />
+                            </MudTooltip>
+                        </MudStack>
                     </MudTd>
                 </RowTemplate>
                 <PagerContent>
@@ -166,10 +271,134 @@
     }
 </MudContainer>
 
+@* ── Tenant Detail Dialog ─────────────────────────────────────────── *@
+<MudDialog @bind-Visible="_showDetailDialog" Options="_detailDialogOptions">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Business" />
+            <MudText Typo="Typo.h6">@_selectedTenant?.OrganizationName</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        @if (_selectedTenant != null)
+        {
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudField Label="Tenant ID" Variant="Variant.Outlined">@_selectedTenant.TenantId</MudField>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudField Label="Admin Email" Variant="Variant.Outlined">@_selectedTenant.AdminEmail</MudField>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudField Label="Plan" Variant="Variant.Outlined">
+                        <MudChip T="string" Size="Size.Small" Color="@GetPlanColor(_selectedTenant.Plan)">@_selectedTenant.Plan</MudChip>
+                    </MudField>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudField Label="Status" Variant="Variant.Outlined">
+                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(_selectedTenant.Status)" Variant="Variant.Filled"
+                                 Icon="@GetStatusIcon(_selectedTenant.Status)">
+                            @_selectedTenant.Status
+                        </MudChip>
+                    </MudField>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudField Label="Team Members" Variant="Variant.Outlined">@_selectedTenant.TeamMemberCount</MudField>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudField Label="Transactions" Variant="Variant.Outlined">@_selectedTenant.TransactionCount.ToString("N0")</MudField>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudField Label="Risk Rules" Variant="Variant.Outlined">@_selectedTenant.RiskRuleCount</MudField>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudField Label="Created" Variant="Variant.Outlined">@_selectedTenant.CreatedAt.ToString("MMMM dd, yyyy h:mm tt")</MudField>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudField Label="Last Activity" Variant="Variant.Outlined">
+                        @(_selectedTenant.LastActivityAt?.ToString("MMMM dd, yyyy h:mm tt") ?? "No activity yet")
+                    </MudField>
+                </MudItem>
+                @if (_selectedTenant.TrialEndsAt != null)
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudField Label="Trial Ends" Variant="Variant.Outlined">
+                            @{
+                                var daysLeft = (_selectedTenant.TrialEndsAt.Value - DateTime.UtcNow).Days;
+                            }
+                            @_selectedTenant.TrialEndsAt.Value.ToString("MMM dd, yyyy")
+                            @if (daysLeft > 0)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Info" Class="ml-2">@daysLeft days left</MudChip>
+                            }
+                            else
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Error" Class="ml-2">Expired</MudChip>
+                            }
+                        </MudField>
+                    </MudItem>
+                }
+                @if (_selectedTenant.ApiKeyCount > 0)
+                {
+                    <MudItem xs="12" sm="6">
+                        <MudField Label="API Keys" Variant="Variant.Outlined">@_selectedTenant.ApiKeyCount</MudField>
+                    </MudItem>
+                }
+            </MudGrid>
+
+            <MudDivider Class="my-4" />
+
+            @* ── Quick Actions ─────────────────────────────────────── *@
+            <MudText Typo="Typo.subtitle2" Class="mb-2" Color="Color.Secondary">Quick Actions</MudText>
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Info"
+                           StartIcon="@Icons.Material.Filled.SwapHoriz"
+                           Disabled="@(_selectedTenant.TenantId == TenantContext.TenantId)"
+                           OnClick="@(() => SwitchToTenant(_selectedTenant))">
+                    Switch to Tenant
+                </MudButton>
+                @if (_selectedTenant.Status == "disabled")
+                {
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Success"
+                               StartIcon="@Icons.Material.Filled.PlayArrow"
+                               OnClick="@(() => ToggleTenantStatusFromDialog(true))">
+                        Enable Tenant
+                    </MudButton>
+                }
+                else
+                {
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Warning"
+                               StartIcon="@Icons.Material.Filled.Pause"
+                               OnClick="@(() => ToggleTenantStatusFromDialog(false))">
+                        Disable Tenant
+                    </MudButton>
+                }
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Error"
+                           StartIcon="@Icons.Material.Filled.DeleteForever"
+                           OnClick="@(() => ConfirmDeleteTenant(_selectedTenant))">
+                    Delete Tenant
+                </MudButton>
+            </MudStack>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showDetailDialog = false)">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
     private List<TenantSummary> _tenants = [];
     private bool _isLoading = true;
     private string _errorMessage = string.Empty;
+    private string? _togglingTenantId;
+    private string _searchString = string.Empty;
+    private bool _showDetailDialog;
+    private TenantSummary? _selectedTenant;
+    private readonly DialogOptions _detailDialogOptions = new() { MaxWidth = MaxWidth.Medium, FullWidth = true };
 
     protected override async Task OnInitializedAsync()
     {
@@ -196,14 +425,36 @@
         }
     }
 
+    private bool FilterFunc(TenantSummary tenant) =>
+        string.IsNullOrWhiteSpace(_searchString)
+        || tenant.OrganizationName.Contains(_searchString, StringComparison.OrdinalIgnoreCase)
+        || tenant.TenantId.Contains(_searchString, StringComparison.OrdinalIgnoreCase)
+        || tenant.AdminEmail.Contains(_searchString, StringComparison.OrdinalIgnoreCase)
+        || tenant.Plan.Contains(_searchString, StringComparison.OrdinalIgnoreCase)
+        || tenant.Status.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+
     private async Task ToggleTenantStatus(TenantSummary tenant, bool enable)
     {
+        // Confirmation dialog for disabling
+        if (!enable)
+        {
+            var confirm = await DialogService.ShowMessageBox(
+                "Disable Tenant?",
+                $"Are you sure you want to disable \"{tenant.OrganizationName}\"? " +
+                "Their users will be blocked from accessing the platform until re-enabled.",
+                yesText: "Disable", cancelText: "Cancel");
+            if (confirm != true) return;
+        }
+
+        _togglingTenantId = tenant.TenantId;
+        StateHasChanged();
+
         try
         {
             await OnboardingService.SetTenantStatusAsync(tenant.TenantId, enable);
             tenant.Status = enable ? "active" : "disabled";
             Snackbar.Add(
-                $"Tenant \"{tenant.OrganizationName}\" {(enable ? "enabled" : "disabled")}.",
+                $"Tenant \"{tenant.OrganizationName}\" has been {(enable ? "enabled ✓" : "disabled ✗")}.",
                 enable ? Severity.Success : Severity.Warning);
         }
         catch (Exception ex)
@@ -211,6 +462,63 @@
             Logger.LogError(ex, "Error toggling tenant {TenantId} status", tenant.TenantId);
             Snackbar.Add("Failed to update tenant status.", Severity.Error);
         }
+        finally
+        {
+            _togglingTenantId = null;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleTenantStatusFromDialog(bool enable)
+    {
+        if (_selectedTenant == null) return;
+        await ToggleTenantStatus(_selectedTenant, enable);
+        StateHasChanged(); // Update the dialog content
+    }
+
+    private async Task ConfirmDeleteTenant(TenantSummary tenant)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "⚠️ Delete Tenant Permanently?",
+            $"This will permanently delete \"{tenant.OrganizationName}\" and ALL of their data " +
+            "(transactions, rules, team members, settings). This action CANNOT be undone.",
+            yesText: "Delete Forever", cancelText: "Cancel");
+
+        if (confirm != true) return;
+
+        // Double confirmation with tenant name
+        var secondConfirm = await DialogService.ShowMessageBox(
+            "Final Confirmation",
+            $"Type the tenant ID to confirm: {tenant.TenantId}\n\n" +
+            "Are you absolutely sure?",
+            yesText: $"Yes, delete {tenant.TenantId}", cancelText: "Cancel");
+
+        if (secondConfirm != true) return;
+
+        try
+        {
+            await OnboardingService.DeleteTenantAsync(tenant.TenantId);
+            _tenants.Remove(tenant);
+            _showDetailDialog = false;
+            Snackbar.Add($"Tenant \"{tenant.OrganizationName}\" has been permanently deleted.", Severity.Success);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error deleting tenant {TenantId}", tenant.TenantId);
+            Snackbar.Add($"Failed to delete tenant: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void OnRowClicked(TableRowClickEventArgs<TenantSummary> args)
+    {
+        ShowTenantDetails(args.Item!);
+    }
+
+    private void ShowTenantDetails(TenantSummary tenant)
+    {
+        _selectedTenant = tenant;
+        _showDetailDialog = true;
     }
 
     private static Color GetPlanColor(string plan) => plan switch
@@ -228,6 +536,15 @@
         "disabled" => Color.Error,
         "past_due" => Color.Warning,
         _ => Color.Default
+    };
+
+    private static string GetStatusIcon(string status) => status switch
+    {
+        "active" => Icons.Material.Filled.CheckCircle,
+        "trialing" => Icons.Material.Filled.Timer,
+        "disabled" => Icons.Material.Filled.Block,
+        "past_due" => Icons.Material.Filled.Warning,
+        _ => Icons.Material.Filled.HelpOutline
     };
 
     private void SwitchToTenant(TenantSummary tenant)
