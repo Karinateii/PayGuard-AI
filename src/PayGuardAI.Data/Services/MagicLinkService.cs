@@ -1,7 +1,7 @@
-using System.Net;
-using System.Net.Mail;
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -15,15 +15,18 @@ public class MagicLinkService : IMagicLinkService
     private readonly ApplicationDbContext _db;
     private readonly IConfiguration _config;
     private readonly ILogger<MagicLinkService> _logger;
+    private readonly IHttpClientFactory _httpClientFactory;
 
     public MagicLinkService(
         ApplicationDbContext db,
         IConfiguration config,
-        ILogger<MagicLinkService> logger)
+        ILogger<MagicLinkService> logger,
+        IHttpClientFactory httpClientFactory)
     {
         _db = db;
         _config = config;
         _logger = logger;
+        _httpClientFactory = httpClientFactory;
     }
 
     public async Task<bool> SendMagicLinkAsync(string email, string requestIp, CancellationToken ct = default)
@@ -74,13 +77,15 @@ public class MagicLinkService : IMagicLinkService
         var appUrl = _config["AppUrl"]?.TrimEnd('/') ?? "http://localhost:5054";
         var magicLinkUrl = $"{appUrl}/api/Auth/magic-link/verify?token={Uri.EscapeDataString(token)}";
 
-        // Magic links always send directly via SMTP (auth-critical, not optional notifications).
-        // Only fall back to logging if SMTP is not configured at all.
-        var smtpHost = _config["Email:SmtpHost"] ?? "";
-        var smtpPass = _config["Email:SmtpPassword"] ?? "";
+        // Magic links send via Resend HTTP API (SMTP ports are blocked on Railway).
+        // Falls back to logging the URL if no API key is configured.
+        var resendApiKey = _config["Email:ResendApiKey"] ?? _config["Email:SmtpPassword"] ?? "";
 
-        if (!string.IsNullOrEmpty(smtpHost) && !string.IsNullOrEmpty(smtpPass))
+        if (!string.IsNullOrEmpty(resendApiKey) && resendApiKey.StartsWith("re_"))
         {
+            var fromAddr = _config["Email:FromAddress"] ?? "onboarding@resend.dev";
+            var fromName = _config["Email:FromName"] ?? "PayGuard AI";
+
             var html = $"""
                 <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
                     <h2 style="color: #1a3a5c; margin-bottom: 24px;">Sign in to PayGuard AI</h2>
@@ -98,8 +103,8 @@ public class MagicLinkService : IMagicLinkService
 
             try
             {
-                await SendSmtpEmailAsync(email, "Sign in to PayGuard AI", html, ct);
-                _logger.LogInformation("Magic link sent to {Email}", email);
+                await SendViaResendApiAsync(resendApiKey, $"{fromName} <{fromAddr}>", email, "Sign in to PayGuard AI", html, ct);
+                _logger.LogInformation("Magic link sent to {Email} via Resend API", email);
             }
             catch (Exception ex)
             {
@@ -108,8 +113,8 @@ public class MagicLinkService : IMagicLinkService
         }
         else
         {
-            // No SMTP configured: log the link so the developer can click it
-            _logger.LogWarning("📧 MAGIC LINK (SMTP not configured): {Url}", magicLinkUrl);
+            // No API key configured: log the link so the developer can click it
+            _logger.LogWarning("📧 MAGIC LINK (email not configured): {Url}", magicLinkUrl);
         }
 
         return true;
@@ -155,29 +160,35 @@ public class MagicLinkService : IMagicLinkService
     }
 
     /// <summary>
-    /// Send email directly via SMTP — bypasses notification feature flag
-    /// because magic links are auth-critical.
+    /// Send email via Resend HTTP API (https://resend.com/docs/api-reference).
+    /// Uses standard HTTPS (port 443) which works on Railway, unlike SMTP (port 587).
     /// </summary>
-    private async Task SendSmtpEmailAsync(string toEmail, string subject, string htmlBody, CancellationToken ct)
+    private async Task SendViaResendApiAsync(
+        string apiKey, string from, string to, string subject, string html, CancellationToken ct)
     {
-        var smtpHost = _config["Email:SmtpHost"] ?? "smtp.resend.com";
-        var smtpPort = int.TryParse(_config["Email:SmtpPort"], out var p) ? p : 587;
-        var smtpUser = _config["Email:SmtpUser"] ?? "resend";
-        var smtpPass = _config["Email:SmtpPassword"] ?? "";
-        var fromAddr = _config["Email:FromAddress"] ?? "noreply@payguard.ai";
-        var fromName = _config["Email:FromName"] ?? "PayGuard AI";
+        var client = _httpClientFactory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
-        using var message = new MailMessage();
-        message.From = new MailAddress(fromAddr, fromName);
-        message.To.Add(new MailAddress(toEmail));
-        message.Subject = subject;
-        message.Body = htmlBody;
-        message.IsBodyHtml = true;
+        var payload = new
+        {
+            from,
+            to = new[] { to },
+            subject,
+            html
+        };
 
-        using var client = new SmtpClient(smtpHost, smtpPort);
-        client.Credentials = new NetworkCredential(smtpUser, smtpPass);
-        client.EnableSsl = true;
+        var json = JsonSerializer.Serialize(payload);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        await client.SendMailAsync(message, ct);
+        var response = await client.PostAsync("https://api.resend.com/emails", content, ct);
+        var body = await response.Content.ReadAsStringAsync(ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError("Resend API error {Status}: {Body}", response.StatusCode, body);
+            throw new InvalidOperationException($"Resend API returned {response.StatusCode}: {body}");
+        }
+
+        _logger.LogDebug("Resend API response: {Body}", body);
     }
 }
