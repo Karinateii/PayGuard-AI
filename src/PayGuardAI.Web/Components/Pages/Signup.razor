@@ -1,0 +1,186 @@
+@page "/signup"
+@using Microsoft.AspNetCore.Authorization
+@using PayGuardAI.Core.Services
+@attribute [AllowAnonymous]
+@inject ITenantOnboardingService OnboardingService
+@inject NavigationManager Navigation
+@inject ILogger<Signup> Logger
+
+<PageTitle>Sign Up - PayGuard AI</PageTitle>
+
+<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #0d1b2a 0%, #1b2838 50%, #1a3a5c 100%);">
+    <MudContainer MaxWidth="MaxWidth.ExtraSmall">
+        <MudPaper Elevation="8" Class="pa-8 pa-sm-10 rounded-lg" Style="border-top: 4px solid var(--mud-palette-primary);">
+            <div class="text-center mb-6">
+                <MudAvatar Color="Color.Primary" Size="Size.Large" Class="mx-auto mb-4" Style="width: 72px; height: 72px;">
+                    <MudIcon Icon="@Icons.Material.Filled.Security" Size="Size.Large" />
+                </MudAvatar>
+                <MudText Typo="Typo.h4" Style="font-weight: 700;">Create Account</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-1">
+                    Start monitoring cross-border payment risk in minutes
+                </MudText>
+            </div>
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4" Variant="Variant.Outlined" Dense="true">
+                    @_errorMessage
+                </MudAlert>
+            }
+
+            @if (_isSuccess)
+            {
+                <MudAlert Severity="Severity.Success" Class="mb-4" Variant="Variant.Filled">
+                    <MudText Typo="Typo.body1" Style="font-weight: 600;">
+                        🎉 Organization <strong>@_orgName</strong> created!
+                    </MudText>
+                    <MudText Typo="Typo.body2" Class="mt-1">
+                        Tenant ID: <code>@_createdTenantId</code> · 30-day free trial active
+                    </MudText>
+                </MudAlert>
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           Size="Size.Large"
+                           StartIcon="@Icons.Material.Filled.RocketLaunch"
+                           Class="mt-2 py-3"
+                           OnClick="GoToOnboarding">
+                    Continue Setup →
+                </MudButton>
+            }
+            else
+            {
+                <MudTextField @bind-Value="_orgName"
+                              Label="Organization Name"
+                              Placeholder="e.g., Acme FinTech"
+                              Variant="Variant.Outlined"
+                              Required="true"
+                              RequiredError="Organization name is required"
+                              Class="mb-3"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Business" />
+
+                <MudTextField @bind-Value="_adminEmail"
+                              Label="Admin Email"
+                              Placeholder="you@company.com"
+                              Variant="Variant.Outlined"
+                              Required="true"
+                              RequiredError="Email is required"
+                              InputType="InputType.Email"
+                              Class="mb-3"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Email" />
+
+                <MudTextField @bind-Value="_adminName"
+                              Label="Your Name"
+                              Placeholder="Jane Smith"
+                              Variant="Variant.Outlined"
+                              Required="true"
+                              RequiredError="Name is required"
+                              Class="mb-4"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Person" />
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           Size="Size.Large"
+                           StartIcon="@Icons.Material.Filled.AppRegistration"
+                           Class="py-3"
+                           Style="font-size: 1rem; letter-spacing: 0.5px;"
+                           Disabled="@_isLoading"
+                           OnClick="HandleSignup">
+                    @if (_isLoading)
+                    {
+                        <MudProgressCircular Size="Size.Small" Color="Color.Surface" Indeterminate="true" Class="mr-2" />
+                        <span>Creating Account…</span>
+                    }
+                    else
+                    {
+                        <span>Create Organization</span>
+                    }
+                </MudButton>
+
+                <MudText Typo="Typo.caption" Align="Align.Center" Class="mt-3" Color="Color.Secondary">
+                    <MudIcon Icon="@Icons.Material.Filled.CardGiftcard" Size="Size.Small" Style="vertical-align: middle;" Class="mr-1" />
+                    30-day free trial · No credit card required
+                </MudText>
+            }
+
+            <MudDivider Class="my-5" />
+
+            <MudText Typo="Typo.body2" Align="Align.Center">
+                Already have an account?
+                <MudLink Href="/login" Typo="Typo.body2" Color="Color.Primary" Style="font-weight: 600;">
+                    Sign In
+                </MudLink>
+            </MudText>
+        </MudPaper>
+    </MudContainer>
+</div>
+
+@code {
+    private string _orgName = string.Empty;
+    private string _adminEmail = string.Empty;
+    private string _adminName = string.Empty;
+    private string _errorMessage = string.Empty;
+    private string _createdTenantId = string.Empty;
+    private bool _isLoading;
+    private bool _isSuccess;
+
+    private async Task HandleSignup()
+    {
+        _errorMessage = string.Empty;
+
+        // Validate inputs
+        if (string.IsNullOrWhiteSpace(_orgName))
+        {
+            _errorMessage = "Organization name is required.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_adminEmail) || !_adminEmail.Contains('@'))
+        {
+            _errorMessage = "A valid email address is required.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_adminName))
+        {
+            _errorMessage = "Your name is required.";
+            return;
+        }
+
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await OnboardingService.ProvisionTenantAsync(
+                _orgName.Trim(),
+                _adminEmail.Trim().ToLowerInvariant(),
+                _adminName.Trim());
+
+            _createdTenantId = result.TenantId;
+            _isSuccess = true;
+
+            Logger.LogInformation(
+                "Tenant {TenantId} created via signup page for {OrgName} ({Email})",
+                result.TenantId, _orgName, _adminEmail);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error provisioning tenant for {OrgName}", _orgName);
+            _errorMessage = "Something went wrong creating your organization. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void GoToOnboarding()
+    {
+        // Navigate to onboarding with the tenant ID so the user can configure their org
+        Navigation.NavigateTo($"/onboarding?tenantId={_createdTenantId}", forceLoad: true);
+    }
+}

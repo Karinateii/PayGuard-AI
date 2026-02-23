@@ -1,0 +1,368 @@
+@page "/onboarding"
+@using Microsoft.AspNetCore.Authorization
+@using PayGuardAI.Core.Services
+@using PayGuardAI.Core.Entities
+@attribute [AllowAnonymous]
+@inject ITenantOnboardingService OnboardingService
+@inject NavigationManager Navigation
+@inject ILogger<Onboarding> Logger
+
+<PageTitle>Setup - PayGuard AI</PageTitle>
+
+<div style="min-height: 100vh; background: linear-gradient(135deg, #0d1b2a 0%, #1b2838 50%, #1a3a5c 100%); padding: 40px 0;">
+    <MudContainer MaxWidth="MaxWidth.Small">
+
+        @* ── Progress Stepper ─────────────────────────────────────────── *@
+        <MudPaper Elevation="4" Class="pa-4 rounded-lg mb-4">
+            <MudStack Row="true" Justify="Justify.Center" Spacing="2" AlignItems="AlignItems.Center">
+                @foreach (var (label, index) in new[] { ("Welcome", 0), ("Configure", 1), ("Thresholds", 2), ("Complete", 3) })
+                {
+                    <MudChip T="string" 
+                             Color="@(_step >= index ? Color.Primary : Color.Default)"
+                             Variant="@(_step >= index ? Variant.Filled : Variant.Outlined)"
+                             Size="Size.Small">
+                        @($"{index + 1}. {label}")
+                    </MudChip>
+                    @if (index < 3)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" Color="Color.Secondary" />
+                    }
+                }
+            </MudStack>
+        </MudPaper>
+
+        @* ── Step Content ─────────────────────────────────────────────── *@
+        <MudPaper Elevation="8" Class="pa-8 rounded-lg" Style="border-top: 4px solid var(--mud-palette-primary);">
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4" Variant="Variant.Outlined" Dense="true">
+                    @_errorMessage
+                </MudAlert>
+            }
+
+            @if (_isLoading)
+            {
+                <div class="d-flex justify-center align-center pa-8">
+                    <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
+                </div>
+            }
+            else
+            {
+                @switch (_step)
+                {
+                    case 0: // Welcome
+                        <div class="text-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Celebration" Color="Color.Primary"
+                                     Style="font-size: 64px;" Class="mb-4" />
+                            <MudText Typo="Typo.h4" Style="font-weight: 700;" Class="mb-2">
+                                Welcome to PayGuard AI!
+                            </MudText>
+                            <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+                                Let's set up your organization in just a few steps.
+                            </MudText>
+
+                            <MudGrid Class="mt-6">
+                                <MudItem xs="12" sm="4">
+                                    <MudPaper Elevation="0" Class="pa-4 rounded-lg" Style="background: rgba(var(--mud-palette-primary-rgb), 0.08);">
+                                        <MudIcon Icon="@Icons.Material.Filled.Shield" Color="Color.Primary" />
+                                        <MudText Typo="Typo.subtitle2" Class="mt-2">Real-time Scoring</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">AI-powered risk analysis on every transaction</MudText>
+                                    </MudPaper>
+                                </MudItem>
+                                <MudItem xs="12" sm="4">
+                                    <MudPaper Elevation="0" Class="pa-4 rounded-lg" Style="background: rgba(var(--mud-palette-primary-rgb), 0.08);">
+                                        <MudIcon Icon="@Icons.Material.Filled.Rule" Color="Color.Primary" />
+                                        <MudText Typo="Typo.subtitle2" Class="mt-2">Custom Risk Rules</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Configurable thresholds for your business</MudText>
+                                    </MudPaper>
+                                </MudItem>
+                                <MudItem xs="12" sm="4">
+                                    <MudPaper Elevation="0" Class="pa-4 rounded-lg" Style="background: rgba(var(--mud-palette-primary-rgb), 0.08);">
+                                        <MudIcon Icon="@Icons.Material.Filled.Insights" Color="Color.Primary" />
+                                        <MudText Typo="Typo.subtitle2" Class="mt-2">Compliance Reports</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">SAR & CTR generation in one click</MudText>
+                                    </MudPaper>
+                                </MudItem>
+                            </MudGrid>
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       Size="Size.Large"
+                                       EndIcon="@Icons.Material.Filled.ArrowForward"
+                                       Class="mt-6 py-3"
+                                       OnClick="() => _step = 1">
+                                Let's Get Started
+                            </MudButton>
+                        </div>
+                        break;
+
+                    case 1: // Configure basics
+                        <MudText Typo="Typo.h5" Style="font-weight: 700;" Class="mb-1">
+                            <MudIcon Icon="@Icons.Material.Filled.Settings" Class="mr-2" Style="vertical-align: middle;" />
+                            Organization Settings
+                        </MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                            Configure your timezone and default currency for reporting.
+                        </MudText>
+
+                        <MudSelect @bind-Value="_timezone"
+                                   Label="Timezone"
+                                   Variant="Variant.Outlined"
+                                   Adornment="Adornment.Start"
+                                   AdornmentIcon="@Icons.Material.Filled.Schedule"
+                                   Class="mb-3">
+                            <MudSelectItem Value="@("UTC")">UTC</MudSelectItem>
+                            <MudSelectItem Value="@("Africa/Lagos")">Africa/Lagos (WAT)</MudSelectItem>
+                            <MudSelectItem Value="@("Africa/Nairobi")">Africa/Nairobi (EAT)</MudSelectItem>
+                            <MudSelectItem Value="@("Africa/Johannesburg")">Africa/Johannesburg (SAST)</MudSelectItem>
+                            <MudSelectItem Value="@("America/New_York")">America/New York (EST)</MudSelectItem>
+                            <MudSelectItem Value="@("America/Chicago")">America/Chicago (CST)</MudSelectItem>
+                            <MudSelectItem Value="@("America/Los_Angeles")">America/Los Angeles (PST)</MudSelectItem>
+                            <MudSelectItem Value="@("Europe/London")">Europe/London (GMT)</MudSelectItem>
+                            <MudSelectItem Value="@("Europe/Berlin")">Europe/Berlin (CET)</MudSelectItem>
+                            <MudSelectItem Value="@("Asia/Dubai")">Asia/Dubai (GST)</MudSelectItem>
+                            <MudSelectItem Value="@("Asia/Singapore")">Asia/Singapore (SGT)</MudSelectItem>
+                        </MudSelect>
+
+                        <MudSelect @bind-Value="_currency"
+                                   Label="Default Currency"
+                                   Variant="Variant.Outlined"
+                                   Adornment="Adornment.Start"
+                                   AdornmentIcon="@Icons.Material.Filled.AttachMoney"
+                                   Class="mb-4">
+                            <MudSelectItem Value="@("USD")">USD — US Dollar</MudSelectItem>
+                            <MudSelectItem Value="@("NGN")">NGN — Nigerian Naira</MudSelectItem>
+                            <MudSelectItem Value="@("KES")">KES — Kenyan Shilling</MudSelectItem>
+                            <MudSelectItem Value="@("GHS")">GHS — Ghanaian Cedi</MudSelectItem>
+                            <MudSelectItem Value="@("ZAR")">ZAR — South African Rand</MudSelectItem>
+                            <MudSelectItem Value="@("GBP")">GBP — British Pound</MudSelectItem>
+                            <MudSelectItem Value="@("EUR")">EUR — Euro</MudSelectItem>
+                        </MudSelect>
+
+                        <div class="d-flex justify-space-between mt-4">
+                            <MudButton Variant="Variant.Text"
+                                       StartIcon="@Icons.Material.Filled.ArrowBack"
+                                       OnClick="() => _step = 0">
+                                Back
+                            </MudButton>
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       EndIcon="@Icons.Material.Filled.ArrowForward"
+                                       OnClick="() => _step = 2">
+                                Next
+                            </MudButton>
+                        </div>
+                        break;
+
+                    case 2: // Risk thresholds
+                        <MudText Typo="Typo.h5" Style="font-weight: 700;" Class="mb-1">
+                            <MudIcon Icon="@Icons.Material.Filled.Tune" Class="mr-2" Style="vertical-align: middle;" />
+                            Risk Thresholds
+                        </MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                            Set the risk score boundaries for automatic transaction decisions.
+                        </MudText>
+
+                        <MudPaper Elevation="0" Class="pa-4 rounded-lg mb-4" Style="background: rgba(76, 175, 80, 0.08);">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Success">
+                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Class="mr-1" Style="vertical-align: middle;" />
+                                Auto-Approve Threshold
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
+                                Transactions scoring below this are automatically approved.
+                            </MudText>
+                            <MudSlider @bind-Value="_autoApproveThreshold" Min="5" Max="40" Step="5" Color="Color.Success">
+                                <MudText Typo="Typo.body1" Style="font-weight: 700;">@_autoApproveThreshold</MudText>
+                            </MudSlider>
+                        </MudPaper>
+
+                        <MudPaper Elevation="0" Class="pa-4 rounded-lg mb-4" Style="background: rgba(244, 67, 54, 0.08);">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Error">
+                                <MudIcon Icon="@Icons.Material.Filled.Block" Size="Size.Small" Class="mr-1" Style="vertical-align: middle;" />
+                                Auto-Reject Threshold
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
+                                Transactions scoring above this are automatically rejected.
+                            </MudText>
+                            <MudSlider @bind-Value="_autoRejectThreshold" Min="60" Max="95" Step="5" Color="Color.Error">
+                                <MudText Typo="Typo.body1" Style="font-weight: 700;">@_autoRejectThreshold</MudText>
+                            </MudSlider>
+                        </MudPaper>
+
+                        <MudPaper Elevation="0" Class="pa-4 rounded-lg" Style="background: rgba(255, 152, 0, 0.08);">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Warning">
+                                <MudIcon Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Class="mr-1" Style="vertical-align: middle;" />
+                                Manual Review Zone
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Transactions scoring between <strong>@_autoApproveThreshold</strong> and <strong>@_autoRejectThreshold</strong>
+                                will be routed to your review queue.
+                            </MudText>
+                        </MudPaper>
+
+                        <div class="d-flex justify-space-between mt-6">
+                            <MudButton Variant="Variant.Text"
+                                       StartIcon="@Icons.Material.Filled.ArrowBack"
+                                       OnClick="() => _step = 1">
+                                Back
+                            </MudButton>
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       EndIcon="@Icons.Material.Filled.Check"
+                                       Disabled="@_isSaving"
+                                       OnClick="SaveAndComplete">
+                                @if (_isSaving)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Color="Color.Surface" Indeterminate="true" Class="mr-2" />
+                                    <span>Saving…</span>
+                                }
+                                else
+                                {
+                                    <span>Complete Setup</span>
+                                }
+                            </MudButton>
+                        </div>
+                        break;
+
+                    case 3: // Complete!
+                        <div class="text-center">
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success"
+                                     Style="font-size: 80px;" Class="mb-4" />
+                            <MudText Typo="Typo.h4" Style="font-weight: 700;" Class="mb-2">
+                                You're All Set! 🎉
+                            </MudText>
+                            <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-6">
+                                Your organization is configured and ready to process transactions.
+                            </MudText>
+
+                            <MudGrid Class="mb-6">
+                                <MudItem xs="12" sm="6">
+                                    <MudPaper Elevation="2" Class="pa-4 rounded-lg">
+                                        <MudText Typo="Typo.overline" Color="Color.Secondary">TIMEZONE</MudText>
+                                        <MudText Typo="Typo.h6">@_timezone</MudText>
+                                    </MudPaper>
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudPaper Elevation="2" Class="pa-4 rounded-lg">
+                                        <MudText Typo="Typo.overline" Color="Color.Secondary">CURRENCY</MudText>
+                                        <MudText Typo="Typo.h6">@_currency</MudText>
+                                    </MudPaper>
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudPaper Elevation="2" Class="pa-4 rounded-lg">
+                                        <MudText Typo="Typo.overline" Color="Color.Secondary">AUTO-APPROVE ≤</MudText>
+                                        <MudText Typo="Typo.h6" Color="Color.Success">@_autoApproveThreshold</MudText>
+                                    </MudPaper>
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudPaper Elevation="2" Class="pa-4 rounded-lg">
+                                        <MudText Typo="Typo.overline" Color="Color.Secondary">AUTO-REJECT ≥</MudText>
+                                        <MudText Typo="Typo.h6" Color="Color.Error">@_autoRejectThreshold</MudText>
+                                    </MudPaper>
+                                </MudItem>
+                            </MudGrid>
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       Size="Size.Large"
+                                       StartIcon="@Icons.Material.Filled.Dashboard"
+                                       Class="py-3 px-8"
+                                       OnClick="GoToDashboard">
+                                Go to Dashboard
+                            </MudButton>
+
+                            <MudText Typo="Typo.caption" Align="Align.Center" Class="mt-4" Color="Color.Secondary">
+                                Tip: You can update these settings anytime from Organization Settings.
+                            </MudText>
+                        </div>
+                        break;
+                }
+            }
+        </MudPaper>
+    </MudContainer>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public string? TenantId { get; set; }
+
+    private int _step;
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private string _errorMessage = string.Empty;
+
+    // Config values
+    private string _timezone = "UTC";
+    private string _currency = "USD";
+    private int _autoApproveThreshold = 20;
+    private int _autoRejectThreshold = 80;
+
+    // Resolved tenant
+    private string _resolvedTenantId = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrWhiteSpace(TenantId))
+        {
+            _errorMessage = "No tenant ID provided. Please sign up first.";
+            _isLoading = false;
+            return;
+        }
+
+        _resolvedTenantId = TenantId;
+
+        try
+        {
+            var exists = await OnboardingService.TenantExistsAsync(_resolvedTenantId);
+            if (!exists)
+            {
+                _errorMessage = "Tenant not found. Please sign up first.";
+                _isLoading = false;
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error validating tenant {TenantId}", _resolvedTenantId);
+            _errorMessage = "An error occurred. Please try again.";
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task SaveAndComplete()
+    {
+        _isSaving = true;
+        _errorMessage = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            await OnboardingService.UpdateOnboardingSettingsAsync(
+                _resolvedTenantId,
+                _timezone,
+                _currency,
+                _autoApproveThreshold,
+                _autoRejectThreshold);
+
+            _step = 3;
+            Logger.LogInformation(
+                "Onboarding completed for tenant {TenantId}: tz={TZ}, currency={Currency}, approve≤{Approve}, reject≥{Reject}",
+                _resolvedTenantId, _timezone, _currency, _autoApproveThreshold, _autoRejectThreshold);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error saving onboarding settings for tenant {TenantId}", _resolvedTenantId);
+            _errorMessage = "Failed to save settings. Please try again.";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void GoToDashboard()
+    {
+        Navigation.NavigateTo("/login", forceLoad: true);
+    }
+}

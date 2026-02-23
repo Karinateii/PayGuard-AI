@@ -202,6 +202,9 @@ builder.Services.AddHttpClient<IBillingService, PaystackBillingService>();
 // Register admin dashboard service
 builder.Services.AddScoped<IAdminService, AdminService>();
 
+// Register tenant onboarding service
+builder.Services.AddScoped<ITenantOnboardingService, TenantOnboardingService>();
+
 // Register RBAC service for permission-based access control
 builder.Services.AddScoped<IRbacService, RbacService>();
 builder.Services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();

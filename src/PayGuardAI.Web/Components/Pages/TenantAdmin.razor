@@ -1,0 +1,222 @@
+@page "/super-admin/tenants"
+@using Microsoft.AspNetCore.Authorization
+@using PayGuardAI.Core.Services
+@attribute [Authorize(Roles = "Admin")]
+@inject ITenantOnboardingService OnboardingService
+@inject ISnackbar Snackbar
+@inject ILogger<TenantAdmin> Logger
+
+<PageTitle>Tenant Management - PayGuard AI</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-6">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+        <div>
+            <MudText Typo="Typo.h4" Style="font-weight: 700;">
+                <MudIcon Icon="@Icons.Material.Filled.Business" Class="mr-2" Style="vertical-align: middle;" />
+                Tenant Management
+            </MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Super-admin view of all organizations using PayGuard AI
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="LoadTenantsAsync"
+                   Disabled="@_isLoading">
+            Refresh
+        </MudButton>
+    </MudStack>
+
+    @if (_isLoading)
+    {
+        <MudPaper Elevation="2" Class="pa-8 rounded-lg">
+            <div class="d-flex justify-center">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
+            </div>
+        </MudPaper>
+    }
+    else if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Filled">@_errorMessage</MudAlert>
+    }
+    else
+    {
+        @* ── Summary Cards ─────────────────────────────────────────── *@
+        <MudGrid Class="mb-4">
+            <MudItem xs="12" sm="3">
+                <MudPaper Elevation="2" Class="pa-4 rounded-lg">
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">TOTAL TENANTS</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight: 700;">@_tenants.Count</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudPaper Elevation="2" Class="pa-4 rounded-lg">
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">ACTIVE</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight: 700;" Color="Color.Success">
+                        @_tenants.Count(t => t.Status is "active" or "trialing")
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudPaper Elevation="2" Class="pa-4 rounded-lg">
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">TOTAL USERS</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight: 700;">@_tenants.Sum(t => t.TeamMemberCount)</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudPaper Elevation="2" Class="pa-4 rounded-lg">
+                    <MudText Typo="Typo.overline" Color="Color.Secondary">TOTAL TRANSACTIONS</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight: 700;">@_tenants.Sum(t => t.TransactionCount)</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        @* ── Tenant Table ──────────────────────────────────────────── *@
+        <MudPaper Elevation="2" Class="rounded-lg">
+            <MudTable Items="@_tenants"
+                      Hover="true"
+                      Breakpoint="Breakpoint.Sm"
+                      Dense="true"
+                      RowsPerPage="10">
+                <HeaderContent>
+                    <MudTh>Organization</MudTh>
+                    <MudTh>Tenant ID</MudTh>
+                    <MudTh>Admin</MudTh>
+                    <MudTh>Plan</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh Style="text-align: center;">Team</MudTh>
+                    <MudTh Style="text-align: center;">Transactions</MudTh>
+                    <MudTh>Created</MudTh>
+                    <MudTh>Last Activity</MudTh>
+                    <MudTh Style="text-align: center;">Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Organization">
+                        <MudText Typo="Typo.body2" Style="font-weight: 600;">@context.OrganizationName</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Tenant ID">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Default">
+                            @context.TenantId
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Admin">
+                        <MudText Typo="Typo.caption">@context.AdminEmail</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Plan">
+                        <MudChip T="string" Size="Size.Small" Color="@GetPlanColor(context.Plan)">
+                            @context.Plan
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Size="Size.Small"
+                                 Color="@GetStatusColor(context.Status)"
+                                 Variant="Variant.Filled">
+                            @context.Status
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Team" Style="text-align: center;">
+                        @context.TeamMemberCount
+                    </MudTd>
+                    <MudTd DataLabel="Transactions" Style="text-align: center;">
+                        @context.TransactionCount.ToString("N0")
+                    </MudTd>
+                    <MudTd DataLabel="Created">
+                        <MudText Typo="Typo.caption">@context.CreatedAt.ToString("MMM dd, yyyy")</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Last Activity">
+                        <MudText Typo="Typo.caption">
+                            @(context.LastActivityAt?.ToString("MMM dd, yyyy") ?? "—")
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Actions" Style="text-align: center;">
+                        @if (context.Status == "disabled")
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.PlayArrow"
+                                           Color="Color.Success"
+                                           Size="Size.Small"
+                                           aria-label="Enable tenant"
+                                           OnClick="() => ToggleTenantStatus(context, true)" />
+                        }
+                        else
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Pause"
+                                           Color="Color.Warning"
+                                           Size="Size.Small"
+                                           aria-label="Disable tenant"
+                                           OnClick="() => ToggleTenantStatus(context, false)" />
+                        }
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager />
+                </PagerContent>
+            </MudTable>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private List<TenantSummary> _tenants = [];
+    private bool _isLoading = true;
+    private string _errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTenantsAsync();
+    }
+
+    private async Task LoadTenantsAsync()
+    {
+        _isLoading = true;
+        _errorMessage = string.Empty;
+
+        try
+        {
+            _tenants = await OnboardingService.GetAllTenantsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading tenants");
+            _errorMessage = "Failed to load tenants.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ToggleTenantStatus(TenantSummary tenant, bool enable)
+    {
+        try
+        {
+            await OnboardingService.SetTenantStatusAsync(tenant.TenantId, enable);
+            tenant.Status = enable ? "active" : "disabled";
+            Snackbar.Add(
+                $"Tenant \"{tenant.OrganizationName}\" {(enable ? "enabled" : "disabled")}.",
+                enable ? Severity.Success : Severity.Warning);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error toggling tenant {TenantId} status", tenant.TenantId);
+            Snackbar.Add("Failed to update tenant status.", Severity.Error);
+        }
+    }
+
+    private static Color GetPlanColor(string plan) => plan switch
+    {
+        "Trial" => Color.Info,
+        "Starter" => Color.Default,
+        "Pro" => Color.Primary,
+        "Enterprise" => Color.Secondary,
+        _ => Color.Default
+    };
+
+    private static Color GetStatusColor(string status) => status switch
+    {
+        "active" or "trialing" => Color.Success,
+        "disabled" => Color.Error,
+        "past_due" => Color.Warning,
+        _ => Color.Default
+    };
+}
