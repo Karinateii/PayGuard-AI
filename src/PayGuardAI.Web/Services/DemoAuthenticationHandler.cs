@@ -54,42 +54,74 @@ public class DemoAuthenticationHandler : AuthenticationHandler<AuthenticationSch
             ? sessionEmail
             : _configuration["Auth:DefaultUser"] ?? "compliance_officer@payguard.ai";
 
-        // Look up the user's org from TeamMembers by email
-        // Prioritize SuperAdmin roles first so the platform owner always
-        // lands in their home tenant, even if they also exist in customer orgs.
-        var teamMember = await _db.TeamMembers
-            .IgnoreQueryFilters()
-            .Where(t => t.Email == userName && t.Status == "active")
-            .OrderByDescending(t => t.Role == "SuperAdmin" ? 1 : 0)
-            .ThenBy(t => t.CreatedAt)
-            .FirstOrDefaultAsync();
-
         var claims = new List<Claim>
         {
             new(ClaimTypes.Name, userName),
             new(ClaimTypes.NameIdentifier, userName)
         };
 
-        if (teamMember != null)
+        var platformOwnerEmail = _configuration["Auth:DefaultUser"];
+        var defaultTenantId = _configuration["MultiTenancy:DefaultTenantId"] ?? "afriex-demo";
+
+        // ── Platform owner shortcut ──────────────────────────────────
+        // If this email matches Auth:DefaultUser, always SuperAdmin.
+        if (!string.IsNullOrEmpty(platformOwnerEmail) &&
+            string.Equals(userName, platformOwnerEmail, StringComparison.OrdinalIgnoreCase))
         {
-            // Route to the user's actual org with their assigned role
-            claims.Add(new Claim("tenant_id", teamMember.TenantId));
-            claims.Add(new Claim(ClaimTypes.Role, teamMember.Role));
-            Logger.LogInformation("[AUTH] Mapped {User} to tenant {Tenant} role {Role}",
-                userName, teamMember.TenantId, teamMember.Role);
+            claims.Add(new Claim("tenant_id", defaultTenantId));
+            claims.Add(new Claim(ClaimTypes.Role, "SuperAdmin"));
+            Logger.LogInformation("[AUTH] Platform owner {User} → SuperAdmin in {Tenant}",
+                userName, defaultTenantId);
+
+            // Auto-create SuperAdmin TeamMember if missing
+            var hasSuperAdmin = await _db.TeamMembers
+                .IgnoreQueryFilters()
+                .AnyAsync(t => t.Email == userName
+                            && t.TenantId == defaultTenantId
+                            && t.Role == "SuperAdmin");
+            if (!hasSuperAdmin)
+            {
+                _db.TeamMembers.Add(new PayGuardAI.Core.Entities.TeamMember
+                {
+                    TenantId = defaultTenantId,
+                    Email = userName,
+                    DisplayName = "Platform Owner",
+                    Role = "SuperAdmin",
+                    Status = "active"
+                });
+                await _db.SaveChangesAsync();
+                Logger.LogInformation("[AUTH] Auto-created SuperAdmin TeamMember for {User}", userName);
+            }
         }
         else
         {
-            // Fallback: user not in any org — use config defaults
-            var tenantId = _configuration["MultiTenancy:DefaultTenantId"] ?? "afriex-demo";
-            var roles = _configuration["Auth:DefaultRoles"] ?? "Reviewer,Manager,Admin,SuperAdmin";
-            claims.Add(new Claim("tenant_id", tenantId));
-            foreach (var role in roles.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            // ── Regular user: look up TeamMember by email ────────────
+            var teamMember = await _db.TeamMembers
+                .IgnoreQueryFilters()
+                .Where(t => t.Email == userName && t.Status == "active")
+                .OrderByDescending(t => t.Role == "SuperAdmin" ? 1 : 0)
+                .ThenBy(t => t.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            if (teamMember != null)
             {
-                claims.Add(new Claim(ClaimTypes.Role, role));
+                claims.Add(new Claim("tenant_id", teamMember.TenantId));
+                claims.Add(new Claim(ClaimTypes.Role, teamMember.Role));
+                Logger.LogInformation("[AUTH] Mapped {User} to tenant {Tenant} role {Role}",
+                    userName, teamMember.TenantId, teamMember.Role);
             }
-            Logger.LogInformation("[AUTH] No TeamMember for {User}, using default tenant {Tenant}",
-                userName, tenantId);
+            else
+            {
+                // Fallback: user not in any org — use config defaults
+                var roles = _configuration["Auth:DefaultRoles"] ?? "Reviewer,Manager,Admin,SuperAdmin";
+                claims.Add(new Claim("tenant_id", defaultTenantId));
+                foreach (var role in roles.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    claims.Add(new Claim(ClaimTypes.Role, role));
+                }
+                Logger.LogInformation("[AUTH] No TeamMember for {User}, using default tenant {Tenant}",
+                    userName, defaultTenantId);
+            }
         }
 
         var identity = new ClaimsIdentity(claims, Scheme.Name);
