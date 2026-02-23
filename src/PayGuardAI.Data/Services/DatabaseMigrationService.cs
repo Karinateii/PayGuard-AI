@@ -161,6 +161,9 @@ public class DatabaseMigrationService : IDatabaseMigrationService
             }
         }
 
+        // ── Fix RuleCode unique index: must be per-tenant (TenantId + RuleCode) ──
+        await FixRuleCodeUniqueIndexAsync(dbType);
+
         // ── Boolean columns need the correct native type (not TEXT) ──
         await AddBooleanColumnIfMissing(dbType, "OrganizationSettings", "OnboardingCompleted");
         await AddBooleanColumnIfMissing(dbType, "CustomRoles", "IsBuiltIn");
@@ -234,6 +237,55 @@ public class DatabaseMigrationService : IDatabaseMigrationService
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Skipping boolean column migration for {Table}.{Column}", table, column);
+        }
+    }
+
+    /// <summary>
+    /// Drops the old global IX_RiskRules_RuleCode unique index and replaces it with
+    /// a composite IX_RiskRules_TenantId_RuleCode index so each tenant can have rules
+    /// with the same RuleCode.
+    /// </summary>
+    private async Task FixRuleCodeUniqueIndexAsync(string dbType)
+    {
+        try
+        {
+            if (dbType == "PostgreSQL")
+            {
+                // Check if the old single-column unique index exists
+                var checkSql = "SELECT COUNT(*) FROM pg_indexes WHERE tablename = 'RiskRules' AND indexname = 'IX_RiskRules_RuleCode'";
+                await using var cmd = _context.Database.GetDbConnection().CreateCommand();
+                await _context.Database.OpenConnectionAsync();
+                cmd.CommandText = checkSql;
+                var exists = Convert.ToInt64(await cmd.ExecuteScalarAsync()) > 0;
+
+                if (exists)
+                {
+                    await _context.Database.ExecuteSqlRawAsync("DROP INDEX \"IX_RiskRules_RuleCode\"");
+                    await _context.Database.ExecuteSqlRawAsync(
+                        "CREATE UNIQUE INDEX \"IX_RiskRules_TenantId_RuleCode\" ON \"RiskRules\" (\"TenantId\", \"RuleCode\")");
+                    _logger.LogInformation("Fixed RiskRules index: replaced IX_RiskRules_RuleCode with IX_RiskRules_TenantId_RuleCode");
+                }
+            }
+            else
+            {
+                // SQLite: check if old index exists via sqlite_master
+                await using var cmd = _context.Database.GetDbConnection().CreateCommand();
+                await _context.Database.OpenConnectionAsync();
+                cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='IX_RiskRules_RuleCode'";
+                var exists = Convert.ToInt64(await cmd.ExecuteScalarAsync()) > 0;
+
+                if (exists)
+                {
+                    await _context.Database.ExecuteSqlRawAsync("DROP INDEX IF EXISTS IX_RiskRules_RuleCode");
+                    await _context.Database.ExecuteSqlRawAsync(
+                        "CREATE UNIQUE INDEX IX_RiskRules_TenantId_RuleCode ON RiskRules (TenantId, RuleCode)");
+                    _logger.LogInformation("Fixed RiskRules index: replaced IX_RiskRules_RuleCode with IX_RiskRules_TenantId_RuleCode");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipping RuleCode index fix (table may not exist yet)");
         }
     }
 

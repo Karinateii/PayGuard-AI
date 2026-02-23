@@ -120,9 +120,8 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<RiskRule>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.RuleCode).IsUnique();
+            entity.HasIndex(e => new { e.TenantId, e.RuleCode }).IsUnique();
             entity.HasIndex(e => e.IsEnabled);
-            entity.HasIndex(e => e.TenantId);
             entity.Property(e => e.Threshold).HasPrecision(18, 4);
         });
 
