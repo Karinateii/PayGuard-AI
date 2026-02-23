@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using PayGuardAI.Core.Entities;
 using PayGuardAI.Core.Services;
@@ -12,11 +13,19 @@ public class AdminService : IAdminService
 {
     private readonly ApplicationDbContext _db;
     private readonly ILogger<AdminService> _logger;
+    private readonly IMagicLinkService _magicLink;
+    private readonly IConfiguration _config;
 
-    public AdminService(ApplicationDbContext db, ILogger<AdminService> logger)
+    public AdminService(
+        ApplicationDbContext db,
+        ILogger<AdminService> logger,
+        IMagicLinkService magicLink,
+        IConfiguration config)
     {
         _db = db;
         _logger = logger;
+        _magicLink = magicLink;
+        _config = config;
     }
 
     // ── Organization Settings ─────────────────────────────────────────────────
@@ -60,11 +69,24 @@ public class AdminService : IAdminService
             Email = email,
             DisplayName = displayName,
             Role = role,
-            Status = "invited"
+            Status = "active" // Active immediately so they can log in via magic link
         };
         _db.TeamMembers.Add(member);
         await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Invited team member {Email} as {Role} for tenant {TenantId}", email, role, tenantId);
+
+        // Send a magic link email so the new member can sign in immediately
+        try
+        {
+            await _magicLink.SendMagicLinkAsync(email, "team-invite", ct);
+            _logger.LogInformation("Invite magic link sent to {Email}", email);
+        }
+        catch (Exception ex)
+        {
+            // Don't fail the invite if email sending fails
+            _logger.LogWarning(ex, "Failed to send invite email to {Email} — member was still added", email);
+        }
+
         return member;
     }
 

@@ -190,7 +190,7 @@
                                         </MudStack>
                                     </td>
                                     <td>@corridor.Count</td>
-                                    <td>@corridor.Volume.ToString("C0")</td>
+                                    <td>@corridor.Volume.ToString("N0")</td>
                                     <td>
                                         <MudChip T="string" Size="Size.Small" 
                                                  Color="@(corridor.AvgRisk > 50 ? Color.Error : corridor.AvgRisk > 25 ? Color.Warning : Color.Success)">

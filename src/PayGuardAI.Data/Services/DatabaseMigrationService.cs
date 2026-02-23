@@ -85,6 +85,7 @@ public class DatabaseMigrationService : IDatabaseMigrationService
             // ── OrganizationSettings extras ──
             ("OrganizationSettings",    "IpWhitelist", ""),
             ("OrganizationSettings",    "UpdatedBy", "system"),
+            ("OrganizationSettings",    "SlackWebhookUrl", ""),
 
             // ── TeamMember extras ──
             ("TeamMembers",             "DisplayName", ""),

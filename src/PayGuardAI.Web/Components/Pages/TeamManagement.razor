@@ -105,7 +105,8 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        _emailEnabled = Configuration.GetValue<bool>("FeatureFlags:EmailNotificationsEnabled");
+        var resendKey = Configuration["Email:ResendApiKey"] ?? Configuration["Email:SmtpPassword"] ?? "";
+        _emailEnabled = !string.IsNullOrEmpty(resendKey) && resendKey.StartsWith("re_");
         await LoadMembers();
     }
 
@@ -138,8 +139,8 @@ else
                 await AdminService.InviteTeamMemberAsync(TenantContext.TenantId, newMember.Email, newMember.DisplayName, newMember.Role);
                 Snackbar.Add(
                     _emailEnabled
-                        ? $"Invitation sent to {newMember.Email}!"
-                        : $"Team member {newMember.DisplayName} added (status: invited). Share login details manually — email is not configured.",
+                        ? $"Invitation sent to {newMember.Email}! They'll receive a sign-in link."
+                        : $"Team member {newMember.DisplayName} added. Email not configured — share the login URL with them directly.",
                     Severity.Success);
                 await LoadMembers();
             }

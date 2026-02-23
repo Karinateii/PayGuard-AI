@@ -21,6 +21,11 @@ public class OrganizationSettings
     /// </summary>
     public string? IpWhitelist { get; set; }
     /// <summary>
+    /// Slack incoming-webhook URL for this tenant's alerts.
+    /// If empty, falls back to the global Slack:WebhookUrl config.
+    /// </summary>
+    public string? SlackWebhookUrl { get; set; }
+    /// <summary>
     /// Set to true when the tenant completes the onboarding wizard.
     /// Used to redirect first-time users from the dashboard to onboarding.
     /// </summary>

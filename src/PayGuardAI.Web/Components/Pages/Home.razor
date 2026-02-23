@@ -111,7 +111,7 @@ else
                     </MudStack>
                     <MudStack AlignItems="AlignItems.Center">
                         <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Color="Color.Info" Size="Size.Large" />
-                        <MudText Typo="Typo.h5">@_stats.TotalVolumeToday.ToString("C0")</MudText>
+                        <MudText Typo="Typo.h5">@_stats.TotalVolumeToday.ToString("N0") USD</MudText>
                         <MudText Typo="Typo.caption">Volume</MudText>
                     </MudStack>
                 </MudStack>
@@ -159,7 +159,7 @@ else
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd>@context.ExternalId[..8]...</MudTd>
-                    <MudTd>@context.Amount.ToString("C2") @context.SourceCurrency</MudTd>
+                    <MudTd>@context.Amount.ToString("N2") @context.SourceCurrency</MudTd>
                     <MudTd>@context.SourceCountry → @context.DestinationCountry</MudTd>
                     <MudTd>
                         <MudChip T="string" Size="Size.Small" Color="@GetRiskColor(context.RiskAnalysis?.RiskLevel)">

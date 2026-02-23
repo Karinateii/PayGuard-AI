@@ -82,6 +82,34 @@ else if (_settings != null)
                     </MudAlert>
                 </MudStack>
             </MudPaper>
+
+            <MudPaper Class="pa-6 mt-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-2">
+                    <MudIcon Icon="@Icons.Custom.Brands.GitHub" Class="mr-1" />
+                    Slack Alerts
+                </MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                    Receive real-time alerts in your Slack channel when high-risk transactions are detected.
+                </MudText>
+                <MudTextField @bind-Value="_settings.SlackWebhookUrl"
+                              Label="Slack Webhook URL" Variant="Variant.Outlined"
+                              Placeholder="https://hooks.slack.com/services/T.../B.../..."
+                              HelperText="Create one at api.slack.com → Incoming Webhooks"
+                              InputType="InputType.Url" />
+                @if (!string.IsNullOrWhiteSpace(_settings.SlackWebhookUrl))
+                {
+                    <MudAlert Severity="Severity.Success" Dense="true" Class="mt-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Class="mr-1" />
+                        Slack alerts are configured for your organization.
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+                        No webhook URL set — alerts will use the platform default (if configured).
+                    </MudAlert>
+                }
+            </MudPaper>
         </MudItem>
 
         <MudItem xs="12">

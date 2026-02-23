@@ -143,7 +143,7 @@
                                 <MudText Typo="Typo.caption">Transaction ID</MudText>
                                 <MudText>@(review.Transaction.ExternalId.Length > 16 ? review.Transaction.ExternalId[..16] + "..." : review.Transaction.ExternalId)</MudText>
                                 <MudText Typo="Typo.caption" Class="mt-2">Amount</MudText>
-                                <MudText Typo="Typo.h6">@review.Transaction.Amount.ToString("C2") @review.Transaction.SourceCurrency</MudText>
+                                <MudText Typo="Typo.h6">@review.Transaction.Amount.ToString("N2") @review.Transaction.SourceCurrency</MudText>
                             </MudStack>
                         </MudItem>
                         <MudItem xs="12" md="2">

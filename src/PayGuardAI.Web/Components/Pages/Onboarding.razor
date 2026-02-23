@@ -9,12 +9,12 @@
 
 <PageTitle>Setup - PayGuard AI</PageTitle>
 
-<div style="min-height: 100vh; background: linear-gradient(135deg, #0d1b2a 0%, #1b2838 50%, #1a3a5c 100%); padding: 40px 0;">
-    <MudContainer MaxWidth="MaxWidth.Small">
+<div style="min-height: 100vh; background: linear-gradient(135deg, #0d1b2a 0%, #1b2838 50%, #1a3a5c 100%); padding: 20px 8px;">
+    <MudContainer MaxWidth="MaxWidth.Small" Style="padding: 0 4px;">
 
         @* ── Progress Stepper ─────────────────────────────────────────── *@
-        <MudPaper Elevation="4" Class="pa-4 rounded-lg mb-4">
-            <MudStack Row="true" Justify="Justify.Center" Spacing="2" AlignItems="AlignItems.Center">
+        <MudPaper Elevation="4" Class="pa-3 pa-sm-4 rounded-lg mb-4">
+            <MudStack Row="true" Justify="Justify.Center" Spacing="1" AlignItems="AlignItems.Center" Style="flex-wrap: wrap; gap: 6px;">
                 @foreach (var (label, index) in new[] { ("Welcome", 0), ("Configure", 1), ("Thresholds", 2), ("Complete", 3) })
                 {
                     <MudChip T="string" 
@@ -32,7 +32,7 @@
         </MudPaper>
 
         @* ── Step Content ─────────────────────────────────────────────── *@
-        <MudPaper Elevation="8" Class="pa-8 rounded-lg" Style="border-top: 4px solid var(--mud-palette-primary);">
+        <MudPaper Elevation="8" Class="pa-4 pa-sm-8 rounded-lg" Style="border-top: 4px solid var(--mud-palette-primary);">
 
             @if (!string.IsNullOrEmpty(_errorMessage))
             {
@@ -62,7 +62,7 @@
                                 Let's set up your organization in just a few steps.
                             </MudText>
 
-                            <MudGrid Class="mt-6">
+                            <MudGrid Class="mt-4 mt-sm-6">
                                 <MudItem xs="12" sm="4">
                                     <MudPaper Elevation="0" Class="pa-4 rounded-lg" Style="background: rgba(var(--mud-palette-primary-rgb), 0.08);">
                                         <MudIcon Icon="@Icons.Material.Filled.Shield" Color="Color.Primary" />

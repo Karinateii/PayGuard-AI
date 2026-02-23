@@ -1,7 +1,9 @@
 using System.Text;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using PayGuardAI.Core.Entities;
 using PayGuardAI.Core.Services;
 
 namespace PayGuardAI.Data.Services;
@@ -21,6 +23,7 @@ public class SlackAlertService : IAlertingService
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _config;
     private readonly ILogger<SlackAlertService> _logger;
+    private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
 
     // Colour bars for Slack attachments (matches PayGuard risk levels)
     private const string ColourCritical = "#D32F2F";  // red
@@ -31,11 +34,13 @@ public class SlackAlertService : IAlertingService
     public SlackAlertService(
         HttpClient httpClient,
         IConfiguration config,
-        ILogger<SlackAlertService> logger)
+        ILogger<SlackAlertService> logger,
+        IDbContextFactory<ApplicationDbContext> dbFactory)
     {
         _httpClient = httpClient;
         _config = config;
         _logger = logger;
+        _dbFactory = dbFactory;
     }
 
     /// <summary>
@@ -115,7 +120,7 @@ public class SlackAlertService : IAlertingService
         };
 
         var json = JsonSerializer.Serialize(payload);
-        await PostToSlackAsync(json, cancellationToken);
+        await PostToSlackAsync(json, cancellationToken, tenantId);
     }
 
     private async Task SendSlackMessageAsync(
@@ -143,12 +148,12 @@ public class SlackAlertService : IAlertingService
         await PostToSlackAsync(json, cancellationToken);
     }
 
-    private async Task PostToSlackAsync(string json, CancellationToken cancellationToken)
+    private async Task PostToSlackAsync(string json, CancellationToken cancellationToken, string? tenantId = null)
     {
-        var webhookUrl = _config["Slack:WebhookUrl"];
+        var webhookUrl = await ResolveWebhookUrlAsync(tenantId, cancellationToken);
         if (string.IsNullOrWhiteSpace(webhookUrl))
         {
-            _logger.LogWarning("Slack:WebhookUrl is not configured. Slack alert skipped.");
+            _logger.LogWarning("No Slack webhook URL configured (tenant: {TenantId}). Alert skipped.", tenantId ?? "global");
             return;
         }
 
@@ -176,4 +181,31 @@ public class SlackAlertService : IAlertingService
 
     private bool IsEnabled() =>
         bool.TryParse(_config["FeatureFlags:SlackAlertsEnabled"], out var result) && result;
+
+    /// <summary>
+    /// Resolves the Slack webhook URL for the given tenant.
+    /// Priority: tenant OrganizationSettings.SlackWebhookUrl → global Slack:WebhookUrl config.
+    /// </summary>
+    private async Task<string?> ResolveWebhookUrlAsync(string? tenantId, CancellationToken ct)
+    {
+        if (!string.IsNullOrWhiteSpace(tenantId))
+        {
+            try
+            {
+                await using var db = await _dbFactory.CreateDbContextAsync(ct);
+                var settings = await db.OrganizationSettings
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(s => s.TenantId == tenantId, ct);
+
+                if (!string.IsNullOrWhiteSpace(settings?.SlackWebhookUrl))
+                    return settings.SlackWebhookUrl;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not look up tenant Slack webhook for {TenantId}; falling back to global", tenantId);
+            }
+        }
+
+        return _config["Slack:WebhookUrl"];
+    }
 }

@@ -93,7 +93,7 @@
                     </MudItem>
                     <MudItem xs="6">
                         <MudText Typo="Typo.caption">Amount</MudText>
-                        <MudText Typo="Typo.h5">@_selectedTransaction.Amount.ToString("C2") @_selectedTransaction.SourceCurrency</MudText>
+                        <MudText Typo="Typo.h5">@_selectedTransaction.Amount.ToString("N2") @_selectedTransaction.SourceCurrency</MudText>
                     </MudItem>
                     <MudItem xs="6">
                         <MudText Typo="Typo.caption">Corridor</MudText>
@@ -269,12 +269,12 @@ else
             <MudItem xs="6" sm="4" md="2">
                 <MudNumericField @bind-Value="_filterMinAmount" Label="Min ($)" Variant="Variant.Outlined"
                                  FullWidth="true" Min="0" Step="100"
-                                 Placeholder="e.g. 100" Adornment="Adornment.Start" AdornmentText="$" />
+                                 Placeholder="e.g. 100" />
             </MudItem>
             <MudItem xs="6" sm="4" md="2">
                 <MudNumericField @bind-Value="_filterMaxAmount" Label="Max ($)" Variant="Variant.Outlined"
                                  FullWidth="true" Min="0" Step="100"
-                                 Placeholder="e.g. 5000" Adornment="Adornment.Start" AdornmentText="$" />
+                                 Placeholder="e.g. 5000" />
             </MudItem>
         </MudGrid>
         <!-- Action Buttons -->
@@ -316,7 +316,7 @@ else
                 <RowTemplate>
                     <MudTd>@(context.ExternalId.Length > 12 ? context.ExternalId[..12] + "..." : context.ExternalId)</MudTd>
                     <MudTd>@context.Type</MudTd>
-                    <MudTd>@context.Amount.ToString("C2") @context.SourceCurrency</MudTd>
+                    <MudTd>@context.Amount.ToString("N2") @context.SourceCurrency</MudTd>
                     <MudTd>@context.SourceCountry → @context.DestinationCountry</MudTd>
                     <MudTd>
                         <MudChip T="string" Size="Size.Small" Color="@GetRiskColor(context.RiskAnalysis?.RiskLevel)" Style="@GetRiskStyle(context.RiskAnalysis?.RiskLevel)">
@@ -375,7 +375,7 @@ else
                 <MudGrid Spacing="2">
                     <MudItem xs="6">
                         <MudText Typo="Typo.caption" Color="Color.Primary">Amount</MudText>
-                        <MudText Typo="Typo.h6">@_selectedTransaction.Amount.ToString("C2")</MudText>
+                        <MudText Typo="Typo.h6">@_selectedTransaction.Amount.ToString("N2")</MudText>
                         <MudText Typo="Typo.caption">@_selectedTransaction.SourceCurrency → @_selectedTransaction.DestinationCurrency</MudText>
                     </MudItem>
                     <MudItem xs="6">
