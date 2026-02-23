@@ -376,10 +376,13 @@ public class TenantIsolationTests : IDisposable
     // ── Middleware Claim Resolution ────────────────────────────────────────
 
     [Fact]
-    public void TenantContext_DefaultValue_ShouldBeFallback()
+    public void TenantContext_DefaultValue_ShouldBeEmpty()
     {
+        // Default is empty string so that query filters return NO data
+        // until TenantCircuitHandler or TenantResolutionMiddleware sets the real tenant.
+        // This prevents cross-tenant data leaks on fresh DI scopes.
         var tenantContext = new TenantContext();
-        tenantContext.TenantId.Should().Be("afriex-demo");
+        tenantContext.TenantId.Should().Be(string.Empty);
     }
 
     [Fact]
