@@ -150,12 +150,17 @@ if (usePostgres)
     
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
         options.UseNpgsql(pgConnString));
+    builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
+        options.UseNpgsql(pgConnString), ServiceLifetime.Scoped);
 }
 else
 {
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
         options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection") 
             ?? "Data Source=payguardai.db"));
+    builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
+        options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection") 
+            ?? "Data Source=payguardai.db"), ServiceLifetime.Scoped);
 }
 
 // Register application services

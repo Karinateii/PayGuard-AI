@@ -5,7 +5,7 @@
 @inject ISnackbar Snackbar
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
 @inject ITenantContext TenantContext
-@inject PayGuardAI.Data.ApplicationDbContext Db
+@inject IDbContextFactory<PayGuardAI.Data.ApplicationDbContext> DbFactory
 @inject AuthenticationStateProvider AuthStateProvider
 @implements IAsyncDisposable
 @using Microsoft.AspNetCore.SignalR.Client
@@ -148,7 +148,9 @@
     {
         try
         {
-            var settings = await Db.OrganizationSettings.FirstOrDefaultAsync();
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenantId(TenantContext.TenantId);
+            var settings = await db.OrganizationSettings.FirstOrDefaultAsync();
             _organizationName = settings?.OrganizationName;
         }
         catch

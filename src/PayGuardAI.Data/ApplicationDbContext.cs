@@ -15,8 +15,19 @@ public class ApplicationDbContext : DbContext
     /// <summary>
     /// Current tenant ID — evaluated at query time, not construction time.
     /// EF Core query filters reference this property so they always use the latest value.
+    /// If _overrideTenantId is set (e.g. from factory-created contexts), it takes priority.
     /// </summary>
-    private string TenantId => _tenantContext?.TenantId ?? "";
+    private string? _overrideTenantId;
+    private string TenantId => _overrideTenantId ?? _tenantContext?.TenantId ?? "";
+
+    /// <summary>
+    /// Explicitly set the tenant for this DbContext instance.
+    /// Used by IDbContextFactory-created contexts that don't have a scoped ITenantContext.
+    /// </summary>
+    public void SetTenantId(string tenantId)
+    {
+        _overrideTenantId = tenantId;
+    }
 
     public ApplicationDbContext(
         DbContextOptions<ApplicationDbContext> options,
