@@ -170,7 +170,11 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error provisioning tenant for {OrgName}", _orgName);
-            _errorMessage = $"Something went wrong: {ex.Message}";
+            // Unwrap inner exceptions to show the real database error
+            var innerMsg = ex.InnerException?.InnerException?.Message 
+                        ?? ex.InnerException?.Message 
+                        ?? ex.Message;
+            _errorMessage = $"Something went wrong: {innerMsg}";
         }
         finally
         {

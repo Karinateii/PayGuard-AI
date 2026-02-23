@@ -61,6 +61,7 @@ public class DatabaseMigrationService : IDatabaseMigrationService
         // Map of table name → list of (column, type, default)
         var columnMigrations = new (string Table, string Column, string DefaultValue)[]
         {
+            // ── TenantId columns (multi-tenancy) ──
             ("Transactions",            "TenantId", "afriex-demo"),
             ("RiskAnalyses",            "TenantId", "afriex-demo"),
             ("RiskFactors",             "TenantId", "afriex-demo"),
@@ -74,6 +75,25 @@ public class DatabaseMigrationService : IDatabaseMigrationService
             ("WebhookEndpoints",        "TenantId", "afriex-demo"),
             ("NotificationPreferences", "TenantId", "afriex-demo"),
             ("CustomRoles",             "TenantId", "afriex-demo"),
+
+            // ── OrganizationSettings extras ──
+            ("OrganizationSettings",    "IpWhitelist", ""),
+            ("OrganizationSettings",    "UpdatedBy", "system"),
+
+            // ── TeamMember extras ──
+            ("TeamMembers",             "DisplayName", ""),
+            ("TeamMembers",             "Status", "active"),
+
+            // ── TenantSubscription extras ──
+            ("TenantSubscriptions",     "PaystackPlanCode", ""),
+            ("TenantSubscriptions",     "PaystackSubscriptionCode", ""),
+            ("TenantSubscriptions",     "BillingEmail", ""),
+
+            // ── NotificationPreference extras ──
+            ("NotificationPreferences", "DisplayName", ""),
+
+            // ── CustomRole extras ──
+            // (IsBuiltIn is boolean — handled separately below)
         };
 
         foreach (var (table, column, defaultValue) in columnMigrations)
@@ -143,6 +163,7 @@ public class DatabaseMigrationService : IDatabaseMigrationService
 
         // ── Boolean columns need the correct native type (not TEXT) ──
         await AddBooleanColumnIfMissing(dbType, "OrganizationSettings", "OnboardingCompleted");
+        await AddBooleanColumnIfMissing(dbType, "CustomRoles", "IsBuiltIn");
     }
 
     /// <summary>
