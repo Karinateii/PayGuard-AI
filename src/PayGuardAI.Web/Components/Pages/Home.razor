@@ -12,6 +12,14 @@
 
 <PageTitle>Dashboard - PayGuard AI</PageTitle>
 
+@if (TenantContext.IsDisabled)
+{
+    <MudAlert Severity="Severity.Warning" Variant="Variant.Filled" Class="mb-4" Icon="@Icons.Material.Filled.PauseCircleFilled">
+        <strong>Service Suspended</strong> — Your organization's PayGuard transaction processing is currently disabled.
+        New transactions will not be analyzed. Please contact your platform administrator to re-enable service.
+    </MudAlert>
+}
+
 <MudText Typo="Typo.h4" Class="mb-4">
     <MudIcon Icon="@Icons.Material.Filled.Dashboard" Class="mr-2" />
     Risk Monitoring Dashboard

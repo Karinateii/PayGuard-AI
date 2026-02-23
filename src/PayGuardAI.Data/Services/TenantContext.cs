@@ -8,4 +8,5 @@ namespace PayGuardAI.Data.Services;
 public class TenantContext : ITenantContext
 {
     public string TenantId { get; set; } = string.Empty;
+    public bool IsDisabled { get; set; }
 }

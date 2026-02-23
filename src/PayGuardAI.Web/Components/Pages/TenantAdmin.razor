@@ -146,8 +146,6 @@
                       Dense="true"
                       RowsPerPage="10"
                       Filter="new Func<TenantSummary, bool>(FilterFunc)"
-                      RowStyle="cursor: pointer;"
-                      OnRowClick="@OnRowClicked"
                       T="TenantSummary">
                 <ToolBarContent>
                     <MudText Typo="Typo.h6">All Tenants</MudText>
@@ -226,8 +224,7 @@
                                                Size="Size.Small"
                                                Disabled="@(context.TenantId == TenantContext.TenantId)"
                                                aria-label="Switch to tenant"
-                                               OnClick="@(() => SwitchToTenant(context))"
-                                               OnClickStopPropagation="true" />
+                                               OnClick="@(() => SwitchToTenant(context))" />
                             </MudTooltip>
                             @if (context.Status == "disabled")
                             {
@@ -237,8 +234,7 @@
                                                    Size="Size.Small"
                                                    Disabled="@(_togglingTenantId == context.TenantId)"
                                                    aria-label="Enable tenant"
-                                                   OnClick="@(() => ToggleTenantStatus(context, true))"
-                                                   OnClickStopPropagation="true" />
+                                                   OnClick="@(() => ToggleTenantStatus(context, true))" />
                                 </MudTooltip>
                             }
                             else
@@ -249,8 +245,7 @@
                                                    Size="Size.Small"
                                                    Disabled="@(_togglingTenantId == context.TenantId)"
                                                    aria-label="Disable tenant"
-                                                   OnClick="@(() => ToggleTenantStatus(context, false))"
-                                                   OnClickStopPropagation="true" />
+                                                   OnClick="@(() => ToggleTenantStatus(context, false))" />
                                 </MudTooltip>
                             }
                             <MudTooltip Text="View tenant details">
@@ -258,8 +253,7 @@
                                                Color="Color.Default"
                                                Size="Size.Small"
                                                aria-label="View details"
-                                               OnClick="@(() => ShowTenantDetails(context))"
-                                               OnClickStopPropagation="true" />
+                                               OnClick="@(() => ShowTenantDetails(context))" />
                             </MudTooltip>
                         </MudStack>
                     </MudTd>
@@ -442,7 +436,7 @@
             var confirm = await DialogService.ShowMessageBox(
                 "Disable Tenant?",
                 $"Are you sure you want to disable \"{tenant.OrganizationName}\"? " +
-                "Their users will be blocked from accessing the platform until re-enabled.",
+                "Their users can still log in, but transaction processing through PayGuard will be suspended until re-enabled.",
                 yesText: "Disable", cancelText: "Cancel");
             if (confirm != true) return;
         }
@@ -509,11 +503,6 @@
             Logger.LogError(ex, "Error deleting tenant {TenantId}", tenant.TenantId);
             Snackbar.Add($"Failed to delete tenant: {ex.Message}", Severity.Error);
         }
-    }
-
-    private void OnRowClicked(TableRowClickEventArgs<TenantSummary> args)
-    {
-        ShowTenantDetails(args.Item!);
     }
 
     private void ShowTenantDetails(TenantSummary tenant)

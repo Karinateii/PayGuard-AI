@@ -7,9 +7,10 @@ namespace PayGuardAI.Web.Services;
 /// <summary>
 /// Resolves tenant context from authenticated user claims, API key header, or config default.
 /// Must run AFTER authentication middleware so user claims are available.
-/// Also enforces disabled tenant blocking — disabled tenants get a 403 (except SuperAdmins).
+/// Sets IsDisabled flag so downstream services can skip transaction processing.
 /// 
 /// Resolution order:
+/// 0. Session impersonation (SuperAdmin)
 /// 1. Authenticated user's "tenant_id" claim (set by OAuth/Demo auth handlers)
 /// 2. X-Tenant-Id header (for API key access — validated by ApiKeyAuthMiddleware)
 /// 3. Config default (MultiTenancy:DefaultTenantId)
@@ -56,38 +57,17 @@ public class TenantResolutionMiddleware
 
         context.Items["TenantId"] = tenantContext.TenantId;
 
-        // ── Enforce disabled tenant blocking ──────────────────────────
-        // Skip for: unauthenticated requests, auth endpoints, static files, SuperAdmins
-        var isSuperAdmin = context.User?.IsInRole("SuperAdmin") == true;
-        var path = context.Request.Path.Value ?? "";
-        var skipEnforcement = !context.User?.Identity?.IsAuthenticated == true
-                              || isSuperAdmin
-                              || path.StartsWith("/api/Auth", StringComparison.OrdinalIgnoreCase)
-                              || path.StartsWith("/_", StringComparison.OrdinalIgnoreCase)
-                              || path.StartsWith("/css", StringComparison.OrdinalIgnoreCase)
-                              || path.StartsWith("/js", StringComparison.OrdinalIgnoreCase)
-                              || path.StartsWith("/_framework", StringComparison.OrdinalIgnoreCase)
-                              || path.StartsWith("/_blazor", StringComparison.OrdinalIgnoreCase);
-
-        if (!skipEnforcement && !string.IsNullOrWhiteSpace(tenantContext.TenantId))
+        // ── Check if tenant is disabled (set flag, don't block login) ─────
+        if (!string.IsNullOrWhiteSpace(tenantContext.TenantId))
         {
             await using var db = await dbFactory.CreateDbContextAsync();
-            var sub = await db.TenantSubscriptions
+            var status = await db.TenantSubscriptions
                 .IgnoreQueryFilters()
                 .Where(s => s.TenantId == tenantContext.TenantId)
                 .Select(s => s.Status)
                 .FirstOrDefaultAsync();
 
-            if (sub == "disabled")
-            {
-                context.Response.StatusCode = 403;
-                context.Response.ContentType = "text/html";
-                await context.Response.WriteAsync(
-                    "<h2>Account Disabled</h2>" +
-                    "<p>Your organization's account has been disabled by the platform administrator. " +
-                    "Please contact support for assistance.</p>");
-                return;
-            }
+            tenantContext.IsDisabled = status == "disabled";
         }
 
         await _next(context);

@@ -44,6 +44,15 @@ public class TransactionService : ITransactionService
 
     public async Task<Transaction> ProcessWebhookAsync(string payload, CancellationToken cancellationToken = default)
     {
+        // Reject transactions for disabled tenants
+        if (_tenantContext.IsDisabled)
+        {
+            _logger.LogWarning("Transaction rejected: tenant {TenantId} is disabled", _tenantContext.TenantId);
+            throw new InvalidOperationException(
+                "Your organization's PayGuard service is currently suspended. " +
+                "Transactions are not being processed. Please contact your platform administrator.");
+        }
+
         _logger.LogInformation("Processing incoming webhook");
 
         // Parse the webhook payload
