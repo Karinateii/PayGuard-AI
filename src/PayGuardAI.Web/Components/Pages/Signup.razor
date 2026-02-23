@@ -170,7 +170,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error provisioning tenant for {OrgName}", _orgName);
-            _errorMessage = "Something went wrong creating your organization. Please try again.";
+            _errorMessage = $"Something went wrong: {ex.Message}";
         }
         finally
         {

@@ -85,6 +85,7 @@ public partial class TenantOnboardingService : ITenantOnboardingService
         {
             TenantId = tenantId,
             Email = adminEmail,
+            DisplayName = adminDisplayName,
             RiskAlertsEnabled = true,
             DailySummaryEnabled = true,
             ReviewAssignmentsEnabled = true,
