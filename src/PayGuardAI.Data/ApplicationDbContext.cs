@@ -77,10 +77,9 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<Transaction>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.ExternalId).IsUnique();
+            entity.HasIndex(e => new { e.TenantId, e.ExternalId }).IsUnique();
             entity.HasIndex(e => e.SenderId);
             entity.HasIndex(e => e.CreatedAt);
-            entity.HasIndex(e => e.TenantId);
             entity.Property(e => e.Amount).HasPrecision(18, 4);
         });
 
@@ -116,8 +115,7 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<CustomerProfile>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.ExternalId).IsUnique();
-            entity.HasIndex(e => e.TenantId);
+            entity.HasIndex(e => new { e.TenantId, e.ExternalId }).IsUnique();
             entity.Property(e => e.TotalVolume).HasPrecision(18, 4);
             entity.Property(e => e.AverageTransactionAmount).HasPrecision(18, 4);
             entity.Property(e => e.MaxTransactionAmount).HasPrecision(18, 4);

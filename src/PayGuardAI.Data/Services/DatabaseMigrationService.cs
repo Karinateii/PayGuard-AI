@@ -167,8 +167,9 @@ public class DatabaseMigrationService : IDatabaseMigrationService
             }
         }
 
-        // ── Fix RuleCode unique index: must be per-tenant (TenantId + RuleCode) ──
+        // ── Fix unique indexes: must be per-tenant composites ──
         await FixRuleCodeUniqueIndexAsync(dbType);
+        await FixExternalIdUniqueIndexesAsync(dbType);
 
         // ── Boolean columns need the correct native type (not TEXT) ──
         await AddBooleanColumnIfMissing(dbType, "OrganizationSettings", "OnboardingCompleted");
@@ -307,6 +308,64 @@ public class DatabaseMigrationService : IDatabaseMigrationService
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Skipping MagicLinkTokens table creation");
+        }
+    }
+
+    /// <summary>
+    /// <summary>
+    /// Replaces globally-unique ExternalId indexes on Transactions and CustomerProfiles
+    /// with per-tenant composite indexes (TenantId + ExternalId). Without this, a new
+    /// tenant can't create a transaction or customer profile if the ExternalId already
+    /// exists in another tenant's data.
+    /// </summary>
+    private async Task FixExternalIdUniqueIndexesAsync(string dbType)
+    {
+        var fixes = new[]
+        {
+            ("Transactions", "IX_Transactions_ExternalId", "IX_Transactions_TenantId_ExternalId"),
+            ("CustomerProfiles", "IX_CustomerProfiles_ExternalId", "IX_CustomerProfiles_TenantId_ExternalId"),
+        };
+
+        foreach (var (table, oldIndex, newIndex) in fixes)
+        {
+            try
+            {
+                if (dbType == "PostgreSQL")
+                {
+                    var checkSql = $"SELECT COUNT(*) FROM pg_indexes WHERE tablename = '{table}' AND indexname = '{oldIndex}'";
+                    await using var cmd = _context.Database.GetDbConnection().CreateCommand();
+                    await _context.Database.OpenConnectionAsync();
+                    cmd.CommandText = checkSql;
+                    var exists = Convert.ToInt64(await cmd.ExecuteScalarAsync()) > 0;
+
+                    if (exists)
+                    {
+                        await _context.Database.ExecuteSqlRawAsync($"DROP INDEX \"{oldIndex}\"");
+                        await _context.Database.ExecuteSqlRawAsync(
+                            $"CREATE UNIQUE INDEX \"{newIndex}\" ON \"{table}\" (\"TenantId\", \"ExternalId\")");
+                        _logger.LogInformation("Fixed {Table} index: replaced {Old} with {New}", table, oldIndex, newIndex);
+                    }
+                }
+                else
+                {
+                    await using var cmd = _context.Database.GetDbConnection().CreateCommand();
+                    await _context.Database.OpenConnectionAsync();
+                    cmd.CommandText = $"SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='{oldIndex}'";
+                    var exists = Convert.ToInt64(await cmd.ExecuteScalarAsync()) > 0;
+
+                    if (exists)
+                    {
+                        await _context.Database.ExecuteSqlRawAsync($"DROP INDEX IF EXISTS {oldIndex}");
+                        await _context.Database.ExecuteSqlRawAsync(
+                            $"CREATE UNIQUE INDEX {newIndex} ON {table} (TenantId, ExternalId)");
+                        _logger.LogInformation("Fixed {Table} index: replaced {Old} with {New}", table, oldIndex, newIndex);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Skipping ExternalId index fix for {Table} (table may not exist yet)", table);
+            }
         }
     }
 
