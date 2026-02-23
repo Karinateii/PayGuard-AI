@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using PayGuardAI.Core.Entities;
 using PayGuardAI.Core.Services;
 
@@ -29,21 +30,17 @@ public class ApplicationDbContext : DbContext
         _overrideTenantId = tenantId;
     }
 
+    /// <summary>
+    /// Primary constructor — used by DI and IDbContextFactory.
+    /// ITenantContext is optional so the factory can create instances without it.
+    /// </summary>
+    [ActivatorUtilitiesConstructor]
     public ApplicationDbContext(
         DbContextOptions<ApplicationDbContext> options,
-        ITenantContext tenantContext)
+        ITenantContext? tenantContext = null)
         : base(options)
     {
         _tenantContext = tenantContext;
-    }
-
-    /// <summary>
-    /// Constructor for migrations and test scenarios where no tenant context is available.
-    /// </summary>
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
-        : base(options)
-    {
-        _tenantContext = null; // TenantId will return ""
     }
 
     public DbSet<Transaction> Transactions => Set<Transaction>();
