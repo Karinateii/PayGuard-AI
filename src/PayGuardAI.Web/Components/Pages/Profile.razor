@@ -28,7 +28,8 @@
     else if (_member == null)
     {
         <MudAlert Severity="Severity.Warning" Variant="Variant.Filled">
-            Could not load your profile. Please try signing out and back in.
+            Could not load your profile for "@_lookupEmail" in tenant "@TenantContext.TenantId".
+            <MudButton Variant="Variant.Text" Color="Color.Inherit" OnClick="LoadProfile" Class="ml-2">Retry</MudButton>
         </MudAlert>
     }
     else
@@ -146,6 +147,7 @@
     private PayGuardAI.Core.Entities.TeamMember? _member;
     private string _editName = string.Empty;
     private string _organizationName = string.Empty;
+    private string _lookupEmail = string.Empty;
     private bool _isLoading = true;
     private bool _isSaving;
 
@@ -160,19 +162,46 @@
         try
         {
             var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-            var email = authState.User?.Identity?.Name;
+            var user = authState.User;
+
+            // Try multiple claim types to find the email
+            var email = user?.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
+                     ?? user?.FindFirst("email")?.Value
+                     ?? user?.Identity?.Name;
+
+            Logger.LogInformation("Profile loading for email: {Email}, TenantId: {TenantId}", email, TenantContext.TenantId);
 
             if (string.IsNullOrEmpty(email)) return;
+
+            _lookupEmail = email;
 
             await using var db = await DbFactory.CreateDbContextAsync();
             db.SetTenantId(TenantContext.TenantId);
 
+            // Try exact match first, then case-insensitive
             _member = await db.TeamMembers
-                .FirstOrDefaultAsync(m => m.Email == email);
+                .FirstOrDefaultAsync(m => m.Email == email)
+                ?? await db.TeamMembers
+                    .FirstOrDefaultAsync(m => m.Email.ToLower() == email.ToLower());
+
+            // If still not found and we're impersonating, try across tenants
+            if (_member == null)
+            {
+                Logger.LogWarning("TeamMember not found for {Email} in tenant {TenantId}, trying IgnoreQueryFilters",
+                    email, TenantContext.TenantId);
+                _member = await db.TeamMembers
+                    .IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(m => m.Email.ToLower() == email.ToLower()
+                                           && m.TenantId == TenantContext.TenantId);
+            }
 
             if (_member != null)
             {
                 _editName = _member.DisplayName;
+            }
+            else
+            {
+                Logger.LogWarning("No TeamMember found for {Email} in any lookup path", email);
             }
 
             var settings = await db.OrganizationSettings.FirstOrDefaultAsync();
