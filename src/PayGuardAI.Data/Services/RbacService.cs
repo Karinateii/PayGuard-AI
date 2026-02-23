@@ -209,6 +209,23 @@ public class RbacService : IRbacService
         var oldRole = member.Role;
         if (oldRole == newRole) return;
 
+        // Guard: prevent demoting the last Admin/SuperAdmin in the org
+        var wasAdmin = oldRole is "Admin" or "SuperAdmin";
+        var willBeAdmin = newRole is "Admin" or "SuperAdmin";
+
+        if (wasAdmin && !willBeAdmin)
+        {
+            var adminCount = await _db.TeamMembers
+                .CountAsync(m => m.TenantId == member.TenantId
+                              && (m.Role == "Admin" || m.Role == "SuperAdmin")
+                              && m.Status == "active", ct);
+            if (adminCount <= 1)
+            {
+                throw new InvalidOperationException(
+                    "Cannot demote the last admin. Promote another member to Admin first.");
+            }
+        }
+
         member.Role = newRole;
 
         // Audit log
