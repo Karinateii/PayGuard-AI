@@ -140,7 +140,7 @@
             _errorMessage = "Organization name is required.";
             return;
         }
-        if (string.IsNullOrWhiteSpace(_adminEmail) || !_adminEmail.Contains('@'))
+        if (string.IsNullOrWhiteSpace(_adminEmail) || !_adminEmail.Contains("@"))
         {
             _errorMessage = "A valid email address is required.";
             return;
