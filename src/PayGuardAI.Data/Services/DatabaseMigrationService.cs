@@ -40,6 +40,9 @@ public class DatabaseMigrationService : IDatabaseMigrationService
             // Add missing TenantId columns to existing PostgreSQL/SQLite databases
             await AddMissingColumnsAsync(dbType);
 
+            // Create MagicLinkTokens table if it doesn't exist (added after initial DB)
+            await CreateMagicLinkTokensTableAsync(dbType);
+
             // Mark existing tenants as onboarded so they aren't redirected
             await MarkExistingTenantsOnboardedAsync(dbType);
 
@@ -240,6 +243,70 @@ public class DatabaseMigrationService : IDatabaseMigrationService
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Skipping boolean column migration for {Table}.{Column}", table, column);
+        }
+    }
+
+    /// <summary>
+    /// Creates the MagicLinkTokens table if it doesn't already exist.
+    /// This table was added after the initial database creation.
+    /// </summary>
+    private async Task CreateMagicLinkTokensTableAsync(string dbType)
+    {
+        try
+        {
+            if (dbType == "PostgreSQL")
+            {
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS "MagicLinkTokens" (
+                        "Id" uuid NOT NULL PRIMARY KEY,
+                        "TokenHash" text NOT NULL,
+                        "Email" text NOT NULL,
+                        "ExpiresAt" timestamp with time zone NOT NULL,
+                        "IsUsed" boolean NOT NULL DEFAULT false,
+                        "RequestedFromIp" text NOT NULL DEFAULT '',
+                        "CreatedAt" timestamp with time zone NOT NULL DEFAULT now()
+                    )
+                    """);
+
+                // Add indexes if missing (safe to run repeatedly)
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS "IX_MagicLinkTokens_TokenHash"
+                    ON "MagicLinkTokens" ("TokenHash")
+                    """);
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS "IX_MagicLinkTokens_Email"
+                    ON "MagicLinkTokens" ("Email")
+                    """);
+            }
+            else
+            {
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS MagicLinkTokens (
+                        Id TEXT NOT NULL PRIMARY KEY,
+                        TokenHash TEXT NOT NULL,
+                        Email TEXT NOT NULL,
+                        ExpiresAt TEXT NOT NULL,
+                        IsUsed INTEGER NOT NULL DEFAULT 0,
+                        RequestedFromIp TEXT NOT NULL DEFAULT '',
+                        CreatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+                    )
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS IX_MagicLinkTokens_TokenHash
+                    ON MagicLinkTokens (TokenHash)
+                    """);
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS IX_MagicLinkTokens_Email
+                    ON MagicLinkTokens (Email)
+                    """);
+            }
+
+            _logger.LogDebug("MagicLinkTokens table ensured");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipping MagicLinkTokens table creation");
         }
     }
 

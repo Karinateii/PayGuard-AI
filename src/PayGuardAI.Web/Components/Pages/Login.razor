@@ -1,6 +1,4 @@
 @page "/login"
-@using Microsoft.AspNetCore.Authentication
-@using Microsoft.AspNetCore.Authentication.OpenIdConnect
 @using Microsoft.AspNetCore.Authorization
 @attribute [AllowAnonymous]
 @inject IConfiguration Configuration
@@ -21,49 +19,103 @@
                 </MudText>
             </div>
 
-            @if (_isOAuthEnabled)
+            @* ── Status messages ── *@
+            @if (_magicLinkSent)
             {
+                <MudAlert Severity="Severity.Success" Class="mb-4" Variant="Variant.Outlined">
+                    <MudText Typo="Typo.body2" Style="font-weight: 600;">Check your email!</MudText>
+                    <MudText Typo="Typo.caption">
+                        We sent a sign-in link to <strong>@_sentToEmail</strong>.
+                        Click the link in the email to continue. It expires in 15 minutes.
+                    </MudText>
+                </MudAlert>
+            }
+            else if (_error == "invalid_link")
+            {
+                <MudAlert Severity="Severity.Warning" Class="mb-4" Variant="Variant.Outlined">
+                    That sign-in link is invalid or expired. Please request a new one.
+                </MudAlert>
+            }
+            else if (_error == "no_account")
+            {
+                <MudAlert Severity="Severity.Warning" Class="mb-4" Variant="Variant.Outlined">
+                    No active account found for that email. Please sign up first.
+                </MudAlert>
+            }
+
+            @* ── Magic Link: Sign in with Email ── *@
+            <MudText Typo="Typo.subtitle2" Class="mb-2" Style="font-weight: 600;">
+                Sign in with Email
+            </MudText>
+
+            <form method="post" action="/api/Auth/magic-link/request">
+                <MudTextField @bind-Value="_loginEmail"
+                              name="email"
+                              Label="Work Email"
+                              Placeholder="you@company.com"
+                              Variant="Variant.Outlined"
+                              InputType="InputType.Email"
+                              Required="true"
+                              Class="mb-3"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Email" />
+
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Primary"
                            FullWidth="true"
                            Size="Size.Large"
-                           StartIcon="@Icons.Material.Filled.Login"
-                           Class="mt-4 py-3"
+                           StartIcon="@Icons.Material.Filled.Send"
+                           Class="py-3"
                            Style="font-size: 1rem; letter-spacing: 0.5px;"
+                           ButtonType="ButtonType.Submit">
+                    Send Sign-In Link
+                </MudButton>
+            </form>
+
+            <MudText Typo="Typo.caption" Align="Align.Center" Class="mt-3" Color="Color.Secondary">
+                <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Class="mr-1" Style="vertical-align: middle;" />
+                No password needed — we'll email you a secure link
+            </MudText>
+
+            @if (_isOAuthEnabled)
+            {
+                <MudDivider Class="my-5">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">or</MudText>
+                </MudDivider>
+
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Default"
+                           FullWidth="true"
+                           Size="Size.Large"
+                           StartIcon="@Icons.Material.Filled.Login"
+                           Class="py-3"
+                           Style="font-size: 0.95rem;"
                            OnClick="HandleOAuthLogin">
                     Sign in with Google
                 </MudButton>
-
-                <MudText Typo="Typo.caption" Align="Align.Center" Class="mt-4" Color="Color.Secondary">
-                    <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Class="mr-1" Style="vertical-align: middle;" />
-                    Secure OAuth 2.0 authentication
-                </MudText>
             }
-            else
+            else if (!_magicLinkSent)
             {
-                <MudAlert Severity="Severity.Info" Class="mb-4" Variant="Variant.Outlined" Dense="true">
-                    Demo mode — OAuth authentication is disabled.
-                </MudAlert>
+                @* Demo mode fallback *@
+                <MudDivider Class="my-5">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">or</MudText>
+                </MudDivider>
 
                 <form method="post" action="/api/Auth/demo-login">
-                    <MudButton Variant="Variant.Filled"
-                               Color="Color.Primary"
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Default"
                                FullWidth="true"
                                Size="Size.Large"
                                StartIcon="@Icons.Material.Filled.Home"
                                Class="py-3"
-                               Style="font-size: 1rem; letter-spacing: 0.5px;"
+                               Style="font-size: 0.95rem;"
                                ButtonType="ButtonType.Submit">
-                        Continue to Dashboard
+                        Demo Dashboard
                     </MudButton>
                 </form>
-
-                <MudText Typo="Typo.caption" Align="Align.Center" Class="mt-4" Color="Color.Secondary">
-                    Set <code>FeatureFlags:OAuthEnabled</code> to enable OAuth
-                </MudText>
             }
 
-            <MudDivider Class="my-6" />
+            <MudDivider Class="my-5" />
 
             <MudText Typo="Typo.body2" Align="Align.Center" Class="mb-3">
                 Don't have an account?
@@ -81,15 +133,25 @@
 
 @code {
     private bool _isOAuthEnabled;
+    private bool _magicLinkSent;
+    private string _sentToEmail = string.Empty;
+    private string _loginEmail = string.Empty;
+    private string? _error;
 
     protected override void OnInitialized()
     {
         _isOAuthEnabled = Configuration.IsOAuthEnabled();
+
+        // Read query params for status messages
+        var uri = new Uri(Navigation.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        _magicLinkSent = query["magicLinkSent"] == "true";
+        _sentToEmail = query["email"] ?? "";
+        _error = query["error"];
     }
 
     private void HandleOAuthLogin()
     {
-        // Navigate to the OIDC challenge endpoint which triggers the Google login flow
         Navigation.NavigateTo("/api/Auth/oauth-login", forceLoad: true);
     }
 }

@@ -47,7 +47,12 @@ public class DemoAuthenticationHandler : AuthenticationHandler<AuthenticationSch
         
         Logger.LogInformation("[AUTH] User is authenticated - creating claims principal");
 
-        var userName = _configuration["Auth:DefaultUser"] ?? "compliance_officer@payguard.ai";
+        // If the user signed in via magic link, use the email from the session
+        // Otherwise fall back to the config default (platform owner)
+        var sessionEmail = Context.Session.GetString("AuthenticatedEmail");
+        var userName = !string.IsNullOrEmpty(sessionEmail)
+            ? sessionEmail
+            : _configuration["Auth:DefaultUser"] ?? "compliance_officer@payguard.ai";
 
         // Look up the user's org from TeamMembers by email
         var teamMember = await _db.TeamMembers

@@ -42,6 +42,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<WebhookEndpoint> WebhookEndpoints => Set<WebhookEndpoint>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
     public DbSet<CustomRole> CustomRoles => Set<CustomRole>();
+    public DbSet<MagicLinkToken> MagicLinkTokens => Set<MagicLinkToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -133,6 +134,15 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(e => e.EntityId);
             entity.HasIndex(e => e.CreatedAt);
             entity.HasIndex(e => e.TenantId);
+        });
+
+        // MagicLinkToken configuration (no tenant filter — looked up by token hash)
+        modelBuilder.Entity<MagicLinkToken>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.TokenHash).IsUnique();
+            entity.HasIndex(e => e.Email);
+            entity.HasIndex(e => e.ExpiresAt);
         });
 
         // TenantSubscription configuration

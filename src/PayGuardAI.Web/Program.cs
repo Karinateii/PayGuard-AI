@@ -211,6 +211,9 @@ builder.Services.AddScoped<ITenantOnboardingService, TenantOnboardingService>();
 builder.Services.AddScoped<IRbacService, RbacService>();
 builder.Services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
+// Register magic link (passwordless) authentication service
+builder.Services.AddScoped<IMagicLinkService, MagicLinkService>();
+
 // Register email notification service — real SMTP when enabled, no-op fallback otherwise
 var emailEnabled = builder.Configuration.GetValue<bool>("FeatureFlags:EmailNotificationsEnabled");
 if (emailEnabled)

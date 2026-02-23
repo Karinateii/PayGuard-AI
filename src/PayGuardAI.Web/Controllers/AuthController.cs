@@ -1,13 +1,17 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using PayGuardAI.Core.Services;
+using PayGuardAI.Data;
 
 namespace PayGuardAI.Web.Controllers;
 
 /// <summary>
-/// Authentication controller for demo mode login/logout and OAuth
+/// Authentication controller for demo mode, OAuth, and magic link login/logout
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
@@ -15,11 +19,19 @@ public class AuthController : ControllerBase
 {
     private readonly ILogger<AuthController> _logger;
     private readonly IConfiguration _configuration;
+    private readonly IMagicLinkService _magicLink;
+    private readonly ApplicationDbContext _db;
 
-    public AuthController(ILogger<AuthController> logger, IConfiguration configuration)
+    public AuthController(
+        ILogger<AuthController> logger,
+        IConfiguration configuration,
+        IMagicLinkService magicLink,
+        ApplicationDbContext db)
     {
         _logger = logger;
         _configuration = configuration;
+        _magicLink = magicLink;
+        _db = db;
     }
 
     /// <summary>
@@ -56,6 +68,86 @@ public class AuthController : ControllerBase
         };
 
         return Challenge(properties, OpenIdConnectDefaults.AuthenticationScheme);
+    }
+
+    /// <summary>
+    /// Request a magic link — sends a one-time login link to the user's email.
+    /// </summary>
+    [HttpPost("magic-link/request")]
+    [AllowAnonymous]
+    public async Task<IActionResult> RequestMagicLink([FromForm] string email)
+    {
+        _logger.LogInformation("[AUTH] Magic link requested for {Email}", email);
+
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        await _magicLink.SendMagicLinkAsync(email, ip);
+
+        // Always redirect to a confirmation page — don't reveal if email exists
+        return Redirect($"/login?magicLinkSent=true&email={Uri.EscapeDataString(email)}");
+    }
+
+    /// <summary>
+    /// Verify a magic link token — validates it, looks up the user's org, and signs them in.
+    /// </summary>
+    [HttpGet("magic-link/verify")]
+    [AllowAnonymous]
+    public async Task<IActionResult> VerifyMagicLink([FromQuery] string token)
+    {
+        var email = await _magicLink.ValidateTokenAsync(token);
+
+        if (email is null)
+        {
+            _logger.LogWarning("[AUTH] Invalid or expired magic link");
+            return Redirect("/login?error=invalid_link");
+        }
+
+        // Look up the TeamMember to get tenant and role
+        var teamMember = await _db.TeamMembers
+            .IgnoreQueryFilters()
+            .Where(t => t.Email == email && t.Status == "active")
+            .OrderByDescending(t => t.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (teamMember is null)
+        {
+            _logger.LogWarning("[AUTH] Magic link valid but no active TeamMember for {Email}", email);
+            return Redirect("/login?error=no_account");
+        }
+
+        // Determine auth mode and sign in accordingly
+        var isOAuth = _configuration.IsOAuthEnabled();
+
+        if (isOAuth)
+        {
+            // OAuth mode: issue a cookie-based sign-in
+            var claims = new List<Claim>
+            {
+                new(ClaimTypes.Name, email),
+                new(ClaimTypes.NameIdentifier, email),
+                new(ClaimTypes.Email, email),
+                new(ClaimTypes.Role, teamMember.Role),
+                new("tenant_id", teamMember.TenantId)
+            };
+
+            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            var principal = new ClaimsPrincipal(identity);
+
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                principal,
+                new AuthenticationProperties { IsPersistent = true });
+        }
+        else
+        {
+            // Demo mode: set session + stash email so DemoAuthHandler can look it up
+            HttpContext.Session.SetString("IsAuthenticated", "true");
+            HttpContext.Session.SetString("AuthenticatedEmail", email);
+        }
+
+        _logger.LogInformation("[AUTH] Magic link login successful for {Email} → tenant {Tenant}",
+            email, teamMember.TenantId);
+
+        return Redirect("/");
     }
 
     /// <summary>
