@@ -6,6 +6,7 @@
 @attribute [Authorize]
 @inject ITransactionService TransactionService
 @inject IHubContext<TransactionHub> HubContext
+@inject ITenantContext TenantContext
 @inject ILogger<Send> Logger
 @inject ISnackbar Snackbar
 
@@ -248,7 +249,8 @@
                     transaction.RiskAnalysis.ReviewStatus,
                     transaction.RiskAnalysis.Explanation ?? "Risk analysis complete"
                 );
-                await HubContext.Clients.All.SendAsync("NewTransaction", notification);
+                var groupName = $"tenant-{TenantContext.TenantId}";
+                await HubContext.Clients.Group(groupName).SendAsync("NewTransaction", notification);
             }
 
             _lastResult = new SimResult

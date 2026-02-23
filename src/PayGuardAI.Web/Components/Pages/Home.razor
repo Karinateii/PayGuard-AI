@@ -247,6 +247,13 @@ else
         });
 
         await _hubConnection.StartAsync();
+
+        // Join tenant-specific group so we only get our own org's updates
+        var tenantId = TenantContext.TenantId;
+        if (!string.IsNullOrEmpty(tenantId))
+        {
+            await _hubConnection.InvokeAsync("JoinTenantGroup", tenantId);
+        }
     }
 
     private async Task RetryLoadAsync()

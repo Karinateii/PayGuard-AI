@@ -23,19 +23,22 @@ public class WebhooksController : ControllerBase
     private readonly IPaymentProviderFactory _providerFactory;
     private readonly ILogger<WebhooksController> _logger;
     private readonly IMetricsService _metrics;
+    private readonly ITenantContext _tenantContext;
 
     public WebhooksController(
         ITransactionService transactionService,
         IHubContext<TransactionHub> hubContext,
         IPaymentProviderFactory providerFactory,
         ILogger<WebhooksController> logger,
-        IMetricsService metrics)
+        IMetricsService metrics,
+        ITenantContext tenantContext)
     {
         _transactionService = transactionService;
         _hubContext = hubContext;
         _providerFactory = providerFactory;
         _logger = logger;
         _metrics = metrics;
+        _tenantContext = tenantContext;
     }
 
     /// <summary>
@@ -136,9 +139,10 @@ public class WebhooksController : ControllerBase
                     transaction.RiskAnalysis.Explanation ?? "Risk analysis complete"
                 );
 
-                await _hubContext.Clients.All.SendAsync("NewTransaction", notification, cancellationToken);
-                _logger.LogInformation("[{Provider}] Broadcasted transaction {TransactionId} to SignalR clients",
-                    providerName, transaction.Id);
+                var groupName = $"tenant-{_tenantContext.TenantId}";
+                await _hubContext.Clients.Group(groupName).SendAsync("NewTransaction", notification, cancellationToken);
+                _logger.LogInformation("[{Provider}] Broadcasted transaction {TransactionId} to tenant group {Group}",
+                    providerName, transaction.Id, groupName);
             }
 
             return Ok(new
@@ -236,7 +240,8 @@ public class WebhooksController : ControllerBase
                     transaction.RiskAnalysis.Explanation ?? "Risk analysis complete"
                 );
 
-                await _hubContext.Clients.All.SendAsync("NewTransaction", notification, cancellationToken);
+                var groupName = $"tenant-{_tenantContext.TenantId}";
+                await _hubContext.Clients.Group(groupName).SendAsync("NewTransaction", notification, cancellationToken);
             }
 
             return Ok(new

@@ -4,6 +4,7 @@
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
+@inject ITenantContext TenantContext
 @implements IAsyncDisposable
 @using Microsoft.AspNetCore.SignalR.Client
 @using PayGuardAI.Web.Hubs
@@ -134,6 +135,11 @@
         try
         {
             await _hubConnection.StartAsync();
+            var tenantId = TenantContext.TenantId;
+            if (!string.IsNullOrEmpty(tenantId))
+            {
+                await _hubConnection.InvokeAsync("JoinTenantGroup", tenantId);
+            }
             await InvokeAsync(StateHasChanged);
         }
         catch
