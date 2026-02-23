@@ -176,4 +176,36 @@ public class AuthController : ControllerBase
         _logger.LogInformation("[AUTH-CONTROLLER] Session + cookies cleared, redirecting to /login");
         return Redirect("/login");
     }
+
+    /// <summary>
+    /// SuperAdmin: switch to another tenant's context.
+    /// Stores the impersonated tenant ID in the session so it survives page loads.
+    /// </summary>
+    [HttpGet("impersonate/{tenantId}")]
+    [Authorize(Roles = "SuperAdmin")]
+    public IActionResult Impersonate(string tenantId)
+    {
+        if (string.IsNullOrWhiteSpace(tenantId))
+            return BadRequest("tenantId is required");
+
+        HttpContext.Session.SetString("ImpersonateTenantId", tenantId);
+        _logger.LogWarning("[AUTH] SuperAdmin {User} impersonating tenant {TenantId}",
+            User.Identity?.Name, tenantId);
+
+        return Redirect("/");
+    }
+
+    /// <summary>
+    /// SuperAdmin: stop impersonating — return to home tenant.
+    /// </summary>
+    [HttpGet("stop-impersonating")]
+    [Authorize(Roles = "SuperAdmin")]
+    public IActionResult StopImpersonating()
+    {
+        HttpContext.Session.Remove("ImpersonateTenantId");
+        _logger.LogInformation("[AUTH] SuperAdmin {User} stopped impersonating",
+            User.Identity?.Name);
+
+        return Redirect("/");
+    }
 }

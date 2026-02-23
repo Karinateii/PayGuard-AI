@@ -7,7 +7,6 @@
 @inject ITenantContext TenantContext
 @inject IDbContextFactory<PayGuardAI.Data.ApplicationDbContext> DbFactory
 @inject AuthenticationStateProvider AuthStateProvider
-@inject IHttpContextAccessor HttpContextAccessor
 @implements IAsyncDisposable
 @using Microsoft.AspNetCore.SignalR.Client
 @using Microsoft.EntityFrameworkCore
@@ -258,13 +257,8 @@
 
     private void SwitchBackToHomeTenant()
     {
-        if (!string.IsNullOrEmpty(_homeTenantId))
-        {
-            // Clear session impersonation
-            HttpContextAccessor.HttpContext?.Session.Remove("ImpersonateTenantId");
-            TenantContext.TenantId = _homeTenantId;
-            NavigationManager.NavigateTo("/", forceLoad: true);
-        }
+        // Navigate to the API endpoint which clears the session and redirects to /
+        NavigationManager.NavigateTo("/api/Auth/stop-impersonating", forceLoad: true);
     }
 
     private void SignOut()
