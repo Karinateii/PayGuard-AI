@@ -197,14 +197,14 @@ public static class AuthenticationConfiguration
                             }
                             else
                             {
-                                // Fallback: user not in any org — assign default tenant + roles
-                                foreach (var role in defaultRoles.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                                {
-                                    identity.AddClaim(new Claim(ClaimTypes.Role, role));
-                                }
-                                identity.AddClaim(new Claim("tenant_id", defaultTenantId));
-                                logger.LogWarning("No TeamMember found for {Email}, using default tenant {Tenant}",
-                                    userEmail, defaultTenantId);
+                                // Fallback: user not in any org — redirect to signup
+                                logger.LogWarning(
+                                    "No TeamMember found for {Email}, redirecting to signup",
+                                    userEmail);
+
+                                context.Response.Redirect("/signup");
+                                context.HandleResponse();
+                                return;
                             }
                         }
 

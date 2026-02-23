@@ -24,6 +24,7 @@ public class WebhooksController : ControllerBase
     private readonly ILogger<WebhooksController> _logger;
     private readonly IMetricsService _metrics;
     private readonly ITenantContext _tenantContext;
+    private readonly IWebhookDeliveryService _webhookDelivery;
 
     public WebhooksController(
         ITransactionService transactionService,
@@ -31,7 +32,8 @@ public class WebhooksController : ControllerBase
         IPaymentProviderFactory providerFactory,
         ILogger<WebhooksController> logger,
         IMetricsService metrics,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IWebhookDeliveryService webhookDelivery)
     {
         _transactionService = transactionService;
         _hubContext = hubContext;
@@ -39,6 +41,7 @@ public class WebhooksController : ControllerBase
         _logger = logger;
         _metrics = metrics;
         _tenantContext = tenantContext;
+        _webhookDelivery = webhookDelivery;
     }
 
     /// <summary>
@@ -145,6 +148,9 @@ public class WebhooksController : ControllerBase
                     providerName, transaction.Id, groupName);
             }
 
+            // Deliver outbound webhooks to customer-configured endpoints (fire-and-forget)
+            _ = DeliverOutboundWebhookAsync(transaction, cancellationToken);
+
             return Ok(new
             {
                 success = true,
@@ -244,6 +250,9 @@ public class WebhooksController : ControllerBase
                 await _hubContext.Clients.Group(groupName).SendAsync("NewTransaction", notification, cancellationToken);
             }
 
+            // Deliver outbound webhooks to customer-configured endpoints (fire-and-forget)
+            _ = DeliverOutboundWebhookAsync(transaction, cancellationToken);
+
             return Ok(new
             {
                 success = true,
@@ -281,6 +290,46 @@ public class WebhooksController : ControllerBase
         "SY" => "SYP",
         _ => "USD"
     };
+
+    /// <summary>
+    /// Fire-and-forget delivery of outbound webhook to customer endpoints.
+    /// Never blocks the API response; failures are logged.
+    /// </summary>
+    private async Task DeliverOutboundWebhookAsync(
+        PayGuardAI.Core.Entities.Transaction transaction,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var eventPayload = new
+            {
+                transactionId = transaction.Id,
+                externalId = transaction.ExternalId,
+                amount = transaction.Amount,
+                sourceCurrency = transaction.SourceCurrency,
+                destinationCurrency = transaction.DestinationCurrency,
+                sourceCountry = transaction.SourceCountry,
+                destinationCountry = transaction.DestinationCountry,
+                riskScore = transaction.RiskAnalysis?.RiskScore,
+                riskLevel = transaction.RiskAnalysis?.RiskLevel.ToString(),
+                reviewStatus = transaction.RiskAnalysis?.ReviewStatus.ToString(),
+                explanation = transaction.RiskAnalysis?.Explanation,
+                analyzedAt = transaction.RiskAnalysis?.AnalyzedAt
+            };
+
+            await _webhookDelivery.DeliverEventAsync(
+                _tenantContext.TenantId,
+                "transaction.analyzed",
+                eventPayload,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Outbound webhooks must never crash the main pipeline
+            _logger.LogWarning(ex, "Outbound webhook delivery failed for transaction {TransactionId}",
+                transaction.Id);
+        }
+    }
 }
 
 public class SimulateTransactionRequest

@@ -205,6 +205,9 @@ builder.Services.AddScoped<IPaymentProviderFactory, PaymentProviderFactory>();
 // Register webhook signature service
 builder.Services.AddSingleton<IWebhookSignatureService, WebhookSignatureService>();
 
+// Register outbound webhook delivery service (POSTs events to customer endpoints)
+builder.Services.AddHttpClient<IWebhookDeliveryService, WebhookDeliveryService>();
+
 // Register Paystack billing service
 builder.Services.AddHttpClient<IBillingService, PaystackBillingService>();
 

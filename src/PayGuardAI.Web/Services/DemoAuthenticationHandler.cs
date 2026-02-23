@@ -112,15 +112,16 @@ public class DemoAuthenticationHandler : AuthenticationHandler<AuthenticationSch
             }
             else
             {
-                // Fallback: user not in any org — use config defaults
-                var roles = _configuration["Auth:DefaultRoles"] ?? "Reviewer,Manager,Admin,SuperAdmin";
-                claims.Add(new Claim("tenant_id", defaultTenantId));
-                foreach (var role in roles.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                {
-                    claims.Add(new Claim(ClaimTypes.Role, role));
-                }
-                Logger.LogInformation("[AUTH] No TeamMember for {User}, using default tenant {Tenant}",
-                    userName, defaultTenantId);
+                // Fallback: user not in any org — they need to sign up first
+                Logger.LogWarning("[AUTH] No TeamMember for {User}, rejecting — user must sign up",
+                    userName);
+
+                // Clear the session so they're not stuck in a loop
+                Context.Session.Remove("IsAuthenticated");
+                Context.Session.Remove("AuthenticatedEmail");
+
+                return AuthenticateResult.Fail(
+                    $"No account found for {userName}. Please sign up at /signup first.");
             }
         }
 
@@ -134,7 +135,7 @@ public class DemoAuthenticationHandler : AuthenticationHandler<AuthenticationSch
     protected override Task HandleChallengeAsync(AuthenticationProperties properties)
     {
         Logger.LogInformation("[AUTH] HandleChallengeAsync called - redirecting to /login");
-        Response.Redirect("/login");
+        Response.Redirect("/login?error=no_account");
         return Task.CompletedTask;
     }
 }
