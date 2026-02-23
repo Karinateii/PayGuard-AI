@@ -1,4 +1,7 @@
-using Microsoft.EntityFrameworkCore;
+#!/usr/bin/env python3
+"""Write the clean ApplicationDbContext.cs file."""
+
+content = r'''using Microsoft.EntityFrameworkCore;
 using PayGuardAI.Core.Entities;
 using PayGuardAI.Core.Services;
 
@@ -292,3 +295,9 @@ public class ApplicationDbContext : DbContext
         });
     }
 }
+'''
+
+target = '/Users/ebenezer/Desktop/Afriex/PayGuardAI/src/PayGuardAI.Data/ApplicationDbContext.cs'
+with open(target, 'w') as f:
+    f.write(content)
+print(f'Written {len(content)} bytes')

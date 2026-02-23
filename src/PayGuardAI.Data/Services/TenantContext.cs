@@ -7,5 +7,5 @@ namespace PayGuardAI.Data.Services;
 /// </summary>
 public class TenantContext : ITenantContext
 {
-    public string TenantId { get; set; } = "afriex-demo";
+    public string TenantId { get; set; } = string.Empty;
 }

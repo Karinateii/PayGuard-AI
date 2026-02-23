@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Components.Server.Circuits;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
@@ -163,6 +164,7 @@ builder.Services.AddScoped<IReviewService, ReviewService>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<DemoDataSeeder>();
 builder.Services.AddScoped<ITenantContext, TenantContext>();
+builder.Services.AddScoped<CircuitHandler, TenantCircuitHandler>();
 builder.Services.AddScoped<IAlertingService, AlertingService>();
 builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<IDatabaseMigrationService, DatabaseMigrationService>();
