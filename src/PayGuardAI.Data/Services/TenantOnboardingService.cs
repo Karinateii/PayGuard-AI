@@ -206,6 +206,7 @@ public partial class TenantOnboardingService : ITenantOnboardingService
         settings.DefaultCurrency = defaultCurrency;
         settings.AutoApproveThreshold = autoApproveThreshold;
         settings.AutoRejectThreshold = autoRejectThreshold;
+        settings.OnboardingCompleted = true;
         settings.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(ct);

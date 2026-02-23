@@ -45,7 +45,7 @@ public class DemoAuthenticationHandler : AuthenticationHandler<AuthenticationSch
         // User and roles come ONLY from config — never from request headers
         // (headers could be spoofed for privilege escalation)
         var userName = _configuration["Auth:DefaultUser"] ?? "compliance_officer@payguard.ai";
-        var roles = _configuration["Auth:DefaultRoles"] ?? "Reviewer,Manager";
+        var roles = _configuration["Auth:DefaultRoles"] ?? "Reviewer,Manager,Admin";
 
         var tenantId = _configuration["MultiTenancy:DefaultTenantId"] ?? "afriex-demo";
 

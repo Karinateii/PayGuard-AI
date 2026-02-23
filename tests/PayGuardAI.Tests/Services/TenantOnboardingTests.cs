@@ -404,6 +404,7 @@ public class TenantOnboardingTests : IDisposable
         settings.DefaultCurrency.Should().Be("NGN");
         settings.AutoApproveThreshold.Should().Be(15);
         settings.AutoRejectThreshold.Should().Be(85);
+        settings.OnboardingCompleted.Should().BeTrue();
     }
 
     [Fact]

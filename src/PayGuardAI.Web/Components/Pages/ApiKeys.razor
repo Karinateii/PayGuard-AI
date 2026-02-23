@@ -36,12 +36,14 @@
                 Copy your API key now — it won't be shown again!
             </MudText>
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                <MudText Typo="Typo.body2" Style="font-family: monospace; background: rgba(0,0,0,0.2); padding: 4px 8px; border-radius: 4px;">
-                    @_newlyGeneratedKey
-                </MudText>
-                <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small"
-                               OnClick="CopyKey" />
+                <MudTextField Value="@_newlyGeneratedKey" ReadOnly="true" Variant="Variant.Outlined"
+                              Margin="Margin.Dense" FullWidth="true"
+                              Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy"
+                              OnAdornmentClick="CopyKey" Style="font-family: monospace;" />
             </MudStack>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                Click the copy icon or select the text and copy manually.
+            </MudText>
         </MudStack>
     </MudAlert>
 }

@@ -20,6 +20,11 @@ public class OrganizationSettings
     /// Empty = all IPs allowed.
     /// </summary>
     public string? IpWhitelist { get; set; }
+    /// <summary>
+    /// Set to true when the tenant completes the onboarding wizard.
+    /// Used to redirect first-time users from the dashboard to onboarding.
+    /// </summary>
+    public bool OnboardingCompleted { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public string UpdatedBy { get; set; } = "system";

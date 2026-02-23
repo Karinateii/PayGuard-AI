@@ -8,6 +8,7 @@
 @inject ITenantContext TenantContext
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject IConfiguration Configuration
 
 <PageTitle>Notification Preferences — PayGuard AI</PageTitle>
 
@@ -154,27 +155,27 @@ else
                     <CardHeaderContent>
                         <MudText Typo="Typo.h6">
                             <MudIcon Icon="@Icons.Material.Filled.Settings" Class="mr-1" />
-                            SMTP Configuration
+                            Email Status
                         </MudText>
                     </CardHeaderContent>
                 </MudCardHeader>
                 <MudCardContent>
-                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
-                        Email uses SMTP — works with SendGrid, AWS SES, Mailgun, or any SMTP provider.
-                    </MudAlert>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                        Configure via <code>appsettings.json</code>:
-                    </MudText>
-                    <MudPaper Class="pa-3 mt-2" Elevation="0" Style="background:#f5f5f5;font-family:monospace;font-size:12px;">
-                        "Email": @("{") <br/>
-                        &nbsp;&nbsp;"SmtpHost": "smtp.sendgrid.net",<br/>
-                        &nbsp;&nbsp;"SmtpPort": 587,<br/>
-                        &nbsp;&nbsp;"SmtpUser": "apikey",<br/>
-                        &nbsp;&nbsp;"SmtpPassword": "SG.xxx...",<br/>
-                        &nbsp;&nbsp;"FromAddress": "noreply@("@")...",<br/>
-                        &nbsp;&nbsp;"FromName": "PayGuard AI"<br/>
-                        @("}")
-                    </MudPaper>
+                    @if (_emailConfigured)
+                    {
+                        <MudAlert Severity="Severity.Success" Dense="true" Class="mb-3">
+                            SMTP is configured — email notifications are active.
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+                            Email is <strong>not configured</strong>. Notification preferences are saved but emails won't be sent until SMTP is set up.
+                        </MudAlert>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+                            To enable email, set <code>FeatureFlags:EmailNotificationsEnabled</code> to <code>true</code>
+                            and configure SMTP settings in <code>appsettings.json</code> or environment variables.
+                        </MudText>
+                    }
                 </MudCardContent>
             </MudCard>
         </MudItem>
@@ -184,9 +185,11 @@ else
 @code {
     private List<NotificationPreference> _preferences = [];
     private bool _loading = true;
+    private bool _emailConfigured;
 
     protected override async Task OnInitializedAsync()
     {
+        _emailConfigured = Configuration.GetValue<bool>("FeatureFlags:EmailNotificationsEnabled");
         await LoadPreferences();
     }
 

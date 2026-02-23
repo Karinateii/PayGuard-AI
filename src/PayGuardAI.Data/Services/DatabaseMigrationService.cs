@@ -39,6 +39,9 @@ public class DatabaseMigrationService : IDatabaseMigrationService
 
             // Add missing TenantId columns to existing PostgreSQL/SQLite databases
             await AddMissingColumnsAsync(dbType);
+
+            // Mark existing tenants as onboarded so they aren't redirected
+            await MarkExistingTenantsOnboardedAsync(dbType);
             
             _logger.LogInformation("Database ready: {DatabaseType}", dbType);
         }
@@ -71,6 +74,8 @@ public class DatabaseMigrationService : IDatabaseMigrationService
             ("WebhookEndpoints",        "TenantId", "afriex-demo"),
             ("NotificationPreferences", "TenantId", "afriex-demo"),
             ("CustomRoles",             "TenantId", "afriex-demo"),
+            // Onboarding flag — defaults to false (0) for existing tenants
+            ("OrganizationSettings",    "OnboardingCompleted", "0"),
         };
 
         foreach (var (table, column, defaultValue) in columnMigrations)
@@ -145,5 +150,40 @@ public class DatabaseMigrationService : IDatabaseMigrationService
         var usePostgresStr = featureFlagsSection["PostgresEnabled"];
         var usePostgres = bool.TryParse(usePostgresStr, out var result) && result;
         return usePostgres ? "PostgreSQL" : "SQLite";
+    }
+
+    /// <summary>
+    /// Mark existing tenants (pre-onboarding-flag) as onboarded so they don't get
+    /// redirected to the onboarding wizard on next login.
+    /// </summary>
+    private async Task MarkExistingTenantsOnboardedAsync(string dbType)
+    {
+        try
+        {
+            var falseValue = dbType == "PostgreSQL" ? "false" : "0";
+            var trueValue = dbType == "PostgreSQL" ? "true" : "1";
+
+            var updateSql = dbType == "PostgreSQL"
+                ? $"""
+                   UPDATE "OrganizationSettings"
+                   SET "OnboardingCompleted" = {trueValue}
+                   WHERE "OrganizationName" != 'My Organization'
+                     AND "OnboardingCompleted" = {falseValue}
+                   """
+                : $"""
+                   UPDATE OrganizationSettings
+                   SET OnboardingCompleted = {trueValue}
+                   WHERE OrganizationName != 'My Organization'
+                     AND OnboardingCompleted = {falseValue}
+                   """;
+
+            var rows = await _context.Database.ExecuteSqlRawAsync(updateSql);
+            if (rows > 0)
+                _logger.LogInformation("Marked {Count} existing tenant(s) as onboarded", rows);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipping MarkExistingTenantsOnboarded (table may not exist yet)");
+        }
     }
 }

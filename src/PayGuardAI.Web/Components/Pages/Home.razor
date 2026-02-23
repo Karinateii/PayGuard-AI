@@ -3,6 +3,8 @@
 @attribute [Authorize]
 @inject ITransactionService TransactionService
 @inject IReviewService ReviewService
+@inject IAdminService AdminService
+@inject ITenantContext TenantContext
 @inject NavigationManager NavigationManager
 @implements IAsyncDisposable
 @using Microsoft.AspNetCore.SignalR.Client
@@ -187,6 +189,26 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        // ── First-time user redirect ──
+        try
+        {
+            var tenantId = TenantContext.TenantId;
+            if (!string.IsNullOrEmpty(tenantId))
+            {
+                var settings = await AdminService.GetOrCreateSettingsAsync(tenantId);
+                if (!settings.OnboardingCompleted && settings.OrganizationName == "My Organization")
+                {
+                    NavigationManager.NavigateTo($"/onboarding?tenantId={tenantId}");
+                    return;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // If onboarding check fails, continue to dashboard normally
+            Console.WriteLine($"Onboarding check skipped: {ex.Message}");
+        }
+
         try
         {
             await LoadDataAsync();
