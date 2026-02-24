@@ -167,6 +167,7 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(e => e.ProviderCustomerId);
             entity.HasIndex(e => e.ProviderSubscriptionId);
             entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.Provider);
         });
 
         // OrganizationSettings configuration

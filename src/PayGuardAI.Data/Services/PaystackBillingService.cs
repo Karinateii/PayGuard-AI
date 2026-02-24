@@ -102,6 +102,7 @@ public class PaystackBillingService : IBillingService
                 BillingEmail = email,
                 Plan = BillingPlan.Trial,
                 Status = "pending",
+                Provider = "paystack",
                 ProviderPlanCode = planCode
             };
             _db.TenantSubscriptions.Add(existing);
@@ -279,7 +280,8 @@ public class PaystackBillingService : IBillingService
             sub = new TenantSubscription
             {
                 TenantId = customerEmail, // fallback — will be linked properly when OAuth is on
-                BillingEmail = customerEmail
+                BillingEmail = customerEmail,
+                Provider = "paystack"
             };
             _db.TenantSubscriptions.Add(sub);
         }
@@ -289,6 +291,7 @@ public class PaystackBillingService : IBillingService
         sub.ProviderSubscriptionId = subscriptionCode;
         sub.ProviderPlanCode = planCode;
         sub.ProviderEmailToken = emailToken;
+        sub.Provider = "paystack";
         sub.Plan = plan;
         sub.Status = "active";
         sub.IncludedTransactions = PlanLimits[plan];

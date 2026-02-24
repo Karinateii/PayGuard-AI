@@ -1,12 +1,15 @@
 @page "/pricing"
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using PayGuardAI.Core.Entities
 @using PayGuardAI.Core.Services
+@using PayGuardAI.Data.Services
 @attribute [Authorize(Policy = "RequireAdmin")]
-@inject IBillingService BillingService
+@inject BillingServiceFactory BillingFactory
 @inject NavigationManager Nav
 @inject IConfiguration Config
 @inject PayGuardAI.Core.Services.ITenantContext TenantContext
+@inject AuthenticationStateProvider AuthState
 
 <PageTitle>Pricing — PayGuard AI</PageTitle>
 
@@ -20,6 +23,28 @@
 
     @if (_billingEnabled)
     {
+        @* Payment method selector — only show when both providers are available *@
+        @if (_dualProviderAvailable)
+        {
+            <MudPaper Elevation="0" Class="pa-4 mb-6 d-flex justify-center align-center gap-4"
+                      Style="background: var(--mud-palette-surface); border-radius: 12px;">
+                <MudText Typo="Typo.body1" Style="font-weight:600">Pay with:</MudText>
+                <MudToggleGroup T="string" @bind-Value="_selectedProvider" Color="Color.Primary"
+                                Style="border-radius:8px;">
+                    <MudToggleItem T="string" Value="@("paystack")">
+                        <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Class="mr-1" Size="Size.Small"/>
+                        Paystack
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-1">(Africa)</MudText>
+                    </MudToggleItem>
+                    <MudToggleItem T="string" Value="@("flutterwave")">
+                        <MudIcon Icon="@Icons.Material.Filled.Language" Class="mr-1" Size="Size.Small"/>
+                        Flutterwave
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-1">(International)</MudText>
+                    </MudToggleItem>
+                </MudToggleGroup>
+            </MudPaper>
+        }
+
         <MudGrid Justify="Justify.Center" Spacing="4">
             @foreach (var plan in _plans)
             {
@@ -122,15 +147,38 @@
 @code {
     private IReadOnlyList<PlanInfo> _plans = [];
     private bool _billingEnabled;
+    private bool _dualProviderAvailable;
     private bool _loading;
     private BillingPlan? _checkingOutPlan;
     private string _error = string.Empty;
+    private string _selectedProvider = "paystack";
+    private string _userEmail = "demo@payguard.ai";
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         _billingEnabled = bool.TryParse(Config["FeatureFlags:BillingEnabled"], out var b) && b;
+        _dualProviderAvailable = BillingFactory.IsDualProviderAvailable();
+
+        // Auto-select provider: if only Flutterwave is available, use it
+        if (!BillingFactory.IsPaystackBillingAvailable() && BillingFactory.IsFlutterwaveBillingAvailable())
+            _selectedProvider = "flutterwave";
+
+        // Get current user's email for checkout
+        try
+        {
+            var authState = await AuthState.GetAuthenticationStateAsync();
+            var email = authState.User?.FindFirst("email")?.Value
+                     ?? authState.User?.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
+            if (!string.IsNullOrWhiteSpace(email))
+                _userEmail = email;
+        }
+        catch { /* fallback to demo email */ }
+
         if (_billingEnabled)
-            _plans = BillingService.GetPlans();
+        {
+            var billingService = BillingFactory.GetProvider(_selectedProvider);
+            _plans = billingService.GetPlans();
+        }
     }
 
     private async Task StartCheckout(BillingPlan plan)
@@ -142,12 +190,13 @@
 
         try
         {
+            var billingService = BillingFactory.GetProvider(_selectedProvider);
             var baseUrl = Config["AppUrl"] ?? Nav.BaseUri.TrimEnd('/');
             var callbackUrl = $"{baseUrl}/billing?success=true";
 
-            var checkoutUrl = await BillingService.CreateCheckoutSessionAsync(
+            var checkoutUrl = await billingService.CreateCheckoutSessionAsync(
                 tenantId: TenantContext.TenantId,
-                email: "demo@payguard.ai",
+                email: _userEmail,
                 plan: plan,
                 callbackUrl: callbackUrl);
 

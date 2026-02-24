@@ -6,7 +6,8 @@ namespace PayGuardAI.Core.Services;
 /// Payment-provider-agnostic billing service.
 /// Handles subscriptions, checkout, subscription management, usage metering,
 /// and incoming webhook events.
-/// Current implementation: Paystack (PaystackBillingService).
+/// Implementations: PaystackBillingService (Africa), FlutterwaveBillingService (International).
+/// Use BillingServiceFactory to resolve the correct provider.
 /// </summary>
 public interface IBillingService
 {

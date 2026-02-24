@@ -14,6 +14,7 @@ public static class FeatureFlags
     public const string FlutterwaveEnabledKey = "FlutterwaveEnabled";
     public const string SlackAlertsEnabledKey = "SlackAlertsEnabled";
     public const string BillingEnabledKey = "BillingEnabled";
+    public const string FlutterwaveBillingEnabledKey = "FlutterwaveBillingEnabled";
     public const string EmailNotificationsEnabledKey = "EmailNotificationsEnabled";
     public const string WiseEnabledKey = "WiseEnabled";
 
@@ -49,6 +50,13 @@ public static class FeatureFlags
     {
         var section = config.GetSection(SectionName);
         var value = section[BillingEnabledKey];
+        return bool.TryParse(value, out var result) && result;
+    }
+
+    public static bool IsFlutterwaveBillingEnabled(this IConfiguration config)
+    {
+        var section = config.GetSection(SectionName);
+        var value = section[FlutterwaveBillingEnabledKey];
         return bool.TryParse(value, out var result) && result;
     }
 

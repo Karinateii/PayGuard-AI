@@ -98,6 +98,7 @@ public class DatabaseMigrationService : IDatabaseMigrationService
             ("TenantSubscriptions",     "PaystackPlanCode", ""),
             ("TenantSubscriptions",     "PaystackSubscriptionCode", ""),
             ("TenantSubscriptions",     "BillingEmail", ""),
+            ("TenantSubscriptions",     "Provider", "paystack"),
 
             // ── NotificationPreference extras ──
             ("NotificationPreferences", "DisplayName", ""),

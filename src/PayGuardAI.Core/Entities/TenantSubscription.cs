@@ -23,6 +23,9 @@ public class TenantSubscription
     /// <summary>Email token required by Paystack to enable/disable subscriptions</summary>
     public string? ProviderEmailToken { get; set; }
 
+    /// <summary>Which billing provider owns this subscription: "paystack" or "flutterwave"</summary>
+    public string Provider { get; set; } = "paystack";
+
     /// <summary>Current plan: Starter, Pro, Enterprise, Trial</summary>
     public BillingPlan Plan { get; set; } = BillingPlan.Trial;
 

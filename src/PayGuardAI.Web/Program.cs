@@ -208,8 +208,21 @@ builder.Services.AddSingleton<IWebhookSignatureService, WebhookSignatureService>
 // Register outbound webhook delivery service (POSTs events to customer endpoints)
 builder.Services.AddHttpClient<IWebhookDeliveryService, WebhookDeliveryService>();
 
-// Register Paystack billing service
-builder.Services.AddHttpClient<IBillingService, PaystackBillingService>();
+// Register billing services: Paystack (African) + Flutterwave (international)
+builder.Services.AddHttpClient<PaystackBillingService>();
+builder.Services.AddKeyedScoped<IBillingService, PaystackBillingService>("paystack",
+    (sp, _) => sp.GetRequiredService<PaystackBillingService>());
+
+builder.Services.AddHttpClient<FlutterwaveBillingService>();
+builder.Services.AddKeyedScoped<IBillingService, FlutterwaveBillingService>("flutterwave",
+    (sp, _) => sp.GetRequiredService<FlutterwaveBillingService>());
+
+// Factory to resolve the correct billing provider based on config/preference
+builder.Services.AddScoped<BillingServiceFactory>();
+
+// Default IBillingService registration (for existing code that injects IBillingService directly)
+builder.Services.AddScoped<IBillingService>(sp =>
+    sp.GetRequiredService<BillingServiceFactory>().GetDefault());
 
 // Register admin dashboard service
 builder.Services.AddScoped<IAdminService, AdminService>();

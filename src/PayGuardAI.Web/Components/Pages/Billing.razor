@@ -1,8 +1,9 @@
 @page "/billing"
 @using PayGuardAI.Core.Entities
 @using PayGuardAI.Core.Services
+@using PayGuardAI.Data.Services
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Policy = "RequireManager")]
-@inject IBillingService BillingService
+@inject BillingServiceFactory BillingFactory
 @inject NavigationManager Nav
 @inject IConfiguration Config
 @inject ISnackbar Snackbar
@@ -47,11 +48,19 @@ else
                         </MudText>
                     </CardHeaderContent>
                     <CardHeaderActions>
-                        <MudChip T="string" 
-                                 Color="@GetStatusColor(_subscription?.Status)"
-                                 Size="Size.Small">
-                            @(_subscription?.Status ?? "trialing")
-                        </MudChip>
+                        <div class="d-flex flex-column align-end gap-1">
+                            <MudChip T="string" 
+                                     Color="@GetStatusColor(_subscription?.Status)"
+                                     Size="Size.Small">
+                                @(_subscription?.Status ?? "trialing")
+                            </MudChip>
+                            @if (!string.IsNullOrWhiteSpace(_subscription?.Provider))
+                            {
+                                <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Outlined">
+                                    @(_subscription.Provider == "flutterwave" ? "Flutterwave" : "Paystack")
+                                </MudChip>
+                            }
+                        </div>
                     </CardHeaderActions>
                 </MudCardHeader>
                 <MudCardContent>
@@ -164,6 +173,7 @@ else
     private bool _portalLoading;
     private bool _billingEnabled;
     private bool _success;
+    private IBillingService? _activeBillingService;
 
     [SupplyParameterFromQuery(Name = "success")]
     public bool SuccessParam { get; set; }
@@ -177,7 +187,15 @@ else
         {
             try
             {
-                _subscription = await BillingService.GetSubscriptionAsync(TenantContext.TenantId);
+                // Get subscription using the default billing service first
+                _activeBillingService = BillingFactory.GetDefault();
+                _subscription = await _activeBillingService.GetSubscriptionAsync(TenantContext.TenantId);
+
+                // If the subscription has a specific provider, use that provider's service
+                if (_subscription != null && !string.IsNullOrWhiteSpace(_subscription.Provider))
+                {
+                    _activeBillingService = BillingFactory.GetProvider(_subscription.Provider);
+                }
             }
             catch { /* no subscription yet is fine */ }
         }
@@ -187,7 +205,7 @@ else
 
     private async Task ManageSubscription()
     {
-        if (_subscription == null)
+        if (_subscription == null || _activeBillingService == null)
         {
             Snackbar.Add("No active subscription found. Please subscribe first.", Severity.Warning);
             return;
@@ -196,7 +214,7 @@ else
         _portalLoading = true;
         try
         {
-            var manageUrl = await BillingService.GetManageSubscriptionUrlAsync(TenantContext.TenantId);
+            var manageUrl = await _activeBillingService.GetManageSubscriptionUrlAsync(TenantContext.TenantId);
             Nav.NavigateTo(manageUrl, forceLoad: true);
         }
         catch (Exception ex)
@@ -234,7 +252,8 @@ else
 
     private string[] GetCurrentPlanFeatures()
     {
-        var plan = BillingService.GetPlans()
+        var billingService = _activeBillingService ?? BillingFactory.GetDefault();
+        var plan = billingService.GetPlans()
             .FirstOrDefault(p => p.Plan == (_subscription?.Plan ?? BillingPlan.Trial));
         return plan?.Features ?? ["Real-time risk scoring", "HITL review queue", "14-day free trial"];
     }

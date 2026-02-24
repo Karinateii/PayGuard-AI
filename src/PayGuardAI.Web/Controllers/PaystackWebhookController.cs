@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using PayGuardAI.Core.Services;
+using PayGuardAI.Data.Services;
 
 namespace PayGuardAI.Web.Controllers;
 
@@ -17,12 +17,12 @@ namespace PayGuardAI.Web.Controllers;
 [AllowAnonymous]
 public class PaystackWebhookController : ControllerBase
 {
-    private readonly IBillingService _billingService;
+    private readonly BillingServiceFactory _billingFactory;
     private readonly ILogger<PaystackWebhookController> _logger;
 
-    public PaystackWebhookController(IBillingService billingService, ILogger<PaystackWebhookController> logger)
+    public PaystackWebhookController(BillingServiceFactory billingFactory, ILogger<PaystackWebhookController> logger)
     {
-        _billingService = billingService;
+        _billingFactory = billingFactory;
         _logger = logger;
     }
 
@@ -41,7 +41,8 @@ public class PaystackWebhookController : ControllerBase
 
         try
         {
-            await _billingService.HandleWebhookAsync(payload, signature, cancellationToken);
+            var paystackBilling = _billingFactory.GetPaystack();
+            await paystackBilling.HandleWebhookAsync(payload, signature, cancellationToken);
             return Ok();
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("signature"))
