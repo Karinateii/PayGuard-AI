@@ -17,6 +17,8 @@ public class ReviewService : IReviewService
     private readonly IMemoryCache _cache;
     private readonly ITenantContext _tenantContext;
     private readonly IMetricsService _metrics;
+    private readonly IEmailNotificationService _emailService;
+    private readonly IAlertingService _alertingService;
 
     private const string DashboardCacheKey = "dashboard-stats";
 
@@ -25,13 +27,17 @@ public class ReviewService : IReviewService
         ILogger<ReviewService> logger,
         IMemoryCache cache,
         ITenantContext tenantContext,
-        IMetricsService metrics)
+        IMetricsService metrics,
+        IEmailNotificationService emailService,
+        IAlertingService alertingService)
     {
         _context = context;
         _logger = logger;
         _cache = cache;
         _tenantContext = tenantContext;
         _metrics = metrics;
+        _emailService = emailService;
+        _alertingService = alertingService;
     }
 
     public async Task<RiskAnalysis> ApproveAsync(
@@ -127,7 +133,72 @@ public class ReviewService : IReviewService
         _logger.LogInformation("Transaction {TransactionId} escalated by {Reviewer}", 
             analysis.TransactionId, reviewedBy);
 
+        // Notify managers/admins about the escalation so they can act on it
+        await NotifyEscalationAsync(analysis, reviewedBy, notes, cancellationToken);
+
         return analysis;
+    }
+
+    /// <summary>
+    /// When a transaction is escalated, notify all managers and admins in the tenant
+    /// so someone with authority picks it up for senior review.
+    /// </summary>
+    private async Task NotifyEscalationAsync(
+        RiskAnalysis analysis, 
+        string escalatedBy, 
+        string? notes, 
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var tenantId = _tenantContext.TenantId;
+            
+            // Find all managers/admins/superadmins in this tenant
+            var managers = await _context.TeamMembers
+                .Where(m => m.TenantId == tenantId 
+                         && m.Status == "active"
+                         && (m.Role == "Admin" || m.Role == "SuperAdmin" || m.Role == "Manager")
+                         && m.Email.ToLower() != escalatedBy.ToLower())
+                .ToListAsync(cancellationToken);
+
+            if (!managers.Any())
+            {
+                _logger.LogWarning("No managers found to notify for escalation of transaction {TransactionId}", 
+                    analysis.TransactionId);
+                return;
+            }
+
+            // Send email to each manager
+            foreach (var manager in managers)
+            {
+                await _emailService.SendReviewAssignmentEmailAsync(
+                    tenantId,
+                    manager.Email,
+                    manager.DisplayName ?? manager.Email,
+                    analysis.Transaction.ExternalId ?? analysis.TransactionId.ToString(),
+                    analysis.RiskScore,
+                    analysis.RiskLevel.ToString(),
+                    cancellationToken);
+            }
+
+            // Also send an alert
+            await _alertingService.AlertAsync(
+                $"⚠️ Escalation: Transaction {analysis.Transaction.ExternalId ?? analysis.TransactionId.ToString()} "
+                + $"(Risk Score: {analysis.RiskScore}, Level: {analysis.RiskLevel}) "
+                + $"was escalated by {escalatedBy}."
+                + (string.IsNullOrWhiteSpace(notes) ? "" : $" Reason: {notes}"),
+                cancellationToken);
+
+            _logger.LogInformation(
+                "Escalation notifications sent to {Count} managers for transaction {TransactionId}",
+                managers.Count, analysis.TransactionId);
+        }
+        catch (Exception ex)
+        {
+            // Don't fail the escalation itself if notification fails
+            _logger.LogError(ex, "Failed to send escalation notifications for transaction {TransactionId}",
+                analysis.TransactionId);
+        }
     }
 
     public async Task<IEnumerable<RiskAnalysis>> GetPendingReviewsAsync(

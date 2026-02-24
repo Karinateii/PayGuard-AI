@@ -260,12 +260,13 @@ public class AdvancedAnalyticsService : IAdvancedAnalyticsService
         var auditLogs = await _db.AuditLogs
             .Where(a => a.TenantId == tenantId 
                      && a.CreatedAt >= cutoff
-                     && (a.Action == "TRANSACTION_APPROVED" 
-                      || a.Action == "TRANSACTION_REJECTED" 
-                      || a.Action == "TRANSACTION_ESCALATED"))
+                     && (a.Action == "REVIEW_APPROVED" 
+                      || a.Action == "REVIEW_REJECTED" 
+                      || a.Action == "REVIEW_ESCALATED"))
             .ToListAsync(ct);
 
-        // Build a lookup of transaction creation times for review-time calculation.
+        // Build a lookup of analysis times for review-time calculation.
+        // EntityId in audit logs stores the RiskAnalysis.Id (not TransactionId).
         // Parse EntityId safely — skip any entries that aren't valid GUIDs.
         var entityIds = auditLogs
             .Select(a => Guid.TryParse(a.EntityId, out var id) ? id : (Guid?)null)
@@ -274,10 +275,10 @@ public class AdvancedAnalyticsService : IAdvancedAnalyticsService
             .Distinct()
             .ToList();
 
-        var transactionTimes = await _db.RiskAnalyses
-            .Where(r => entityIds.Contains(r.TransactionId))
-            .Select(r => new { r.TransactionId, r.AnalyzedAt })
-            .ToDictionaryAsync(r => r.TransactionId, r => r.AnalyzedAt, ct);
+        var analysisTimes = await _db.RiskAnalyses
+            .Where(r => entityIds.Contains(r.Id))
+            .Select(r => new { r.Id, r.AnalyzedAt })
+            .ToDictionaryAsync(r => r.Id, r => r.AnalyzedAt, ct);
 
         var analystGroups = auditLogs
             .GroupBy(a => a.PerformedBy)
@@ -290,8 +291,8 @@ public class AdvancedAnalyticsService : IAdvancedAnalyticsService
                 var reviewTimes = g
                     .Select(a =>
                     {
-                        if (!Guid.TryParse(a.EntityId, out var txId)) return -1.0;
-                        if (!transactionTimes.TryGetValue(txId, out var analyzedAt)) return -1.0;
+                        if (!Guid.TryParse(a.EntityId, out var analysisId)) return -1.0;
+                        if (!analysisTimes.TryGetValue(analysisId, out var analyzedAt)) return -1.0;
                         return (a.CreatedAt - analyzedAt).TotalMinutes;
                     })
                     .Where(t => t > 0)
@@ -299,9 +300,9 @@ public class AdvancedAnalyticsService : IAdvancedAnalyticsService
 
                 var avgReviewTime = reviewTimes.Any() ? reviewTimes.Average() : 0;
 
-                var approvals = g.Count(a => a.Action == "TRANSACTION_APPROVED");
-                var rejections = g.Count(a => a.Action == "TRANSACTION_REJECTED");
-                var escalations = g.Count(a => a.Action == "TRANSACTION_ESCALATED");
+                var approvals = g.Count(a => a.Action == "REVIEW_APPROVED");
+                var rejections = g.Count(a => a.Action == "REVIEW_REJECTED");
+                var escalations = g.Count(a => a.Action == "REVIEW_ESCALATED");
                 var total = g.Count();
 
                 return new AnalystPerformance
@@ -351,10 +352,10 @@ public class AdvancedAnalyticsService : IAdvancedAnalyticsService
         var reviews = await _db.AuditLogs
             .Where(a => a.TenantId == tenantId 
                      && a.CreatedAt >= cutoff
-                     && (a.Action == "TRANSACTION_APPROVED" || a.Action == "TRANSACTION_REJECTED"))
+                     && (a.Action == "REVIEW_APPROVED" || a.Action == "REVIEW_REJECTED"))
             .ToListAsync(ct);
 
-        // Parse entity IDs safely
+        // Parse entity IDs safely — EntityId stores RiskAnalysis.Id
         var entityIds = reviews
             .Select(a => Guid.TryParse(a.EntityId, out var id) ? id : (Guid?)null)
             .Where(id => id.HasValue)
@@ -362,17 +363,17 @@ public class AdvancedAnalyticsService : IAdvancedAnalyticsService
             .Distinct()
             .ToList();
 
-        var transactionTimes = await _db.RiskAnalyses
-            .Where(r => entityIds.Contains(r.TransactionId))
-            .Select(r => new { r.TransactionId, r.AnalyzedAt })
-            .ToDictionaryAsync(r => r.TransactionId, r => r.AnalyzedAt, ct);
+        var analysisTimes = await _db.RiskAnalyses
+            .Where(r => entityIds.Contains(r.Id))
+            .Select(r => new { r.Id, r.AnalyzedAt })
+            .ToDictionaryAsync(r => r.Id, r => r.AnalyzedAt, ct);
 
         // Calculate actual review times (minutes between risk analysis and human review)
         var reviewTimes = reviews
             .Select(a =>
             {
-                if (!Guid.TryParse(a.EntityId, out var txId)) return -1.0;
-                if (!transactionTimes.TryGetValue(txId, out var analyzedAt)) return -1.0;
+                if (!Guid.TryParse(a.EntityId, out var analysisId)) return -1.0;
+                if (!analysisTimes.TryGetValue(analysisId, out var analyzedAt)) return -1.0;
                 return (a.CreatedAt - analyzedAt).TotalMinutes;
             })
             .Where(t => t > 0)
@@ -397,26 +398,27 @@ public class AdvancedAnalyticsService : IAdvancedAnalyticsService
         var cutoff = DateTime.UtcNow.AddDays(-days);
         
         // Get audit logs with valid EntityIds only
+        // ReviewService logs actions as REVIEW_APPROVED/REVIEW_REJECTED with EntityId = RiskAnalysis.Id
         var auditLogs = await _db.AuditLogs
             .Where(a => a.TenantId == tenantId 
                      && a.CreatedAt >= cutoff
-                     && (a.Action == "TRANSACTION_APPROVED" || a.Action == "TRANSACTION_REJECTED"))
+                     && (a.Action == "REVIEW_APPROVED" || a.Action == "REVIEW_REJECTED"))
             .ToListAsync(ct);
 
-        // Safely parse EntityIds and filter out invalid ones
-        var logsByTxId = auditLogs
-            .Select(a => new { Log = a, TxId = Guid.TryParse(a.EntityId, out var id) ? id : (Guid?)null })
-            .Where(x => x.TxId.HasValue)
-            .Select(x => new { x.Log, TxId = x.TxId!.Value })
+        // Safely parse EntityIds (which are RiskAnalysis.Id values)
+        var logsByAnalysisId = auditLogs
+            .Select(a => new { Log = a, AnalysisId = Guid.TryParse(a.EntityId, out var id) ? id : (Guid?)null })
+            .Where(x => x.AnalysisId.HasValue)
+            .Select(x => new { x.Log, AnalysisId = x.AnalysisId!.Value })
             .ToList();
 
-        var txIds = logsByTxId.Select(x => x.TxId).Distinct().ToList();
+        var analysisIds = logsByAnalysisId.Select(x => x.AnalysisId).Distinct().ToList();
 
-        // Get risk scores for those transactions
+        // Get risk scores for those analyses
         var riskScores = await _db.RiskAnalyses
-            .Where(r => txIds.Contains(r.TransactionId))
-            .Select(r => new { r.TransactionId, r.RiskScore })
-            .ToDictionaryAsync(r => r.TransactionId, r => r.RiskScore, ct);
+            .Where(r => analysisIds.Contains(r.Id))
+            .Select(r => new { r.Id, r.RiskScore })
+            .ToDictionaryAsync(r => r.Id, r => r.RiskScore, ct);
 
         var riskBands = new Dictionary<string, DecisionRateByRiskBand>
         {
@@ -426,13 +428,13 @@ public class AdvancedAnalyticsService : IAdvancedAnalyticsService
             ["75-100"] = new() { RiskBand = "75-100" }
         };
 
-        foreach (var entry in logsByTxId)
+        foreach (var entry in logsByAnalysisId)
         {
-            if (!riskScores.TryGetValue(entry.TxId, out var score)) continue;
+            if (!riskScores.TryGetValue(entry.AnalysisId, out var score)) continue;
 
             var band = GetRiskBand(score);
             riskBands[band].TotalDecisions++;
-            if (entry.Log.Action == "TRANSACTION_APPROVED")
+            if (entry.Log.Action == "REVIEW_APPROVED")
                 riskBands[band].Approvals++;
             else
                 riskBands[band].Rejections++;
@@ -464,11 +466,11 @@ public class AdvancedAnalyticsService : IAdvancedAnalyticsService
         }
 
         // Count inconsistencies: high-risk approved or low-risk rejected
-        var inconsistencies = logsByTxId.Count(x =>
+        var inconsistencies = logsByAnalysisId.Count(x =>
         {
-            if (!riskScores.TryGetValue(x.TxId, out var score)) return false;
-            return (score >= 75 && x.Log.Action == "TRANSACTION_APPROVED") ||
-                   (score < 25 && x.Log.Action == "TRANSACTION_REJECTED");
+            if (!riskScores.TryGetValue(x.AnalysisId, out var score)) return false;
+            return (score >= 75 && x.Log.Action == "REVIEW_APPROVED") ||
+                   (score < 25 && x.Log.Action == "REVIEW_REJECTED");
         });
 
         return new DecisionConsistencyMetrics
@@ -520,17 +522,22 @@ public class AdvancedAnalyticsService : IAdvancedAnalyticsService
         var reviewedLogs = await _db.AuditLogs
             .Where(a => a.TenantId == tenantId 
                      && a.CreatedAt >= onboardingDate
-                     && (a.Action == "TRANSACTION_APPROVED" || a.Action == "TRANSACTION_REJECTED"))
+                     && (a.Action == "REVIEW_APPROVED" || a.Action == "REVIEW_REJECTED"))
             .ToListAsync(ct);
 
-        var rejections = reviewedLogs.Count(a => a.Action == "TRANSACTION_REJECTED");
-        var approvals = reviewedLogs.Count(a => a.Action == "TRANSACTION_APPROVED");
+        var rejections = reviewedLogs.Count(a => a.Action == "REVIEW_REJECTED");
+        var approvals = reviewedLogs.Count(a => a.Action == "REVIEW_APPROVED");
 
-        // Safely parse EntityIds for fraud value calculation
-        var rejectedTxIds = reviewedLogs
-            .Where(r => r.Action == "TRANSACTION_REJECTED" && Guid.TryParse(r.EntityId, out _))
+        // EntityId stores RiskAnalysis.Id — resolve to TransactionId for amount lookup
+        var rejectedAnalysisIds = reviewedLogs
+            .Where(r => r.Action == "REVIEW_REJECTED" && Guid.TryParse(r.EntityId, out _))
             .Select(r => Guid.Parse(r.EntityId!))
             .ToHashSet();
+
+        var rejectedTxIds = await _db.RiskAnalyses
+            .Where(r => rejectedAnalysisIds.Contains(r.Id))
+            .Select(r => r.TransactionId)
+            .ToListAsync(ct);
 
         // Estimate fraud value prevented (assume rejections were fraud)
         var fraudValuePrevented = allTransactions
@@ -637,7 +644,10 @@ public class AdvancedAnalyticsService : IAdvancedAnalyticsService
 
     private string CsvEscape(string value)
     {
-        if (value.Contains(',') || value.Contains('"') || value.Contains('\n'))
+        // Always quote values that contain commas, quotes, newlines, or look like dates/numbers
+        // to prevent Excel from auto-interpreting and showing ### or wrong formats
+        if (value.Contains(',') || value.Contains('"') || value.Contains('\n') 
+            || value.Contains('-') || value.Contains('/') || value.Contains(':'))
             return $"\"{value.Replace("\"", "\"\"")}\"";
         return value;
     }
@@ -673,7 +683,7 @@ public class AdvancedAnalyticsService : IAdvancedAnalyticsService
         var total = reviewList.Count;
         if (total == 0) return 0;
 
-        var falsePositives = reviewList.Count(r => r.Action == "TRANSACTION_APPROVED");
+        var falsePositives = reviewList.Count(r => r.Action == "REVIEW_APPROVED");
         return (double)falsePositives / total * 100;
     }
 
