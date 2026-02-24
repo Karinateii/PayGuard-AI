@@ -184,10 +184,20 @@
                     }
 
                     @if (_selectedTransaction.RiskAnalysis.ReviewStatus == ReviewStatus.Pending ||
-                         _selectedTransaction.RiskAnalysis.ReviewStatus == ReviewStatus.Escalated)
+                         (_selectedTransaction.RiskAnalysis.ReviewStatus == ReviewStatus.Escalated && _isManagerOrAbove))
                     {
                         <MudDivider Class="mb-3" />
-                        <MudText Typo="Typo.subtitle2" Class="mb-2">Human-in-the-Loop Review</MudText>
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">
+                            @if (_selectedTransaction.RiskAnalysis.ReviewStatus == ReviewStatus.Escalated)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.PriorityHigh" Color="Color.Warning" Size="Size.Small" Class="mr-1" />
+                                @:Escalated — Senior Review Required
+                            }
+                            else
+                            {
+                                @:Human-in-the-Loop Review
+                            }
+                        </MudText>
                         <MudStack Spacing="2">
                             <MudButton Variant="Variant.Filled" Color="Color.Success" FullWidth="true"
                                        StartIcon="@Icons.Material.Filled.CheckCircle"
@@ -209,6 +219,15 @@
                                 </MudButton>
                             }
                         </MudStack>
+                    }
+                    else if (_selectedTransaction.RiskAnalysis.ReviewStatus == ReviewStatus.Escalated && !_isManagerOrAbove)
+                    {
+                        <MudDivider Class="mb-3" />
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                            <MudIcon Icon="@Icons.Material.Filled.PriorityHigh" Size="Size.Small" Class="mr-1" />
+                            This transaction has been escalated for senior review. 
+                            A manager or admin will handle the final decision.
+                        </MudAlert>
                     }
                     else if (_selectedTransaction.RiskAnalysis.ReviewedAt.HasValue)
                     {
@@ -426,10 +445,19 @@ else
                 }
                 
                 @if (_selectedTransaction.RiskAnalysis?.ReviewStatus == ReviewStatus.Pending ||
-                     _selectedTransaction.RiskAnalysis?.ReviewStatus == ReviewStatus.Escalated)
+                     (_selectedTransaction.RiskAnalysis?.ReviewStatus == ReviewStatus.Escalated && _isManagerOrAbove))
                 {
                     <MudDivider Class="my-4" />
-                    <MudText Typo="Typo.subtitle2" Class="mb-2">Quick Actions</MudText>
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">
+                        @if (_selectedTransaction.RiskAnalysis?.ReviewStatus == ReviewStatus.Escalated)
+                        {
+                            @:⚠️ Escalated — Senior Review
+                        }
+                        else
+                        {
+                            @:Quick Actions
+                        }
+                    </MudText>
                     <MudStack Row="true" Spacing="2">
                         <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small"
                                    StartIcon="@Icons.Material.Filled.CheckCircle"
@@ -451,6 +479,13 @@ else
                             </MudButton>
                         }
                     </MudStack>
+                }
+                else if (_selectedTransaction.RiskAnalysis?.ReviewStatus == ReviewStatus.Escalated && !_isManagerOrAbove)
+                {
+                    <MudDivider Class="my-4" />
+                    <MudAlert Severity="Severity.Info" Dense="true" Variant="Variant.Outlined">
+                        Escalated for senior review.
+                    </MudAlert>
                 }
                 
                 <MudDivider Class="my-4" />
