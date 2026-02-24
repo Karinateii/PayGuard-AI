@@ -298,5 +298,13 @@ public class ApplicationDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.TenantId, e.Email }).IsUnique();
         });
+
+        // CustomReport configuration (Advanced Analytics)
+        modelBuilder.Entity<CustomReport>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.TenantId);
+            entity.HasIndex(e => new { e.TenantId, e.CreatedBy });
+        });
     }
 }

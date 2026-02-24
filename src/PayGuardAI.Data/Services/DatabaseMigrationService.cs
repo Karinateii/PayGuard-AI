@@ -43,6 +43,9 @@ public class DatabaseMigrationService : IDatabaseMigrationService
             // Create MagicLinkTokens table if it doesn't exist (added after initial DB)
             await CreateMagicLinkTokensTableAsync(dbType);
 
+            // Create CustomReports table if it doesn't exist (added for Advanced Analytics)
+            await CreateCustomReportsTableAsync(dbType);
+
             // Mark existing tenants as onboarded so they aren't redirected
             await MarkExistingTenantsOnboardedAsync(dbType);
 
@@ -309,6 +312,83 @@ public class DatabaseMigrationService : IDatabaseMigrationService
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Skipping MagicLinkTokens table creation");
+        }
+    }
+
+    /// <summary>
+    /// Creates the CustomReports table if it doesn't already exist.
+    /// Added for the Advanced Analytics feature — stores user-defined report definitions.
+    /// </summary>
+    private async Task CreateCustomReportsTableAsync(string dbType)
+    {
+        try
+        {
+            if (dbType == "PostgreSQL")
+            {
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS "CustomReports" (
+                        "Id" uuid NOT NULL PRIMARY KEY,
+                        "TenantId" text NOT NULL DEFAULT '',
+                        "Name" text NOT NULL DEFAULT '',
+                        "Description" text,
+                        "ReportType" text NOT NULL DEFAULT 'transactions',
+                        "StartDate" timestamp with time zone,
+                        "EndDate" timestamp with time zone,
+                        "Filters" text,
+                        "Grouping" text,
+                        "IsScheduled" boolean NOT NULL DEFAULT false,
+                        "ScheduleCron" text,
+                        "EmailRecipients" text,
+                        "CreatedBy" text NOT NULL DEFAULT '',
+                        "CreatedAt" timestamp with time zone NOT NULL DEFAULT now()
+                    )
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS "IX_CustomReports_TenantId"
+                    ON "CustomReports" ("TenantId")
+                    """);
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS "IX_CustomReports_TenantId_CreatedBy"
+                    ON "CustomReports" ("TenantId", "CreatedBy")
+                    """);
+            }
+            else
+            {
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS CustomReports (
+                        Id TEXT NOT NULL PRIMARY KEY,
+                        TenantId TEXT NOT NULL DEFAULT '',
+                        Name TEXT NOT NULL DEFAULT '',
+                        Description TEXT,
+                        ReportType TEXT NOT NULL DEFAULT 'transactions',
+                        StartDate TEXT,
+                        EndDate TEXT,
+                        Filters TEXT,
+                        Grouping TEXT,
+                        IsScheduled INTEGER NOT NULL DEFAULT 0,
+                        ScheduleCron TEXT,
+                        EmailRecipients TEXT,
+                        CreatedBy TEXT NOT NULL DEFAULT '',
+                        CreatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+                    )
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS IX_CustomReports_TenantId
+                    ON CustomReports (TenantId)
+                    """);
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS IX_CustomReports_TenantId_CreatedBy
+                    ON CustomReports (TenantId, CreatedBy)
+                    """);
+            }
+
+            _logger.LogDebug("CustomReports table ensured");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipping CustomReports table creation");
         }
     }
 

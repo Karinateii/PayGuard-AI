@@ -1,10 +1,13 @@
 @page "/admin/reports"
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using PayGuardAI.Core.Services
 @attribute [Authorize(Policy = "RequireManager")]
 @inject IAdvancedAnalyticsService AnalyticsService
 @inject ITenantContext TenantContext
+@inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Advanced Reports — PayGuard AI</PageTitle>
 
@@ -13,46 +16,77 @@
         <MudIcon Icon="@Icons.Material.Filled.Assessment" Class="mr-2" />
         Advanced Reports
     </MudText>
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenCreateReportDialog"
-               StartIcon="@Icons.Material.Filled.Add">
-        Create Report
-    </MudButton>
+    <MudStack Row="true" Spacing="2">
+        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="RefreshAll"
+                   StartIcon="@Icons.Material.Filled.Refresh" Disabled="_loading">
+            Refresh
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenCreateReportDialog"
+                   StartIcon="@Icons.Material.Filled.Add">
+            Create Report
+        </MudButton>
+    </MudStack>
 </MudStack>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
 
 <MudTabs Elevation="4" Rounded="true" Color="Color.Primary" Class="mb-4">
     <!-- Saved Reports Tab -->
     <MudTabPanel Text="My Reports" Icon="@Icons.Material.Filled.Description">
-        @if (_loading)
+        @if (_reportsError != null)
         {
-            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            <MudAlert Severity="Severity.Error" Class="my-4">@_reportsError</MudAlert>
         }
         else if (_reports.Any())
         {
-            <MudGrid>
+            <MudGrid Class="mt-2">
                 @foreach (var report in _reports)
                 {
                     <MudItem xs="12" md="6" lg="4">
-                        <MudCard>
+                        <MudCard Elevation="2">
                             <MudCardHeader>
                                 <CardHeaderContent>
                                     <MudText Typo="Typo.h6">@report.Name</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@report.ReportType</MudText>
+                                    <MudChip T="string" Size="Size.Small" Color="@GetReportTypeColor(report.ReportType)">
+                                        @GetReportTypeLabel(report.ReportType)
+                                    </MudChip>
                                 </CardHeaderContent>
                                 <CardHeaderActions>
-                                    <MudIconButton Icon="@Icons.Material.Filled.PlayArrow" Color="Color.Primary" 
-                                                   OnClick="@(() => RunReport(report.Id))" Size="Size.Small" />
-                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" 
-                                                   OnClick="@(() => DeleteReport(report.Id))" Size="Size.Small" />
+                                    <MudTooltip Text="Run Report">
+                                        <MudIconButton Icon="@Icons.Material.Filled.PlayArrow" Color="Color.Primary"
+                                                       OnClick="@(() => RunReport(report.Id))" Size="Size.Small" />
+                                    </MudTooltip>
+                                    <MudTooltip Text="Delete">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                                       OnClick="@(() => DeleteReport(report.Id))" Size="Size.Small" />
+                                    </MudTooltip>
                                 </CardHeaderActions>
                             </MudCardHeader>
                             <MudCardContent>
-                                <MudText>@report.Description</MudText>
-                                @if (report.IsScheduled)
+                                @if (!string.IsNullOrWhiteSpace(report.Description))
                                 {
-                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Class="mt-2">
-                                        Scheduled: @report.ScheduleCron
-                                    </MudChip>
+                                    <MudText Typo="Typo.body2">@report.Description</MudText>
                                 }
+                                <MudStack Row="true" Spacing="2" Class="mt-2">
+                                    @if (report.StartDate.HasValue && report.EndDate.HasValue)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
+                                            @report.StartDate.Value.ToString("MMM dd") — @report.EndDate.Value.ToString("MMM dd")
+                                        </MudChip>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(report.Grouping))
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Info">
+                                            Group: @report.Grouping
+                                        </MudChip>
+                                    }
+                                </MudStack>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                                    Created @report.CreatedAt.ToString("MMM dd, yyyy") by @report.CreatedBy
+                                </MudText>
                             </MudCardContent>
                         </MudCard>
                     </MudItem>
@@ -61,71 +95,102 @@
         }
         else
         {
-            <MudAlert Severity="Severity.Info">No reports yet. Create your first custom report!</MudAlert>
+            <MudAlert Severity="Severity.Info" Class="my-4">
+                No reports yet. Click <strong>Create Report</strong> to build your first custom report.
+            </MudAlert>
         }
     </MudTabPanel>
 
     <!-- Risk Trends Tab -->
     <MudTabPanel Text="Risk Trends" Icon="@Icons.Material.Filled.TrendingUp">
         <MudStack Spacing="4" Class="mt-4">
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudText Typo="Typo.h6" Class="mb-4">Risk Score Trend (Last 30 Days)</MudText>
-                @if (_riskTrend != null && _riskTrend.DailyAverageRisk.Any())
-                {
-                    <MudChart ChartType="ChartType.Line" ChartSeries="@_riskTrendSeries" 
-                              XAxisLabels="@_riskTrendLabels" Width="100%" Height="300px" />
-                    <MudText Color="@(_riskTrend.OverallTrend < 0 ? Color.Success : Color.Warning)" Class="mt-2">
-                        <MudIcon Icon="@(_riskTrend.OverallTrend < 0 ? Icons.Material.Filled.TrendingDown : Icons.Material.Filled.TrendingUp)" />
-                        @(_riskTrend.OverallTrend < 0 ? "Improving" : "Worsening") 
-                        (Trend: @_riskTrend.OverallTrend.ToString("F2"), StdDev: @_riskTrend.StandardDeviation.ToString("F2"))
-                    </MudText>
-                }
-                else
-                {
-                    <MudText Color="Color.Secondary">No data available.</MudText>
-                }
-            </MudPaper>
+            @if (_riskTrendError != null)
+            {
+                <MudAlert Severity="Severity.Error">@_riskTrendError</MudAlert>
+            }
+            else
+            {
+                <MudPaper Class="pa-4" Elevation="2">
+                    <MudText Typo="Typo.h6" Class="mb-4">Risk Score Trend (Last 30 Days)</MudText>
+                    @if (_riskTrend != null && _riskTrend.DailyAverageRisk.Any())
+                    {
+                        <MudChart ChartType="ChartType.Line" ChartSeries="@_riskTrendSeries"
+                                  XAxisLabels="@_riskTrendLabels" Width="100%" Height="300px" />
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mt-2">
+                            <MudIcon Icon="@(_riskTrend.OverallTrend < 0 ? Icons.Material.Filled.TrendingDown : Icons.Material.Filled.TrendingUp)"
+                                     Color="@(_riskTrend.OverallTrend < 0 ? Color.Success : Color.Warning)" />
+                            <MudText Color="@(_riskTrend.OverallTrend < 0 ? Color.Success : Color.Warning)">
+                                @(_riskTrend.OverallTrend < 0 ? "Improving" : "Worsening")
+                                (Slope: @(_riskTrend.OverallTrend.ToString("F2")), StdDev: @(_riskTrend.StandardDeviation.ToString("F2")))
+                            </MudText>
+                        </MudStack>
+                    }
+                    else
+                    {
+                        <MudText Color="Color.Secondary">No risk data available for the past 30 days.</MudText>
+                    }
+                </MudPaper>
 
-            <MudPaper Class="pa-4" Elevation="2">
-                <MudText Typo="Typo.h6" Class="mb-4">Corridor Risk Heatmap</MudText>
-                @if (_corridorRisks.Any())
-                {
-                    <MudSimpleTable Hover="true" Dense="true">
-                        <thead>
-                            <tr>
-                                <th>Corridor</th>
-                                <th>Transactions</th>
-                                <th>Avg Risk</th>
-                                <th>High Risk %</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var corridor in _corridorRisks.Take(10))
-                            {
+                <MudPaper Class="pa-4" Elevation="2">
+                    <MudText Typo="Typo.h6" Class="mb-4">Corridor Risk Heatmap</MudText>
+                    @if (_corridorRisks.Any())
+                    {
+                        <MudSimpleTable Hover="true" Dense="true">
+                            <thead>
                                 <tr>
-                                    <td>@corridor.SourceCountry → @corridor.DestinationCountry</td>
-                                    <td>@corridor.TransactionCount</td>
-                                    <td><MudChip T="string" Size="Size.Small" Color="@GetRiskColor(corridor.AverageRiskScore)">
-                                        @corridor.AverageRiskScore.ToString("F1")
-                                    </MudChip></td>
-                                    <td>@(((double)corridor.HighRiskCount / corridor.TransactionCount * 100).ToString("F1"))%</td>
+                                    <th>Corridor</th>
+                                    <th>Transactions</th>
+                                    <th>Avg Risk</th>
+                                    <th>High Risk %</th>
                                 </tr>
-                            }
-                        </tbody>
-                    </MudSimpleTable>
-                }
-                else
-                {
-                    <MudText Color="Color.Secondary">No corridor data available.</MudText>
-                }
-            </MudPaper>
+                            </thead>
+                            <tbody>
+                                @foreach (var corridor in _corridorRisks.Take(10))
+                                {
+                                    <tr>
+                                        <td>@corridor.SourceCountry → @corridor.DestinationCountry</td>
+                                        <td>@corridor.TransactionCount</td>
+                                        <td>
+                                            <MudChip T="string" Size="Size.Small" Color="@GetRiskColor(corridor.AverageRiskScore)">
+                                                @corridor.AverageRiskScore.ToString("F1")
+                                            </MudChip>
+                                        </td>
+                                        <td>@(corridor.TransactionCount > 0 ? ((double)corridor.HighRiskCount / corridor.TransactionCount * 100).ToString("F1") : "0")%</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                    else
+                    {
+                        <MudText Color="Color.Secondary">No corridor data available.</MudText>
+                    }
+                </MudPaper>
+
+                <MudPaper Class="pa-4" Elevation="2">
+                    <MudText Typo="Typo.h6" Class="mb-4">Daily Flagged Transaction Rate</MudText>
+                    @if (_flaggedRates.Any())
+                    {
+                        <MudChart ChartType="ChartType.Line" ChartSeries="@_flaggedRateSeries"
+                                  XAxisLabels="@_flaggedRateLabels" Width="100%" Height="250px" />
+                    }
+                    else
+                    {
+                        <MudText Color="Color.Secondary">No flagged transaction data.</MudText>
+                    }
+                </MudPaper>
+            }
         </MudStack>
     </MudTabPanel>
 
     <!-- Team Performance Tab -->
     <MudTabPanel Text="Team Performance" Icon="@Icons.Material.Filled.Group">
         <MudStack Spacing="4" Class="mt-4">
-            @if (_teamPerformance != null)
+            @if (_teamError != null)
+            {
+                <MudAlert Severity="Severity.Error">@_teamError</MudAlert>
+            }
+            else if (_teamPerformance != null)
             {
                 <MudGrid>
                     <MudItem xs="12" md="3">
@@ -151,45 +216,228 @@
                             <MudStack AlignItems="AlignItems.Center">
                                 <MudIcon Icon="@Icons.Material.Filled.Timer" Size="Size.Large" Color="Color.Warning" />
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">Avg Review Time</MudText>
-                                <MudText Typo="Typo.h4">@_teamPerformance.AverageReviewTimeMinutes.ToString("F1")m</MudText>
+                                <MudText Typo="Typo.h4">@(_teamPerformance.AverageReviewTimeMinutes.ToString("F1"))m</MudText>
                             </MudStack>
                         </MudPaper>
                     </MudItem>
                     <MudItem xs="12" md="3">
                         <MudPaper Class="pa-4" Elevation="2">
                             <MudStack AlignItems="AlignItems.Center">
-                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Large" Color="Color.Success" />
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">Agreement Rate</MudText>
-                                <MudText Typo="Typo.h4">@_teamPerformance.InterRaterAgreement.ToString("F0")%</MudText>
+                                <MudIcon Icon="@Icons.Material.Filled.Speed" Size="Size.Large" Color="Color.Success" />
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Median Review Time</MudText>
+                                <MudText Typo="Typo.h4">@(_teamPerformance.MedianReviewTimeMinutes.ToString("F1"))m</MudText>
                             </MudStack>
                         </MudPaper>
                     </MudItem>
                 </MudGrid>
 
+                @if (_reviewTimeDistribution.Any() && _reviewTimeDistribution.Any(d => d.Count > 0))
+                {
+                    <MudPaper Class="pa-4" Elevation="2">
+                        <MudText Typo="Typo.h6" Class="mb-4">Review Time Distribution</MudText>
+                        <MudChart ChartType="ChartType.Bar" ChartSeries="@_reviewTimeSeries"
+                                  XAxisLabels="@_reviewTimeLabels" Width="100%" Height="250px" />
+                    </MudPaper>
+                }
+
                 <MudPaper Class="pa-4" Elevation="2">
-                    <MudText Typo="Typo.h6" Class="mb-4">Top Performers</MudText>
-                    <MudSimpleTable Hover="true" Dense="true">
-                        <thead>
-                            <tr>
-                                <th>Analyst</th>
-                                <th>Reviews</th>
-                                <th>Avg Time</th>
-                                <th>Approval Rate</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var analyst in _teamPerformance.TopPerformers)
-                            {
+                    <MudText Typo="Typo.h6" Class="mb-4">Analyst Leaderboard</MudText>
+                    @if (_teamPerformance.TopPerformers.Any())
+                    {
+                        <MudSimpleTable Hover="true" Dense="true">
+                            <thead>
                                 <tr>
-                                    <td>@analyst.AnalystName</td>
-                                    <td>@analyst.TotalReviews</td>
-                                    <td>@analyst.AverageReviewTimeMinutes.ToString("F1") min</td>
-                                    <td>@analyst.ApprovalRate.ToString("F1")%</td>
+                                    <th>#</th>
+                                    <th>Analyst</th>
+                                    <th>Reviews</th>
+                                    <th>Avg Time</th>
+                                    <th>Approvals</th>
+                                    <th>Rejections</th>
+                                    <th>Approval Rate</th>
                                 </tr>
-                            }
-                        </tbody>
-                    </MudSimpleTable>
+                            </thead>
+                            <tbody>
+                                @{ var rank = 0; }
+                                @foreach (var analyst in _teamPerformance.TopPerformers)
+                                {
+                                    rank++;
+                                    <tr>
+                                        <td>
+                                            @if (rank <= 3)
+                                            {
+                                                <MudIcon Icon="@Icons.Material.Filled.EmojiEvents"
+                                                         Color="@(rank == 1 ? Color.Warning : rank == 2 ? Color.Default : Color.Dark)"
+                                                         Size="Size.Small" />
+                                            }
+                                            else
+                                            {
+                                                @rank
+                                            }
+                                        </td>
+                                        <td>@analyst.AnalystName</td>
+                                        <td>@analyst.TotalReviews</td>
+                                        <td>@(analyst.AverageReviewTimeMinutes.ToString("F1")) min</td>
+                                        <td>@analyst.ApprovalsCount</td>
+                                        <td>@analyst.RejectionsCount</td>
+                                        <td>
+                                            <MudProgressLinear Color="@(analyst.ApprovalRate > 80 ? Color.Success : analyst.ApprovalRate > 50 ? Color.Info : Color.Warning)"
+                                                               Value="@analyst.ApprovalRate" Max="100" Class="my-1"
+                                                               Style="min-width: 80px;" />
+                                            <MudText Typo="Typo.caption">@(analyst.ApprovalRate.ToString("F1"))%</MudText>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                    else
+                    {
+                        <MudText Color="Color.Secondary">No analyst data available.</MudText>
+                    }
                 </MudPaper>
+            }
+        </MudStack>
+    </MudTabPanel>
+
+    <!-- Decision Insights Tab -->
+    <MudTabPanel Text="Decision Insights" Icon="@Icons.Material.Filled.Balance">
+        <MudStack Spacing="4" Class="mt-4">
+            @if (_insightsError != null)
+            {
+                <MudAlert Severity="Severity.Error">@_insightsError</MudAlert>
+            }
+            else
+            {
+                @if (_decisionConsistency != null)
+                {
+                    <MudGrid>
+                        <MudItem xs="12" md="4">
+                            <MudPaper Class="pa-4" Elevation="2">
+                                <MudStack AlignItems="AlignItems.Center">
+                                    <MudIcon Icon="@Icons.Material.Filled.Balance" Size="Size.Large"
+                                             Color="@(_decisionConsistency.OverallConsistency >= 0.7 ? Color.Success : Color.Warning)" />
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Decision Consistency</MudText>
+                                    <MudText Typo="Typo.h4">@((_decisionConsistency.OverallConsistency * 100).ToString("F0"))%</MudText>
+                                </MudStack>
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudPaper Class="pa-4" Elevation="2">
+                                <MudStack AlignItems="AlignItems.Center">
+                                    <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Large" Color="Color.Warning" />
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Inconsistent Decisions</MudText>
+                                    <MudText Typo="Typo.h4">@_decisionConsistency.TotalInconsistencies</MudText>
+                                </MudStack>
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudPaper Class="pa-4" Elevation="2">
+                                <MudStack AlignItems="AlignItems.Center">
+                                    <MudIcon Icon="@Icons.Material.Filled.PersonSearch" Size="Size.Large" Color="Color.Info" />
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Outlier Analysts</MudText>
+                                    <MudText Typo="Typo.h4">@_outlierAnalysts.Count</MudText>
+                                </MudStack>
+                            </MudPaper>
+                        </MudItem>
+                    </MudGrid>
+
+                    <MudPaper Class="pa-4" Elevation="2">
+                        <MudText Typo="Typo.h6" Class="mb-4">Approval Rates by Risk Band</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                            Lower risk transactions should have higher approval rates. Deviations may indicate inconsistent decision-making.
+                        </MudText>
+                        <MudSimpleTable Hover="true" Dense="true">
+                            <thead>
+                                <tr>
+                                    <th>Risk Band</th>
+                                    <th>Total Decisions</th>
+                                    <th>Approvals</th>
+                                    <th>Rejections</th>
+                                    <th>Approval Rate</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var band in _decisionConsistency.ApprovalRatesByRiskScore.Values.OrderBy(b => b.RiskBand))
+                                {
+                                    var expectedRange = GetExpectedApprovalRange(band.RiskBand);
+                                    var isNormal = band.TotalDecisions == 0 ||
+                                                   (band.ApprovalRate >= expectedRange.min && band.ApprovalRate <= expectedRange.max);
+                                    <tr>
+                                        <td>
+                                            <MudChip T="string" Size="Size.Small" Color="@GetRiskBandColor(band.RiskBand)">
+                                                @band.RiskBand
+                                            </MudChip>
+                                        </td>
+                                        <td>@band.TotalDecisions</td>
+                                        <td>@band.Approvals</td>
+                                        <td>@band.Rejections</td>
+                                        <td>
+                                            <MudProgressLinear Color="@(isNormal ? Color.Success : Color.Warning)"
+                                                               Value="@band.ApprovalRate" Max="100"
+                                                               Style="min-width: 80px;" />
+                                            <MudText Typo="Typo.caption">@(band.ApprovalRate.ToString("F1"))%</MudText>
+                                        </td>
+                                        <td>
+                                            @if (band.TotalDecisions == 0)
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">No data</MudChip>
+                                            }
+                                            else if (isNormal)
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Color="Color.Success">Normal</MudChip>
+                                            }
+                                            else
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Color="Color.Warning">Review</MudChip>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    </MudPaper>
+                }
+
+                @if (_outlierAnalysts.Any())
+                {
+                    <MudPaper Class="pa-4" Elevation="2">
+                        <MudText Typo="Typo.h6" Class="mb-2">
+                            <MudIcon Icon="@Icons.Material.Filled.ReportProblem" Class="mr-1" />
+                            Outlier Analysts
+                        </MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                            Analysts whose approval rates differ significantly from the team average.
+                        </MudText>
+                        <MudGrid>
+                            @foreach (var outlier in _outlierAnalysts)
+                            {
+                                <MudItem xs="12" md="6">
+                                    <MudAlert Severity="@(outlier.OutlierType == "too-lenient" ? Severity.Warning : Severity.Info)"
+                                              Dense="true">
+                                        <MudStack>
+                                            <MudText Typo="Typo.subtitle2">@outlier.AnalystName</MudText>
+                                            <MudText Typo="Typo.body2">
+                                                @(outlier.OutlierType == "too-lenient" ? "Approves more than average" : "Rejects more than average")
+                                            </MudText>
+                                            <MudText Typo="Typo.caption">
+                                                Approval rate: <strong>@(outlier.ApprovalRate.ToString("F1"))%</strong>
+                                                vs team avg: @(outlier.TeamAverageApprovalRate.ToString("F1"))%
+                                            </MudText>
+                                        </MudStack>
+                                    </MudAlert>
+                                </MudItem>
+                            }
+                        </MudGrid>
+                    </MudPaper>
+                }
+                else if (_decisionConsistency != null)
+                {
+                    <MudAlert Severity="Severity.Success">
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-1" />
+                        No outlier analysts detected. Team decisions are consistent.
+                    </MudAlert>
+                }
             }
         </MudStack>
     </MudTabPanel>
@@ -197,11 +445,15 @@
     <!-- ROI Calculator Tab -->
     <MudTabPanel Text="ROI Calculator" Icon="@Icons.Material.Filled.AttachMoney">
         <MudStack Spacing="4" Class="mt-4">
-            @if (_roiMetrics != null)
+            @if (_roiError != null)
+            {
+                <MudAlert Severity="Severity.Error">@_roiError</MudAlert>
+            }
+            else if (_roiMetrics != null)
             {
                 <MudAlert Severity="Severity.Success" Class="mb-4">
-                    <MudText Typo="Typo.h6">PayGuard AI has prevented an estimated 
-                        <strong>$@(_roiMetrics.EstimatedFraudValuePrevented.ToString("N0"))</strong> in fraud 
+                    <MudText Typo="Typo.h6">PayGuard AI has prevented an estimated
+                        <strong>$@(_roiMetrics.EstimatedFraudValuePrevented.ToString("N0"))</strong> in fraud
                         over <strong>@_roiMetrics.DaysSinceOnboarding days</strong>.
                     </MudText>
                 </MudAlert>
@@ -239,11 +491,11 @@
                 <MudPaper Class="pa-4" Elevation="2">
                     <MudText Typo="Typo.h6" Class="mb-2">Summary</MudText>
                     <MudStack Spacing="2">
-                        <MudText>• <strong>@_roiMetrics.TotalTransactionsMonitored.ToString("N0")</strong> transactions monitored</MudText>
-                        <MudText>• <strong>@_roiMetrics.TruePositives</strong> true positives (fraud correctly caught)</MudText>
-                        <MudText>• <strong>@_roiMetrics.FalsePositives</strong> false positives (legitimate flagged as fraud)</MudText>
-                        <MudText>• False positive rate: <strong>@(_roiMetrics.FalsePositiveRate.ToString("F1"))%</strong> (was @(_roiMetrics.FalsePositiveRateAtOnboarding.ToString("F1"))% at onboarding)</MudText>
-                        <MudText>• Estimated cost savings: <strong>$@(_roiMetrics.CostSavings.ToString("N0"))</strong></MudText>
+                        <MudText>Transactions monitored: <strong>@(_roiMetrics.TotalTransactionsMonitored.ToString("N0"))</strong></MudText>
+                        <MudText>True positives (fraud caught): <strong>@_roiMetrics.TruePositives</strong></MudText>
+                        <MudText>False positives (legitimate flagged): <strong>@_roiMetrics.FalsePositives</strong></MudText>
+                        <MudText>False positive rate: <strong>@(_roiMetrics.FalsePositiveRate.ToString("F1"))%</strong> (was @(_roiMetrics.FalsePositiveRateAtOnboarding.ToString("F1"))% at onboarding)</MudText>
+                        <MudText>Estimated cost savings: <strong>$@(_roiMetrics.CostSavings.ToString("N0"))</strong></MudText>
                     </MudStack>
                 </MudPaper>
             }
@@ -256,106 +508,186 @@
     private List<CustomReport> _reports = [];
     private RiskTrendAnalysis? _riskTrend;
     private List<CorridorRiskScore> _corridorRisks = [];
+    private List<DailyMetric> _flaggedRates = [];
     private TeamPerformanceMetrics? _teamPerformance;
+    private List<ReviewTimeDistribution> _reviewTimeDistribution = [];
+    private DecisionConsistencyMetrics? _decisionConsistency;
+    private List<OutlierAnalyst> _outlierAnalysts = [];
     private RoiMetrics? _roiMetrics;
 
     private List<ChartSeries> _riskTrendSeries = [];
     private string[] _riskTrendLabels = [];
+    private List<ChartSeries> _flaggedRateSeries = [];
+    private string[] _flaggedRateLabels = [];
+    private List<ChartSeries> _reviewTimeSeries = [];
+    private string[] _reviewTimeLabels = [];
+
+    private string? _reportsError;
+    private string? _riskTrendError;
+    private string? _teamError;
+    private string? _insightsError;
+    private string? _roiError;
 
     protected override async Task OnInitializedAsync()
     {
-        try
-        {
-            _loading = true;
-            await LoadReportsAsync();
-            await LoadRiskTrendsAsync();
-            await LoadTeamPerformanceAsync();
-            await LoadRoiMetricsAsync();
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Error loading data: {ex.Message}", Severity.Error);
-        }
-        finally
-        {
-            _loading = false;
-        }
+        _loading = true;
+        await LoadAllSections();
+        _loading = false;
+    }
+
+    private async Task LoadAllSections()
+    {
+        await LoadReportsAsync();
+        await LoadRiskTrendsAsync();
+        await LoadTeamPerformanceAsync();
+        await LoadDecisionInsightsAsync();
+        await LoadRoiMetricsAsync();
+    }
+
+    private async Task RefreshAll()
+    {
+        _loading = true;
+        _reportsError = _riskTrendError = _teamError = _insightsError = _roiError = null;
+        StateHasChanged();
+        await LoadAllSections();
+        _loading = false;
+        Snackbar.Add("Data refreshed", Severity.Success);
     }
 
     private async Task LoadReportsAsync()
     {
-        _reports = await AnalyticsService.GetReportsAsync(TenantContext.TenantId);
+        try { _reports = await AnalyticsService.GetReportsAsync(TenantContext.TenantId); }
+        catch (Exception ex) { _reportsError = $"Could not load reports: {ex.Message}"; }
     }
 
     private async Task LoadRiskTrendsAsync()
     {
-        var endDate = DateTime.UtcNow;
-        var startDate = endDate.AddDays(-30);
-        
-        _riskTrend = await AnalyticsService.GetRiskTrendAnalysisAsync(TenantContext.TenantId, startDate, endDate);
-        _corridorRisks = await AnalyticsService.GetCorridorRiskHeatmapAsync(TenantContext.TenantId, 30);
-
-        if (_riskTrend.DailyAverageRisk.Any())
+        try
         {
-            _riskTrendLabels = _riskTrend.DailyAverageRisk.Select(d => d.Date.ToString("MMM dd")).ToArray();
-            _riskTrendSeries =
-            [
-                new ChartSeries { Name = "Avg Risk Score", Data = _riskTrend.DailyAverageRisk.Select(d => d.Value).ToArray() }
-            ];
+            var endDate = DateTime.UtcNow;
+            var startDate = endDate.AddDays(-30);
+            _riskTrend = await AnalyticsService.GetRiskTrendAnalysisAsync(TenantContext.TenantId, startDate, endDate);
+            _corridorRisks = await AnalyticsService.GetCorridorRiskHeatmapAsync(TenantContext.TenantId, 30);
+            _flaggedRates = await AnalyticsService.GetFlaggedTransactionRateAsync(TenantContext.TenantId, 30);
+
+            if (_riskTrend.DailyAverageRisk.Any())
+            {
+                _riskTrendLabels = _riskTrend.DailyAverageRisk.Select(d => d.Date.ToString("MMM dd")).ToArray();
+                _riskTrendSeries = [new ChartSeries { Name = "Avg Risk Score", Data = _riskTrend.DailyAverageRisk.Select(d => d.Value).ToArray() }];
+            }
+            if (_flaggedRates.Any())
+            {
+                _flaggedRateLabels = _flaggedRates.Select(d => d.Date.ToString("MMM dd")).ToArray();
+                _flaggedRateSeries = [new ChartSeries { Name = "Flagged %", Data = _flaggedRates.Select(d => d.Value).ToArray() }];
+            }
         }
+        catch (Exception ex) { _riskTrendError = $"Could not load risk trends: {ex.Message}"; }
     }
 
     private async Task LoadTeamPerformanceAsync()
     {
-        _teamPerformance = await AnalyticsService.GetTeamPerformanceMetricsAsync(TenantContext.TenantId, 30);
+        try
+        {
+            _teamPerformance = await AnalyticsService.GetTeamPerformanceMetricsAsync(TenantContext.TenantId, 30);
+            _reviewTimeDistribution = await AnalyticsService.GetReviewTimeDistributionAsync(TenantContext.TenantId, 30);
+            if (_reviewTimeDistribution.Any())
+            {
+                _reviewTimeLabels = _reviewTimeDistribution.Select(d => d.TimeBucket).ToArray();
+                _reviewTimeSeries = [new ChartSeries { Name = "Reviews", Data = _reviewTimeDistribution.Select(d => (double)d.Count).ToArray() }];
+            }
+        }
+        catch (Exception ex) { _teamError = $"Could not load team performance: {ex.Message}"; }
+    }
+
+    private async Task LoadDecisionInsightsAsync()
+    {
+        try
+        {
+            _decisionConsistency = await AnalyticsService.GetDecisionConsistencyAsync(TenantContext.TenantId, 30);
+            _outlierAnalysts = await AnalyticsService.GetOutlierAnalystsAsync(TenantContext.TenantId, 30);
+        }
+        catch (Exception ex) { _insightsError = $"Could not load decision insights: {ex.Message}"; }
     }
 
     private async Task LoadRoiMetricsAsync()
     {
-        _roiMetrics = await AnalyticsService.CalculateRoiAsync(TenantContext.TenantId);
+        try { _roiMetrics = await AnalyticsService.CalculateRoiAsync(TenantContext.TenantId); }
+        catch (Exception ex) { _roiError = $"Could not load ROI metrics: {ex.Message}"; }
     }
 
-    private void OpenCreateReportDialog()
+    private async Task OpenCreateReportDialog()
     {
-        Snackbar.Add("Report builder coming soon!", Severity.Info);
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true };
+        var dialog = await DialogService.ShowAsync<CreateReportDialog>("Create Report", options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: CustomReport report })
+        {
+            try
+            {
+                var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+                var email = authState.User?.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
+                         ?? authState.User?.FindFirst("email")?.Value ?? "unknown";
+                await AnalyticsService.CreateReportAsync(TenantContext.TenantId, report, email);
+                await LoadReportsAsync();
+                Snackbar.Add($"Report '{report.Name}' created!", Severity.Success);
+            }
+            catch (Exception ex) { Snackbar.Add($"Failed to create report: {ex.Message}", Severity.Error); }
+        }
     }
 
     private async Task RunReport(Guid reportId)
     {
         try
         {
+            Snackbar.Add("Generating report...", Severity.Info);
             var data = await AnalyticsService.RunReportAsync(reportId);
-            Snackbar.Add($"Report '{data.ReportName}' generated: {data.TotalRows} rows", Severity.Success);
-            // TODO: Open report viewer dialog
+            var parameters = new DialogParameters<ReportViewerDialog> { { x => x.Data, data } };
+            var options = new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true, CloseOnEscapeKey = true };
+            await DialogService.ShowAsync<ReportViewerDialog>(data.ReportName, parameters, options);
         }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Error running report: {ex.Message}", Severity.Error);
-        }
+        catch (Exception ex) { Snackbar.Add($"Error running report: {ex.Message}", Severity.Error); }
     }
 
     private async Task DeleteReport(Guid reportId)
     {
-        try
+        var confirmed = await DialogService.ShowMessageBox("Delete Report",
+            "Are you sure you want to delete this report? This cannot be undone.",
+            yesText: "Delete", cancelText: "Cancel");
+        if (confirmed == true)
         {
-            await AnalyticsService.DeleteReportAsync(reportId);
-            await LoadReportsAsync();
-            Snackbar.Add("Report deleted", Severity.Success);
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Error deleting report: {ex.Message}", Severity.Error);
+            try
+            {
+                await AnalyticsService.DeleteReportAsync(reportId);
+                await LoadReportsAsync();
+                Snackbar.Add("Report deleted", Severity.Success);
+            }
+            catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
         }
     }
 
-    private Color GetRiskColor(double score)
+    private Color GetRiskColor(double score) => score switch
     {
-        return score switch
-        {
-            >= 75 => Color.Error,
-            >= 50 => Color.Warning,
-            >= 25 => Color.Info,
-            _ => Color.Success
-        };
-    }
+        >= 75 => Color.Error, >= 50 => Color.Warning, >= 25 => Color.Info, _ => Color.Success
+    };
+
+    private Color GetReportTypeColor(string type) => type switch
+    {
+        "transactions" => Color.Primary, "risk-trends" => Color.Warning, "team-performance" => Color.Info, _ => Color.Default
+    };
+
+    private string GetReportTypeLabel(string type) => type switch
+    {
+        "transactions" => "Transactions", "risk-trends" => "Risk Trends", "team-performance" => "Team Performance", _ => type
+    };
+
+    private Color GetRiskBandColor(string band) => band switch
+    {
+        "0-25" => Color.Success, "25-50" => Color.Info, "50-75" => Color.Warning, "75-100" => Color.Error, _ => Color.Default
+    };
+
+    private (double min, double max) GetExpectedApprovalRange(string band) => band switch
+    {
+        "0-25" => (60, 100), "25-50" => (40, 90), "50-75" => (10, 60), "75-100" => (0, 30), _ => (0, 100)
+    };
 }

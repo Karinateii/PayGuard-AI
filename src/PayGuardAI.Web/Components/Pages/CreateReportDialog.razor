@@ -1,0 +1,97 @@
+@using PayGuardAI.Core.Services
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.AddChart" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Create Custom Report</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3" Class="mt-2" Style="min-width: 450px;">
+            <MudTextField @bind-Value="_report.Name" Label="Report Name" Required="true"
+                          Variant="Variant.Outlined" Placeholder="e.g. Monthly Fraud Summary" />
+
+            <MudTextField @bind-Value="_report.Description" Label="Description"
+                          Variant="Variant.Outlined" Lines="2"
+                          Placeholder="Brief description of what this report tracks" />
+
+            <MudSelect T="string" @bind-Value="_report.ReportType" Label="Report Type"
+                       Variant="Variant.Outlined" Required="true">
+                <MudSelectItem T="string" Value="@("transactions")">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        <MudIcon Icon="@Icons.Material.Filled.Receipt" Size="Size.Small" />
+                        <MudText>Transactions Summary</MudText>
+                    </MudStack>
+                </MudSelectItem>
+                <MudSelectItem T="string" Value="@("risk-trends")">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" />
+                        <MudText>Risk Trends</MudText>
+                    </MudStack>
+                </MudSelectItem>
+                <MudSelectItem T="string" Value="@("team-performance")">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        <MudIcon Icon="@Icons.Material.Filled.Group" Size="Size.Small" />
+                        <MudText>Team Performance</MudText>
+                    </MudStack>
+                </MudSelectItem>
+            </MudSelect>
+
+            <MudGrid>
+                <MudItem xs="6">
+                    <MudDatePicker @bind-Date="_startDate" Label="Start Date"
+                                   Variant="Variant.Outlined" DateFormat="yyyy-MM-dd" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudDatePicker @bind-Date="_endDate" Label="End Date"
+                                   Variant="Variant.Outlined" DateFormat="yyyy-MM-dd" />
+                </MudItem>
+            </MudGrid>
+
+            <MudSelect T="string" @bind-Value="_report.Grouping" Label="Group By (optional)"
+                       Variant="Variant.Outlined" Clearable="true">
+                <MudSelectItem T="string" Value="@("corridor")">Corridor</MudSelectItem>
+                <MudSelectItem T="string" Value="@("risk-level")">Risk Level</MudSelectItem>
+                <MudSelectItem T="string" Value="@("analyst")">Analyst</MudSelectItem>
+                <MudSelectItem T="string" Value="@("date")">Date</MudSelectItem>
+            </MudSelect>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   OnClick="Submit" Disabled="@(!IsValid)">
+            <MudIcon Icon="@Icons.Material.Filled.Add" Class="mr-1" Size="Size.Small" />
+            Create Report
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance? MudDialog { get; set; }
+
+    private CustomReport _report = new()
+    {
+        ReportType = "transactions"
+    };
+
+    private DateTime? _startDate = DateTime.UtcNow.AddDays(-30);
+    private DateTime? _endDate = DateTime.UtcNow;
+
+    private bool IsValid => !string.IsNullOrWhiteSpace(_report.Name) && !string.IsNullOrWhiteSpace(_report.ReportType);
+
+    private void Cancel() => MudDialog?.Cancel();
+
+    private void Submit()
+    {
+        _report.StartDate = _startDate.HasValue
+            ? DateTime.SpecifyKind(_startDate.Value, DateTimeKind.Utc)
+            : null;
+        _report.EndDate = _endDate.HasValue
+            ? DateTime.SpecifyKind(_endDate.Value, DateTimeKind.Utc)
+            : null;
+        MudDialog?.Close(DialogResult.Ok(_report));
+    }
+}
