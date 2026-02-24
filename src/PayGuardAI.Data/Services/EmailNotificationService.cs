@@ -1,5 +1,6 @@
-using System.Net;
-using System.Net.Mail;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -9,25 +10,27 @@ using PayGuardAI.Core.Services;
 namespace PayGuardAI.Data.Services;
 
 /// <summary>
-/// SMTP-based email notification service for compliance alerts and reports.
-/// Works with any SMTP provider — SendGrid, AWS SES, Mailgun, or plain SMTP.
-/// Feature flag: FeatureFlags:EmailNotificationsEnabled
-/// Config section: Email (SmtpHost, SmtpPort, SmtpUser, SmtpPassword, FromAddress, FromName)
+/// Email notification service for compliance alerts and reports.
+/// Uses Resend HTTP API (port 443) — works on Railway where SMTP ports are blocked.
+/// Config: Email:ResendApiKey (or Email:SmtpPassword as fallback), Email:FromAddress, Email:FromName
 /// </summary>
 public class EmailNotificationService : IEmailNotificationService
 {
     private readonly ApplicationDbContext _context;
     private readonly IConfiguration _config;
     private readonly ILogger<EmailNotificationService> _logger;
+    private readonly IHttpClientFactory _httpClientFactory;
 
     public EmailNotificationService(
         ApplicationDbContext context,
         IConfiguration config,
-        ILogger<EmailNotificationService> logger)
+        ILogger<EmailNotificationService> logger,
+        IHttpClientFactory httpClientFactory)
     {
         _context = context;
         _config = config;
         _logger = logger;
+        _httpClientFactory = httpClientFactory;
     }
 
     // ── Risk Alert ────────────────────────────────────────────────
@@ -275,7 +278,7 @@ public class EmailNotificationService : IEmailNotificationService
         await SendEmailAsync(toEmail, toName, subject, htmlBody, cancellationToken);
     }
 
-    // ── Core SMTP sender ─────────────────────────────────────────
+    // ── Core email sender (Resend HTTP API) ─────────────────────
 
     private async Task SendEmailAsync(
         string toEmail,
@@ -284,28 +287,43 @@ public class EmailNotificationService : IEmailNotificationService
         string htmlBody,
         CancellationToken cancellationToken)
     {
+        var apiKey = GetResendApiKey();
+        if (string.IsNullOrEmpty(apiKey))
+        {
+            _logger.LogWarning("No Resend API key configured — email to {Email} skipped", toEmail);
+            return;
+        }
+
+        var fromAddr = _config["Email:FromAddress"] ?? "noreply@payguardai.xyz";
+        var fromName = _config["Email:FromName"] ?? "PayGuard AI";
+
         try
         {
-            var smtpHost = _config["Email:SmtpHost"] ?? "smtp.sendgrid.net";
-            var smtpPort = int.Parse(_config["Email:SmtpPort"] ?? "587");
-            var smtpUser = _config["Email:SmtpUser"] ?? "apikey";
-            var smtpPass = _config["Email:SmtpPassword"] ?? "";
-            var fromAddr = _config["Email:FromAddress"] ?? "noreply@payguard.ai";
-            var fromName = _config["Email:FromName"] ?? "PayGuard AI";
+            var client = _httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
-            using var message = new MailMessage();
-            message.From = new MailAddress(fromAddr, fromName);
-            message.To.Add(new MailAddress(toEmail, toName));
-            message.Subject = subject;
-            message.Body = htmlBody;
-            message.IsBodyHtml = true;
+            var payload = new
+            {
+                from = $"{fromName} <{fromAddr}>",
+                to = new[] { toEmail },
+                subject,
+                html = htmlBody
+            };
 
-            using var client = new SmtpClient(smtpHost, smtpPort);
-            client.Credentials = new NetworkCredential(smtpUser, smtpPass);
-            client.EnableSsl = true;
+            var json = JsonSerializer.Serialize(payload);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            await client.SendMailAsync(message, cancellationToken);
-            _logger.LogInformation("Email sent to {Email}: {Subject}", toEmail, subject);
+            var response = await client.PostAsync("https://api.resend.com/emails", content, cancellationToken);
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError("Resend API error {Status}: {Body} — email to {Email}", response.StatusCode, body, toEmail);
+            }
+            else
+            {
+                _logger.LogInformation("Email sent to {Email}: {Subject}", toEmail, subject);
+            }
         }
         catch (Exception ex)
         {
@@ -318,9 +336,14 @@ public class EmailNotificationService : IEmailNotificationService
 
     private bool IsEnabled()
     {
-        var section = _config.GetSection("FeatureFlags");
-        var value = section["EmailNotificationsEnabled"];
-        return bool.TryParse(value, out var result) && result;
+        var apiKey = GetResendApiKey();
+        return !string.IsNullOrEmpty(apiKey);
+    }
+
+    private string? GetResendApiKey()
+    {
+        var key = _config["Email:ResendApiKey"] ?? _config["Email:SmtpPassword"];
+        return !string.IsNullOrEmpty(key) && key.StartsWith("re_") ? key : null;
     }
 
     private async Task<List<NotificationPreference>> GetSubscribedRecipientsAsync(

@@ -224,16 +224,8 @@ builder.Services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHand
 // Register magic link (passwordless) authentication service
 builder.Services.AddScoped<IMagicLinkService, MagicLinkService>();
 
-// Register email notification service — real SMTP when enabled, no-op fallback otherwise
-var emailEnabled = builder.Configuration.GetValue<bool>("FeatureFlags:EmailNotificationsEnabled");
-if (emailEnabled)
-{
-    builder.Services.AddScoped<IEmailNotificationService, EmailNotificationService>();
-}
-else
-{
-    builder.Services.AddScoped<IEmailNotificationService, NoOpEmailNotificationService>();
-}
+// Register email notification service — uses Resend HTTP API, self-disables if no API key
+builder.Services.AddScoped<IEmailNotificationService, EmailNotificationService>();
 
 // Add controllers for API endpoints (webhooks)
 builder.Services.AddControllers();

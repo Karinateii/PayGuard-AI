@@ -163,17 +163,17 @@ else
                     @if (_emailConfigured)
                     {
                         <MudAlert Severity="Severity.Success" Dense="true" Class="mb-3">
-                            SMTP is configured — email notifications are active.
+                            Resend API is configured — email notifications are active.
                         </MudAlert>
                     }
                     else
                     {
                         <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
-                            Email is <strong>not configured</strong>. Notification preferences are saved but emails won't be sent until SMTP is set up.
+                            Email is <strong>not configured</strong>. Notification preferences are saved but emails won't be sent until a Resend API key is set.
                         </MudAlert>
                         <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
-                            To enable email, set <code>FeatureFlags:EmailNotificationsEnabled</code> to <code>true</code>
-                            and configure SMTP settings in <code>appsettings.json</code> or environment variables.
+                            To enable email, set <code>Email:ResendApiKey</code> with a key starting with <code>re_</code>
+                            in your environment variables or <code>appsettings.json</code>.
                         </MudText>
                     }
                 </MudCardContent>
@@ -189,7 +189,8 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        _emailConfigured = Configuration.GetValue<bool>("FeatureFlags:EmailNotificationsEnabled");
+        var resendKey = Configuration["Email:ResendApiKey"] ?? Configuration["Email:SmtpPassword"] ?? "";
+        _emailConfigured = !string.IsNullOrEmpty(resendKey) && resendKey.StartsWith("re_");
         await LoadPreferences();
     }
 
