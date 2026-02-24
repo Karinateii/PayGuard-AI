@@ -47,7 +47,11 @@ public class AdvancedAnalyticsService : IAdvancedAnalyticsService
 
     public async Task<CustomReport?> GetReportByIdAsync(Guid reportId, CancellationToken ct = default)
     {
-        return await _db.Set<CustomReport>().FindAsync([reportId], ct);
+        // Use FirstOrDefaultAsync instead of FindAsync to guarantee
+        // the global tenant query filter is always applied (FindAsync
+        // checks the change-tracker first and can bypass the filter).
+        return await _db.Set<CustomReport>()
+            .FirstOrDefaultAsync(r => r.Id == reportId, ct);
     }
 
     public async Task DeleteReportAsync(Guid reportId, CancellationToken ct = default)
