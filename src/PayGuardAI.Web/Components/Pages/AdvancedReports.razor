@@ -201,7 +201,7 @@
             {
                 <MudAlert Severity="Severity.Success" Class="mb-4">
                     <MudText Typo="Typo.h6">PayGuard AI has prevented an estimated 
-                        <strong>$@_roiMetrics.EstimatedFraudValuePrevented.ToString("N0")</strong> in fraud 
+                        <strong>$@(_roiMetrics.EstimatedFraudValuePrevented.ToString("N0"))</strong> in fraud 
                         over <strong>@_roiMetrics.DaysSinceOnboarding days</strong>.
                     </MudText>
                 </MudAlert>
@@ -221,7 +221,7 @@
                             <MudStack AlignItems="AlignItems.Center">
                                 <MudIcon Icon="@Icons.Material.Filled.TrendingDown" Size="Size.Large" Color="Color.Success" />
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">False Positive Reduction</MudText>
-                                <MudText Typo="Typo.h4">@_roiMetrics.FalsePositiveReduction.ToString("F1")%</MudText>
+                                <MudText Typo="Typo.h4">@(_roiMetrics.FalsePositiveReduction.ToString("F1"))%</MudText>
                             </MudStack>
                         </MudPaper>
                     </MudItem>
@@ -230,7 +230,7 @@
                             <MudStack AlignItems="AlignItems.Center">
                                 <MudIcon Icon="@Icons.Material.Filled.Gavel" Size="Size.Large" Color="Color.Info" />
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">Precision</MudText>
-                                <MudText Typo="Typo.h4">@(_roiMetrics.Precision * 100).ToString("F1")%</MudText>
+                                <MudText Typo="Typo.h4">@((_roiMetrics.Precision * 100).ToString("F1"))%</MudText>
                             </MudStack>
                         </MudPaper>
                     </MudItem>
@@ -242,8 +242,8 @@
                         <MudText>• <strong>@_roiMetrics.TotalTransactionsMonitored.ToString("N0")</strong> transactions monitored</MudText>
                         <MudText>• <strong>@_roiMetrics.TruePositives</strong> true positives (fraud correctly caught)</MudText>
                         <MudText>• <strong>@_roiMetrics.FalsePositives</strong> false positives (legitimate flagged as fraud)</MudText>
-                        <MudText>• False positive rate: <strong>@_roiMetrics.FalsePositiveRate.ToString("F1")%</strong> (was @_roiMetrics.FalsePositiveRateAtOnboarding.ToString("F1")% at onboarding)</MudText>
-                        <MudText>• Estimated cost savings: <strong>${(_roiMetrics.CostSavings).ToString("N0")}</strong></MudText>
+                        <MudText>• False positive rate: <strong>@(_roiMetrics.FalsePositiveRate.ToString("F1"))%</strong> (was @(_roiMetrics.FalsePositiveRateAtOnboarding.ToString("F1"))% at onboarding)</MudText>
+                        <MudText>• Estimated cost savings: <strong>$@(_roiMetrics.CostSavings.ToString("N0"))</strong></MudText>
                     </MudStack>
                 </MudPaper>
             }
@@ -267,12 +267,10 @@
         try
         {
             _loading = true;
-            await Task.WhenAll(
-                LoadReportsAsync(),
-                LoadRiskTrendsAsync(),
-                LoadTeamPerformanceAsync(),
-                LoadRoiMetricsAsync()
-            );
+            await LoadReportsAsync();
+            await LoadRiskTrendsAsync();
+            await LoadTeamPerformanceAsync();
+            await LoadRoiMetricsAsync();
         }
         catch (Exception ex)
         {
