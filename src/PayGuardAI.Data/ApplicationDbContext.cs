@@ -57,6 +57,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
     public DbSet<CustomRole> CustomRoles => Set<CustomRole>();
     public DbSet<MagicLinkToken> MagicLinkTokens => Set<MagicLinkToken>();
+    public DbSet<CustomReport> CustomReports => Set<CustomReport>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -78,6 +79,7 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<WebhookEndpoint>().HasQueryFilter(e => e.TenantId == TenantId);
         modelBuilder.Entity<NotificationPreference>().HasQueryFilter(e => e.TenantId == TenantId);
         modelBuilder.Entity<CustomRole>().HasQueryFilter(e => e.TenantId == TenantId);
+        modelBuilder.Entity<CustomReport>().HasQueryFilter(e => e.TenantId == TenantId);
 
         // Entity configuration
 

@@ -439,11 +439,11 @@ public class DatabaseMigrationService : IDatabaseMigrationService
             var email = _configuration["Auth:DefaultUser"] ?? "compliance_officer@payguard.ai";
             var tenantId = _configuration["MultiTenancy:DefaultTenantId"] ?? "afriex-demo";
 
-            var exists = await _context.TeamMembers
+            var existing = await _context.TeamMembers
                 .IgnoreQueryFilters()
-                .AnyAsync(t => t.Email.ToLower() == email.ToLower() && t.TenantId == tenantId);
+                .FirstOrDefaultAsync(t => t.Email.ToLower() == email.ToLower() && t.TenantId == tenantId);
 
-            if (!exists)
+            if (existing == null)
             {
                 _context.TeamMembers.Add(new PayGuardAI.Core.Entities.TeamMember
                 {
@@ -455,6 +455,15 @@ public class DatabaseMigrationService : IDatabaseMigrationService
                 });
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Created TeamMember for platform owner {Email} in tenant {Tenant}", email, tenantId);
+            }
+            else if (existing.Role != "SuperAdmin")
+            {
+                // Platform owner must always be SuperAdmin — restore if demoted
+                _logger.LogWarning("Platform owner {Email} was demoted to {Role} — restoring SuperAdmin", email, existing.Role);
+                existing.Role = "SuperAdmin";
+                existing.Status = "active";
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Restored SuperAdmin role for platform owner {Email}", email);
             }
         }
         catch (Exception ex)

@@ -214,6 +214,9 @@ builder.Services.AddHttpClient<IBillingService, PaystackBillingService>();
 // Register admin dashboard service
 builder.Services.AddScoped<IAdminService, AdminService>();
 
+// Register advanced analytics service for custom reports and ROI metrics
+builder.Services.AddScoped<IAdvancedAnalyticsService, AdvancedAnalyticsService>();
+
 // Register tenant onboarding service
 builder.Services.AddScoped<ITenantOnboardingService, TenantOnboardingService>();
 

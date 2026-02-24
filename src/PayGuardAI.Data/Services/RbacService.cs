@@ -209,7 +209,22 @@ public class RbacService : IRbacService
         var oldRole = member.Role;
         if (oldRole == newRole) return;
 
-        // Guard: prevent demoting the last Admin/SuperAdmin in the org
+        // Guard 1: SuperAdmins cannot be demoted (only by themselves or other SuperAdmins)
+        if (oldRole == "SuperAdmin" && newRole != "SuperAdmin")
+        {
+            // Check if the person making the change is also a SuperAdmin
+            var changerMember = await _db.TeamMembers
+                .FirstOrDefaultAsync(m => m.TenantId == member.TenantId 
+                                       && m.Email.ToLower() == changedBy.ToLower(), ct);
+            
+            if (changerMember?.Role != "SuperAdmin")
+            {
+                throw new InvalidOperationException(
+                    "Only SuperAdmins can demote other SuperAdmins.");
+            }
+        }
+
+        // Guard 2: prevent demoting the last Admin/SuperAdmin in the org
         var wasAdmin = oldRole is "Admin" or "SuperAdmin";
         var willBeAdmin = newRole is "Admin" or "SuperAdmin";
 

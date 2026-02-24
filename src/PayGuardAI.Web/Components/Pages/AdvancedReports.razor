@@ -1,0 +1,363 @@
+@page "/admin/reports"
+@using Microsoft.AspNetCore.Authorization
+@using PayGuardAI.Core.Services
+@attribute [Authorize(Policy = "RequireManager")]
+@inject IAdvancedAnalyticsService AnalyticsService
+@inject ITenantContext TenantContext
+@inject ISnackbar Snackbar
+
+<PageTitle>Advanced Reports — PayGuard AI</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">
+        <MudIcon Icon="@Icons.Material.Filled.Assessment" Class="mr-2" />
+        Advanced Reports
+    </MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenCreateReportDialog"
+               StartIcon="@Icons.Material.Filled.Add">
+        Create Report
+    </MudButton>
+</MudStack>
+
+<MudTabs Elevation="4" Rounded="true" Color="Color.Primary" Class="mb-4">
+    <!-- Saved Reports Tab -->
+    <MudTabPanel Text="My Reports" Icon="@Icons.Material.Filled.Description">
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else if (_reports.Any())
+        {
+            <MudGrid>
+                @foreach (var report in _reports)
+                {
+                    <MudItem xs="12" md="6" lg="4">
+                        <MudCard>
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">@report.Name</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@report.ReportType</MudText>
+                                </CardHeaderContent>
+                                <CardHeaderActions>
+                                    <MudIconButton Icon="@Icons.Material.Filled.PlayArrow" Color="Color.Primary" 
+                                                   OnClick="@(() => RunReport(report.Id))" Size="Size.Small" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" 
+                                                   OnClick="@(() => DeleteReport(report.Id))" Size="Size.Small" />
+                                </CardHeaderActions>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <MudText>@report.Description</MudText>
+                                @if (report.IsScheduled)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Class="mt-2">
+                                        Scheduled: @report.ScheduleCron
+                                    </MudChip>
+                                }
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info">No reports yet. Create your first custom report!</MudAlert>
+        }
+    </MudTabPanel>
+
+    <!-- Risk Trends Tab -->
+    <MudTabPanel Text="Risk Trends" Icon="@Icons.Material.Filled.TrendingUp">
+        <MudStack Spacing="4" Class="mt-4">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-4">Risk Score Trend (Last 30 Days)</MudText>
+                @if (_riskTrend != null && _riskTrend.DailyAverageRisk.Any())
+                {
+                    <MudChart ChartType="ChartType.Line" ChartSeries="@_riskTrendSeries" 
+                              XAxisLabels="@_riskTrendLabels" Width="100%" Height="300px" />
+                    <MudText Color="@(_riskTrend.OverallTrend < 0 ? Color.Success : Color.Warning)" Class="mt-2">
+                        <MudIcon Icon="@(_riskTrend.OverallTrend < 0 ? Icons.Material.Filled.TrendingDown : Icons.Material.Filled.TrendingUp)" />
+                        @(_riskTrend.OverallTrend < 0 ? "Improving" : "Worsening") 
+                        (Trend: @_riskTrend.OverallTrend.ToString("F2"), StdDev: @_riskTrend.StandardDeviation.ToString("F2"))
+                    </MudText>
+                }
+                else
+                {
+                    <MudText Color="Color.Secondary">No data available.</MudText>
+                }
+            </MudPaper>
+
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-4">Corridor Risk Heatmap</MudText>
+                @if (_corridorRisks.Any())
+                {
+                    <MudSimpleTable Hover="true" Dense="true">
+                        <thead>
+                            <tr>
+                                <th>Corridor</th>
+                                <th>Transactions</th>
+                                <th>Avg Risk</th>
+                                <th>High Risk %</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var corridor in _corridorRisks.Take(10))
+                            {
+                                <tr>
+                                    <td>@corridor.SourceCountry → @corridor.DestinationCountry</td>
+                                    <td>@corridor.TransactionCount</td>
+                                    <td><MudChip T="string" Size="Size.Small" Color="@GetRiskColor(corridor.AverageRiskScore)">
+                                        @corridor.AverageRiskScore.ToString("F1")
+                                    </MudChip></td>
+                                    <td>@(((double)corridor.HighRiskCount / corridor.TransactionCount * 100).ToString("F1"))%</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+                else
+                {
+                    <MudText Color="Color.Secondary">No corridor data available.</MudText>
+                }
+            </MudPaper>
+        </MudStack>
+    </MudTabPanel>
+
+    <!-- Team Performance Tab -->
+    <MudTabPanel Text="Team Performance" Icon="@Icons.Material.Filled.Group">
+        <MudStack Spacing="4" Class="mt-4">
+            @if (_teamPerformance != null)
+            {
+                <MudGrid>
+                    <MudItem xs="12" md="3">
+                        <MudPaper Class="pa-4" Elevation="2">
+                            <MudStack AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.Group" Size="Size.Large" Color="Color.Primary" />
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Active Analysts</MudText>
+                                <MudText Typo="Typo.h4">@_teamPerformance.ActiveAnalysts</MudText>
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" md="3">
+                        <MudPaper Class="pa-4" Elevation="2">
+                            <MudStack AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.RateReview" Size="Size.Large" Color="Color.Info" />
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Total Reviews</MudText>
+                                <MudText Typo="Typo.h4">@_teamPerformance.TotalReviews</MudText>
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" md="3">
+                        <MudPaper Class="pa-4" Elevation="2">
+                            <MudStack AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.Timer" Size="Size.Large" Color="Color.Warning" />
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Avg Review Time</MudText>
+                                <MudText Typo="Typo.h4">@_teamPerformance.AverageReviewTimeMinutes.ToString("F1")m</MudText>
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" md="3">
+                        <MudPaper Class="pa-4" Elevation="2">
+                            <MudStack AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Large" Color="Color.Success" />
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Agreement Rate</MudText>
+                                <MudText Typo="Typo.h4">@_teamPerformance.InterRaterAgreement.ToString("F0")%</MudText>
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+
+                <MudPaper Class="pa-4" Elevation="2">
+                    <MudText Typo="Typo.h6" Class="mb-4">Top Performers</MudText>
+                    <MudSimpleTable Hover="true" Dense="true">
+                        <thead>
+                            <tr>
+                                <th>Analyst</th>
+                                <th>Reviews</th>
+                                <th>Avg Time</th>
+                                <th>Approval Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var analyst in _teamPerformance.TopPerformers)
+                            {
+                                <tr>
+                                    <td>@analyst.AnalystName</td>
+                                    <td>@analyst.TotalReviews</td>
+                                    <td>@analyst.AverageReviewTimeMinutes.ToString("F1") min</td>
+                                    <td>@analyst.ApprovalRate.ToString("F1")%</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                </MudPaper>
+            }
+        </MudStack>
+    </MudTabPanel>
+
+    <!-- ROI Calculator Tab -->
+    <MudTabPanel Text="ROI Calculator" Icon="@Icons.Material.Filled.AttachMoney">
+        <MudStack Spacing="4" Class="mt-4">
+            @if (_roiMetrics != null)
+            {
+                <MudAlert Severity="Severity.Success" Class="mb-4">
+                    <MudText Typo="Typo.h6">PayGuard AI has prevented an estimated 
+                        <strong>$@_roiMetrics.EstimatedFraudValuePrevented.ToString("N0")</strong> in fraud 
+                        over <strong>@_roiMetrics.DaysSinceOnboarding days</strong>.
+                    </MudText>
+                </MudAlert>
+
+                <MudGrid>
+                    <MudItem xs="12" md="4">
+                        <MudPaper Class="pa-4" Elevation="2">
+                            <MudStack AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.Shield" Size="Size.Large" Color="Color.Error" />
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Fraudulent Txns Caught</MudText>
+                                <MudText Typo="Typo.h4">@_roiMetrics.FraudulentTransactionsCaught</MudText>
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudPaper Class="pa-4" Elevation="2">
+                            <MudStack AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.TrendingDown" Size="Size.Large" Color="Color.Success" />
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">False Positive Reduction</MudText>
+                                <MudText Typo="Typo.h4">@_roiMetrics.FalsePositiveReduction.ToString("F1")%</MudText>
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudPaper Class="pa-4" Elevation="2">
+                            <MudStack AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.Gavel" Size="Size.Large" Color="Color.Info" />
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Precision</MudText>
+                                <MudText Typo="Typo.h4">@(_roiMetrics.Precision * 100).ToString("F1")%</MudText>
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+
+                <MudPaper Class="pa-4" Elevation="2">
+                    <MudText Typo="Typo.h6" Class="mb-2">Summary</MudText>
+                    <MudStack Spacing="2">
+                        <MudText>• <strong>@_roiMetrics.TotalTransactionsMonitored.ToString("N0")</strong> transactions monitored</MudText>
+                        <MudText>• <strong>@_roiMetrics.TruePositives</strong> true positives (fraud correctly caught)</MudText>
+                        <MudText>• <strong>@_roiMetrics.FalsePositives</strong> false positives (legitimate flagged as fraud)</MudText>
+                        <MudText>• False positive rate: <strong>@_roiMetrics.FalsePositiveRate.ToString("F1")%</strong> (was @_roiMetrics.FalsePositiveRateAtOnboarding.ToString("F1")% at onboarding)</MudText>
+                        <MudText>• Estimated cost savings: <strong>${(_roiMetrics.CostSavings).ToString("N0")}</strong></MudText>
+                    </MudStack>
+                </MudPaper>
+            }
+        </MudStack>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private bool _loading = true;
+    private List<CustomReport> _reports = [];
+    private RiskTrendAnalysis? _riskTrend;
+    private List<CorridorRiskScore> _corridorRisks = [];
+    private TeamPerformanceMetrics? _teamPerformance;
+    private RoiMetrics? _roiMetrics;
+
+    private List<ChartSeries> _riskTrendSeries = [];
+    private string[] _riskTrendLabels = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _loading = true;
+            await Task.WhenAll(
+                LoadReportsAsync(),
+                LoadRiskTrendsAsync(),
+                LoadTeamPerformanceAsync(),
+                LoadRoiMetricsAsync()
+            );
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading data: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadReportsAsync()
+    {
+        _reports = await AnalyticsService.GetReportsAsync(TenantContext.TenantId);
+    }
+
+    private async Task LoadRiskTrendsAsync()
+    {
+        var endDate = DateTime.UtcNow;
+        var startDate = endDate.AddDays(-30);
+        
+        _riskTrend = await AnalyticsService.GetRiskTrendAnalysisAsync(TenantContext.TenantId, startDate, endDate);
+        _corridorRisks = await AnalyticsService.GetCorridorRiskHeatmapAsync(TenantContext.TenantId, 30);
+
+        if (_riskTrend.DailyAverageRisk.Any())
+        {
+            _riskTrendLabels = _riskTrend.DailyAverageRisk.Select(d => d.Date.ToString("MMM dd")).ToArray();
+            _riskTrendSeries =
+            [
+                new ChartSeries { Name = "Avg Risk Score", Data = _riskTrend.DailyAverageRisk.Select(d => d.Value).ToArray() }
+            ];
+        }
+    }
+
+    private async Task LoadTeamPerformanceAsync()
+    {
+        _teamPerformance = await AnalyticsService.GetTeamPerformanceMetricsAsync(TenantContext.TenantId, 30);
+    }
+
+    private async Task LoadRoiMetricsAsync()
+    {
+        _roiMetrics = await AnalyticsService.CalculateRoiAsync(TenantContext.TenantId);
+    }
+
+    private void OpenCreateReportDialog()
+    {
+        Snackbar.Add("Report builder coming soon!", Severity.Info);
+    }
+
+    private async Task RunReport(Guid reportId)
+    {
+        try
+        {
+            var data = await AnalyticsService.RunReportAsync(reportId);
+            Snackbar.Add($"Report '{data.ReportName}' generated: {data.TotalRows} rows", Severity.Success);
+            // TODO: Open report viewer dialog
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error running report: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DeleteReport(Guid reportId)
+    {
+        try
+        {
+            await AnalyticsService.DeleteReportAsync(reportId);
+            await LoadReportsAsync();
+            Snackbar.Add("Report deleted", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error deleting report: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private Color GetRiskColor(double score)
+    {
+        return score switch
+        {
+            >= 75 => Color.Error,
+            >= 50 => Color.Warning,
+            >= 25 => Color.Info,
+            _ => Color.Success
+        };
+    }
+}

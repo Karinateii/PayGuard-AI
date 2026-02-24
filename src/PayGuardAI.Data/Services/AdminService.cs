@@ -96,12 +96,29 @@ public class AdminService : IAdminService
         return (member, emailSent);
     }
 
-    public async Task UpdateTeamMemberRoleAsync(Guid memberId, string newRole, CancellationToken ct = default)
+    public async Task UpdateTeamMemberRoleAsync(Guid memberId, string newRole, string? changedByEmail = null, CancellationToken ct = default)
     {
         var member = await _db.TeamMembers.FindAsync([memberId], ct)
             ?? throw new InvalidOperationException("Team member not found.");
 
-        // Guard: prevent demoting the last Admin/SuperAdmin in the org
+        // Guard 1: SuperAdmins cannot be demoted (only by other SuperAdmins)
+        if (member.Role == "SuperAdmin" && newRole != "SuperAdmin")
+        {
+            if (!string.IsNullOrEmpty(changedByEmail))
+            {
+                var changerMember = await _db.TeamMembers
+                    .FirstOrDefaultAsync(m => m.TenantId == member.TenantId 
+                                           && m.Email.ToLower() == changedByEmail.ToLower(), ct);
+                
+                if (changerMember?.Role != "SuperAdmin")
+                {
+                    throw new InvalidOperationException(
+                        "Only SuperAdmins can demote other SuperAdmins.");
+                }
+            }
+        }
+
+        // Guard 2: prevent demoting the last Admin/SuperAdmin in the org
         var wasAdmin = member.Role is "Admin" or "SuperAdmin";
         var willBeAdmin = newRole is "Admin" or "SuperAdmin";
 

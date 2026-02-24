@@ -14,7 +14,7 @@ public interface IAdminService
     // Team Members
     Task<List<TeamMember>> GetTeamMembersAsync(string tenantId, CancellationToken ct = default);
     Task<(TeamMember member, bool emailSent)> InviteTeamMemberAsync(string tenantId, string email, string displayName, string role, CancellationToken ct = default);
-    Task UpdateTeamMemberRoleAsync(Guid memberId, string newRole, CancellationToken ct = default);
+    Task UpdateTeamMemberRoleAsync(Guid memberId, string newRole, string? changedByEmail = null, CancellationToken ct = default);
     Task RemoveTeamMemberAsync(Guid memberId, string? currentUserEmail = null, CancellationToken ct = default);
 
     // API Keys
