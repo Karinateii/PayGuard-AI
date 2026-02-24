@@ -2,7 +2,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using PayGuardAI.Core.Entities
 @using PayGuardAI.Core.Services
-@attribute [Authorize]
+@attribute [Authorize(Policy = "RequireAdmin")]
 @inject IBillingService BillingService
 @inject NavigationManager Nav
 @inject IConfiguration Config
@@ -86,20 +86,20 @@
                     </MudText>
                     <MudExpansionPanels>
                         <MudExpansionPanel Text="What happens after the 14-day trial?">
-                            Your transactions keep flowing. You'll be prompted to add a payment method. 
-                            If you don't, new transactions will be queued until you subscribe.
+                            Your organization continues to operate normally. You'll be prompted to choose a plan.
+                            If you don't subscribe, your account remains active but transaction processing will be paused until you select a plan.
                         </MudExpansionPanel>
                         <MudExpansionPanel Text="Can I change plans later?">
-                            Yes — upgrade or downgrade any time from the Billing dashboard. 
-                            The difference is prorated automatically.
+                            Yes — you can upgrade or downgrade at any time from the Billing page in your admin dashboard.
+                            Changes take effect immediately and billing is adjusted automatically.
                         </MudExpansionPanel>
                         <MudExpansionPanel Text="What counts as a transaction?">
-                            Any webhook event processed by PayGuard AI that triggers a risk score. 
-                            Duplicate events and health checks don't count.
+                            Each unique transaction received via your API webhook that PayGuard AI processes and assigns a risk score.
+                            Duplicate or replayed events and system health checks are not counted.
                         </MudExpansionPanel>
-                        <MudExpansionPanel Text="What payment methods are supported?">
-                            We accept cards (Visa, Mastercard), bank transfers, and mobile money via Paystack.
-                            All major Nigerian banks are supported.
+                        <MudExpansionPanel Text="How does billing work?">
+                            Each plan includes a monthly transaction allowance. Usage beyond the included limit is billed at the overage rate shown on your plan.
+                            You can monitor your usage in real time from the Billing dashboard.
                         </MudExpansionPanel>
                     </MudExpansionPanels>
                 </MudItem>

@@ -16,10 +16,6 @@
     <MudNavLink Href="/reports" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Assessment">
         Compliance Reports
     </MudNavLink>
-    <MudDivider Class="my-2" />
-    <MudNavLink Href="/pricing" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Paid">
-        Pricing
-    </MudNavLink>
 
     @* ── Manager+ only ────────────────────────────────────────────── *@
     <AuthorizeView Roles="Manager,Admin,SuperAdmin">
@@ -41,6 +37,9 @@
         <Authorized>
             <MudDivider Class="my-2" />
             <MudText Typo="Typo.overline" Class="ml-4 mt-1" Color="Color.Secondary">Admin</MudText>
+            <MudNavLink Href="/pricing" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Paid">
+                Pricing
+            </MudNavLink>
             <MudNavLink Href="/admin/settings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Settings">
                 Organization
             </MudNavLink>
