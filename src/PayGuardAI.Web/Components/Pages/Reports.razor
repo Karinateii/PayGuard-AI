@@ -4,6 +4,7 @@
 @inject PayGuardAI.Data.ApplicationDbContext DbContext
 @inject IReviewService ReviewService
 @inject ISnackbar Snackbar
+@inject IJSRuntime JS
 @using Microsoft.EntityFrameworkCore
 
 <PageTitle>Compliance Reports - PayGuard AI</PageTitle>
@@ -226,13 +227,21 @@
                 </MudText>
                 <MudText Class="mt-2" Color="Color.Primary">
                     <strong>Key Compliance Metrics:</strong>
-                    <ul>
-                        <li>@_totalTransactions transactions analyzed with @_highRiskCount (@GetPercentage(_highRiskCount)%) flagged for review</li>
-                        <li>@_approvedCount transactions approved, @_rejectedCount rejected</li>
-                        <li>Average risk score: @_avgRiskScore.ToString("F1")</li>
-                        <li>Human-in-the-Loop review coverage: 100% of flagged transactions</li>
-                    </ul>
                 </MudText>
+                <MudList T="string" Dense="true" Class="mt-1">
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success" IconSize="Size.Small">
+                        @_totalTransactions transactions analyzed with @_highRiskCount (@GetPercentage(_highRiskCount)%) flagged for review
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success" IconSize="Size.Small">
+                        @_approvedCount transactions approved, @_rejectedCount rejected
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success" IconSize="Size.Small">
+                        Average risk score: @_avgRiskScore.ToString("F1")
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success" IconSize="Size.Small">
+                        Human-in-the-Loop review coverage: 100% of flagged transactions
+                    </MudListItem>
+                </MudList>
             </MudPaper>
         </MudItem>
     }
@@ -377,9 +386,69 @@
         return avgMinutes < 60 ? $"{avgMinutes:F0} min" : $"{avgMinutes / 60:F1} hrs";
     }
 
-    private void ExportReport()
+    private async Task ExportReport()
     {
-        Snackbar.Add("CSV export coming soon — report data is available via the audit log.", Severity.Info);
+        if (!_reportGenerated)
+        {
+            Snackbar.Add("Generate a report first before exporting.", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            var from = _fromDate ?? DateTime.UtcNow.Date.AddDays(-30);
+            var to = (_toDate ?? DateTime.UtcNow.Date).AddDays(1);
+
+            var analyses = await DbContext.RiskAnalyses
+                .Include(r => r.Transaction)
+                .Include(r => r.RiskFactors)
+                .Where(r => r.AnalyzedAt >= from && r.AnalyzedAt < to)
+                .OrderByDescending(r => r.AnalyzedAt)
+                .ToListAsync();
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("Transaction ID,Date,Amount,Currency,Source,Destination,Risk Score,Risk Level,Review Status,Reviewed By,Review Time");
+
+            foreach (var a in analyses)
+            {
+                var t = a.Transaction;
+                var reviewTime = a.ReviewedAt.HasValue ? (a.ReviewedAt.Value - a.AnalyzedAt).TotalMinutes.ToString("F0") + " min" : "";
+                sb.AppendLine(string.Join(",",
+                    CsvEscape(t?.ExternalId ?? ""),
+                    CsvEscape(a.AnalyzedAt.ToString("yyyy-MM-dd HH:mm:ss")),
+                    t?.Amount.ToString("F2") ?? "0",
+                    CsvEscape(t?.SourceCurrency ?? ""),
+                    CsvEscape(t?.SourceCountry ?? ""),
+                    CsvEscape(t?.DestinationCountry ?? ""),
+                    a.RiskScore.ToString(),
+                    a.RiskLevel.ToString(),
+                    a.ReviewStatus.ToString(),
+                    CsvEscape(a.ReviewedBy ?? ""),
+                    CsvEscape(reviewTime)
+                ));
+            }
+
+            var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+            var base64 = Convert.ToBase64String(bytes);
+            var fileName = $"payguard-compliance-report-{from:yyyyMMdd}-{to.AddDays(-1):yyyyMMdd}.csv";
+            var script = "(function() { var link = document.createElement('a'); link.download = '"
+                + fileName + "'; link.href = 'data:text/csv;base64," + base64 + "'; link.click(); })()";
+            await JS.InvokeVoidAsync("eval", script);
+
+            Snackbar.Add($"Exported {analyses.Count} records to CSV", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private string CsvEscape(string value)
+    {
+        if (value.Contains(',') || value.Contains('"') || value.Contains('\n')
+            || value.Contains('-') || value.Contains('/') || value.Contains(':'))
+            return $"\"{value.Replace("\"", "\"\"")}\""; 
+        return value;
     }
 
     private Color GetRiskColor(RiskLevel level) => level switch

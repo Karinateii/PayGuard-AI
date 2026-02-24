@@ -199,7 +199,8 @@
                                        OnClick="@(() => OpenRejectDialog())" Disabled="@_processing">
                                 Reject
                             </MudButton>
-                            @if (_selectedTransaction.RiskAnalysis.ReviewStatus == ReviewStatus.Pending)
+                            @if (_selectedTransaction.RiskAnalysis.ReviewStatus == ReviewStatus.Pending
+                                 && !_isManagerOrAbove)
                             {
                                 <MudButton Variant="Variant.Outlined" Color="Color.Warning" FullWidth="true"
                                            StartIcon="@Icons.Material.Filled.Escalator"
@@ -440,7 +441,8 @@ else
                                    OnClick="@(() => OpenRejectDialog())" Disabled="@_processing">
                             Reject
                         </MudButton>
-                        @if (_selectedTransaction.RiskAnalysis?.ReviewStatus == ReviewStatus.Pending)
+                        @if (_selectedTransaction.RiskAnalysis?.ReviewStatus == ReviewStatus.Pending
+                             && !_isManagerOrAbove)
                         {
                             <MudButton Variant="Variant.Outlined" Color="Color.Warning" Size="Size.Small"
                                        StartIcon="@Icons.Material.Filled.Escalator"
@@ -472,6 +474,7 @@ else
     private bool _loading = true;
     private bool _processing = false;
     private bool _drawerOpen = false;
+    private bool _isManagerOrAbove = false;
     private int _rowsPerPage = 10;
     private List<Transaction> _transactions = new();
     private Transaction? _selectedTransaction;
@@ -486,6 +489,10 @@ else
     private string _reviewNotes = "";
     protected override async Task OnInitializedAsync()
     {
+        // Determine if current user is Manager/Admin/SuperAdmin — they shouldn't see Escalate
+        var role = CurrentUser.PrimaryRole;
+        _isManagerOrAbove = role is "Manager" or "Admin" or "SuperAdmin";
+        
         await LoadTransactions();
     }
 

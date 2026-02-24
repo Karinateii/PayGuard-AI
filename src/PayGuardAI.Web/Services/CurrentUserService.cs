@@ -53,6 +53,7 @@ public class CurrentUserService
         get
         {
             var roles = GetRoles().ToList();
+            if (roles.Contains("SuperAdmin")) return "SuperAdmin";
             if (roles.Contains("Admin")) return "Admin";
             if (roles.Contains("Manager")) return "Manager";
             return roles.FirstOrDefault() ?? "Reviewer";
