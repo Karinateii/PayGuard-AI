@@ -1,0 +1,422 @@
+@page "/admin/ml-models"
+@using Microsoft.AspNetCore.Authorization
+@using PayGuardAI.Core.Services
+@using PayGuardAI.Core.Entities
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+@inject IMLTrainingService MLTraining
+@inject IMLScoringService MLScoring
+@inject ITenantContext TenantContext
+@inject ISnackbar Snackbar
+
+<PageTitle>ML Risk Models — PayGuard AI</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">
+    <MudIcon Icon="@Icons.Material.Filled.Psychology" Class="mr-2" />
+    ML Risk Models
+</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+    Train machine learning models from your team's HITL review decisions. 
+    The model learns which transactions are legitimate vs. fraudulent based on your Approve/Reject actions.
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+else
+{
+    @* ── Training Data Stats ─────────────────────────────────────────── *@
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.DataUsage" Size="Size.Large" Color="Color.Primary" />
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.h4">@(_stats?.TotalLabeled ?? 0)</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Labeled Samples</MudText>
+                    </MudStack>
+                </MudStack>
+                <MudDivider Class="my-2" />
+                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Outlined">
+                        @(_stats?.ApprovedCount ?? 0) Approved
+                    </MudChip>
+                    <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Outlined">
+                        @(_stats?.RejectedCount ?? 0) Rejected
+                    </MudChip>
+                </MudStack>
+                @if (_stats != null && !_stats.IsReadyForTraining)
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                        Need at least @_stats.MinimumRequired labeled samples 
+                        (@_stats.MinimumPerClass+ of each class) to train.
+                    </MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.ModelTraining" Size="Size.Large" 
+                             Color="@(_activeModel != null ? Color.Success : Color.Default)" />
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.h4">@(_activeModel?.Version ?? "None")</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Active Model</MudText>
+                    </MudStack>
+                </MudStack>
+                @if (_activeModel != null)
+                {
+                    <MudDivider Class="my-2" />
+                    <MudText Typo="Typo.body2">
+                        AUC: <strong>@_activeModel.AUC.ToString("F3")</strong> · 
+                        F1: <strong>@_activeModel.F1Score.ToString("F3")</strong>
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Trained @_activeModel.TrainedAt.ToString("MMM dd, yyyy HH:mm") UTC
+                    </MudText>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.Speed" Size="Size.Large" Color="Color.Info" />
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.h4">
+                            @(MLScoring.IsModelAvailable(TenantContext.TenantId) ? "Active" : "Inactive")
+                        </MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Scoring Status</MudText>
+                    </MudStack>
+                </MudStack>
+                <MudDivider Class="my-2" />
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    @if (MLScoring.IsModelAvailable(TenantContext.TenantId))
+                    {
+                        <span>ML adds up to 40 pts to rule-based scores</span>
+                    }
+                    else
+                    {
+                        <span>Rule-based scoring only (no ML model loaded)</span>
+                    }
+                </MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @* ── How It Works ─────────────────────────────────────────────── *@
+    <MudExpansionPanels Class="mb-4">
+        <MudExpansionPanel Text="How ML Risk Scoring Works" Icon="@Icons.Material.Filled.Info">
+            <MudGrid>
+                <MudItem xs="12" md="3">
+                    <MudStack AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.RateReview" Size="Size.Large" Color="Color.Primary" />
+                        <MudText Typo="Typo.subtitle2" Align="Align.Center">1. Review Transactions</MudText>
+                        <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
+                            Your team approves or rejects flagged transactions in the HITL queue
+                        </MudText>
+                    </MudStack>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudStack AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.ModelTraining" Size="Size.Large" Color="Color.Warning" />
+                        <MudText Typo="Typo.subtitle2" Align="Align.Center">2. Train Model</MudText>
+                        <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
+                            ML learns from 26 features (amount, velocity, geography, customer maturity, etc.)
+                        </MudText>
+                    </MudStack>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudStack AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Large" Color="Color.Success" />
+                        <MudText Typo="Typo.subtitle2" Align="Align.Center">3. Score Transactions</MudText>
+                        <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
+                            New transactions get ML score (0-40 pts) blended with rule-based scores
+                        </MudText>
+                    </MudStack>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudStack AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Large" Color="Color.Info" />
+                        <MudText Typo="Typo.subtitle2" Align="Align.Center">4. Continuous Learning</MudText>
+                        <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
+                            Retrain as more reviews accumulate — the model gets smarter over time
+                        </MudText>
+                    </MudStack>
+                </MudItem>
+            </MudGrid>
+        </MudExpansionPanel>
+    </MudExpansionPanels>
+
+    @* ── Train / Deactivate Actions ─────────────────────────────── *@
+    <MudPaper Class="pa-4 mb-4" Elevation="2">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="4">
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.BuildCircle" Class="mr-1" />
+                Actions
+            </MudText>
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.ModelTraining"
+                       OnClick="TrainModel"
+                       Disabled="@(_training || _stats == null || !_stats.IsReadyForTraining)">
+                @if (_training)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Training...</span>
+                }
+                else
+                {
+                    <span>Train New Model</span>
+                }
+            </MudButton>
+            @if (_activeModel != null)
+            {
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Warning"
+                           StartIcon="@Icons.Material.Filled.PowerOff"
+                           OnClick="DeactivateModel">
+                    Deactivate ML
+                </MudButton>
+            }
+        </MudStack>
+
+        @if (_lastTrainingResult != null)
+        {
+            <MudDivider Class="my-3" />
+            @if (_lastTrainingResult.Success)
+            {
+                <MudAlert Severity="Severity.Success" Dense="true">
+                    Model <strong>@_lastTrainingResult.Version</strong> trained successfully with 
+                    <strong>@_lastTrainingResult.TrainingSamples</strong> samples.
+                    AUC=@_lastTrainingResult.AUC.ToString("F3"), 
+                    F1=@_lastTrainingResult.F1Score.ToString("F3"),
+                    Precision=@_lastTrainingResult.Precision.ToString("F3"),
+                    Recall=@_lastTrainingResult.Recall.ToString("F3")
+                </MudAlert>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">
+                    Training failed: @_lastTrainingResult.ErrorMessage
+                </MudAlert>
+            }
+        }
+    </MudPaper>
+
+    @* ── Model History Table ─────────────────────────────────────── *@
+    <MudPaper Class="pa-4" Elevation="2">
+        <MudText Typo="Typo.h6" Class="mb-3">
+            <MudIcon Icon="@Icons.Material.Filled.History" Class="mr-1" />
+            Model History
+        </MudText>
+
+        @if (_models.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" Dense="true">
+                No models trained yet. Accumulate at least @(_stats?.MinimumRequired ?? 50) labeled reviews, 
+                then click "Train New Model" to build your first ML model.
+            </MudAlert>
+        }
+        else
+        {
+            <MudTable Items="@_models" Hover="true" Dense="true" Striped="true" Breakpoint="Breakpoint.Sm">
+                <HeaderContent>
+                    <MudTh>Version</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Trainer</MudTh>
+                    <MudTh>Samples</MudTh>
+                    <MudTh>AUC</MudTh>
+                    <MudTh>F1</MudTh>
+                    <MudTh>Precision</MudTh>
+                    <MudTh>Recall</MudTh>
+                    <MudTh>Trained</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Version">
+                        <MudText Typo="Typo.body2" Style="font-weight: 600;">@context.Version</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Status">
+                        @if (context.IsActive)
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small">Active</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Outlined">Inactive</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Trainer">@context.TrainerName</MudTd>
+                    <MudTd DataLabel="Samples">
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.body2">@context.TrainingSamples total</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @context.LegitSamples legit · @context.FraudSamples fraud
+                            </MudText>
+                        </MudStack>
+                    </MudTd>
+                    <MudTd DataLabel="AUC">
+                        <MudText Color="@GetMetricColor(context.AUC)" Typo="Typo.body2" Style="font-weight: 600;">
+                            @context.AUC.ToString("F3")
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="F1">@context.F1Score.ToString("F3")</MudTd>
+                    <MudTd DataLabel="Precision">@context.Precision.ToString("F3")</MudTd>
+                    <MudTd DataLabel="Recall">@context.Recall.ToString("F3")</MudTd>
+                    <MudTd DataLabel="Trained">
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.body2">@context.TrainedAt.ToString("MMM dd, yyyy")</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">by @context.TrainedBy</MudText>
+                        </MudStack>
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        @if (!context.IsActive)
+                        {
+                            <MudButton Size="Size.Small" 
+                                       Variant="Variant.Text" 
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.PlayArrow"
+                                       OnClick="@(() => ActivateModel(context.Id))">
+                                Activate
+                            </MudButton>
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudPaper>
+
+    @* ── Feature List ────────────────────────────────────────────── *@
+    <MudExpansionPanels Class="mt-4">
+        <MudExpansionPanel Text="26 ML Features Used" Icon="@Icons.Material.Filled.List">
+            <MudGrid>
+                @foreach (var group in _featureGroups)
+                {
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-1">@group.Category</MudText>
+                        @foreach (var feature in group.Features)
+                        {
+                            <MudText Typo="Typo.body2" Class="ml-2">• @feature</MudText>
+                        }
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudExpansionPanel>
+    </MudExpansionPanels>
+}
+
+@code {
+    private bool _loading = true;
+    private bool _training;
+    private MLTrainingDataStats? _stats;
+    private MLModelInfo? _activeModel;
+    private List<MLModelInfo> _models = new();
+    private MLTrainingResult? _lastTrainingResult;
+
+    // Feature groups for display
+    private static readonly List<(string Category, string[] Features)> _featureGroups =
+    [
+        ("Amount", ["Transaction Amount", "Amount (log-scaled)", "Round Amount Indicator"]),
+        ("Temporal", ["Hour of Day", "Day of Week", "Weekend Flag", "Night Time (2-5 AM)"]),
+        ("Transaction Type", ["Send", "Receive", "Deposit", "Withdraw"]),
+        ("Geography", ["Cross-Border", "Cross-Currency", "High-Risk Country"]),
+        ("Customer Profile", ["Customer Age (days)", "Total Transactions", "Total Volume", "Average Amount", "Max Amount", "Amount vs Average Deviation"]),
+        ("Customer Risk", ["KYC Level", "Risk Tier", "Flag Rate", "Reject Rate"]),
+        ("Velocity", ["24h Transaction Count", "24h Volume"])
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            var tenantId = TenantContext.TenantId;
+            _stats = await MLTraining.GetTrainingDataStatsAsync(tenantId);
+            _activeModel = await MLTraining.GetActiveModelInfoAsync(tenantId);
+            _models = await MLTraining.GetAllModelsAsync(tenantId);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load ML data: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task TrainModel()
+    {
+        _training = true;
+        _lastTrainingResult = null;
+        StateHasChanged();
+
+        try
+        {
+            var tenantId = TenantContext.TenantId;
+            _lastTrainingResult = await MLTraining.TrainModelAsync(tenantId, "admin");
+
+            if (_lastTrainingResult.Success)
+            {
+                Snackbar.Add($"Model {_lastTrainingResult.Version} trained — AUC: {_lastTrainingResult.AUC:F3}", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add($"Training failed: {_lastTrainingResult.ErrorMessage}", Severity.Error);
+            }
+
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Training error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _training = false;
+        }
+    }
+
+    private async Task ActivateModel(Guid modelId)
+    {
+        try
+        {
+            await MLTraining.ActivateModelAsync(modelId, TenantContext.TenantId);
+            Snackbar.Add("Model activated", Severity.Success);
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to activate: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DeactivateModel()
+    {
+        try
+        {
+            await MLTraining.DeactivateModelAsync(TenantContext.TenantId);
+            Snackbar.Add("ML scoring deactivated — reverting to rule-only", Severity.Info);
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to deactivate: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private static Color GetMetricColor(double value) => value switch
+    {
+        >= 0.9 => Color.Success,
+        >= 0.75 => Color.Warning,
+        _ => Color.Error
+    };
+}

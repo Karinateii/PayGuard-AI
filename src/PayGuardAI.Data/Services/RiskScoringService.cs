@@ -7,7 +7,8 @@ namespace PayGuardAI.Data.Services;
 
 /// <summary>
 /// Risk scoring engine implementation.
-/// Evaluates transactions against configurable rules and generates explainable risk assessments.
+/// Evaluates transactions against configurable rules, blends with ML model predictions,
+/// and generates explainable risk assessments.
 /// </summary>
 public class RiskScoringService : IRiskScoringService
 {
@@ -16,6 +17,7 @@ public class RiskScoringService : IRiskScoringService
     private readonly IAlertingService _alertingService;
     private readonly IEmailNotificationService _emailNotificationService;
     private readonly ITenantContext _tenantContext;
+    private readonly IMLScoringService _mlScoringService;
 
     // Risk level thresholds
     private const int LowRiskThreshold = 25;
@@ -30,13 +32,15 @@ public class RiskScoringService : IRiskScoringService
         ILogger<RiskScoringService> logger,
         IAlertingService alertingService,
         IEmailNotificationService emailNotificationService,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IMLScoringService mlScoringService)
     {
         _context = context;
         _logger = logger;
         _alertingService = alertingService;
         _emailNotificationService = emailNotificationService;
         _tenantContext = tenantContext;
+        _mlScoringService = mlScoringService;
     }
 
     public async Task<RiskAnalysis> AnalyzeTransactionAsync(Transaction transaction, CancellationToken cancellationToken = default)
@@ -68,6 +72,48 @@ public class RiskScoringService : IRiskScoringService
 
         // Cap score at 100
         totalScore = Math.Min(totalScore, 100);
+
+        // ── ML scoring enhancement ──────────────────────────────────
+        // If an ML model is loaded for this tenant, score the transaction
+        // and add the ML prediction as an additional risk factor.
+        if (_mlScoringService.IsModelAvailable(_tenantContext.TenantId))
+        {
+            try
+            {
+                var mlResult = await _mlScoringService.ScoreTransactionAsync(
+                    transaction, customerProfile, cancellationToken);
+
+                if (mlResult != null && mlResult.ScoreContribution > 0)
+                {
+                    var mlFactor = new RiskFactor
+                    {
+                        TenantId = _tenantContext.TenantId,
+                        Category = "ML",
+                        RuleName = $"ML Risk Model ({mlResult.ModelVersion})",
+                        Description = $"ML model predicts {mlResult.FraudProbability:P1} fraud probability. " +
+                                      $"Top signals: {mlResult.TopFeatures}",
+                        ScoreContribution = mlResult.ScoreContribution,
+                        Severity = mlResult.ScoreContribution >= 30 ? FactorSeverity.Critical
+                                 : mlResult.ScoreContribution >= 15 ? FactorSeverity.Warning
+                                 : FactorSeverity.Info,
+                        ContextData = mlResult.ToJson()
+                    };
+                    riskFactors.Add(mlFactor);
+                    totalScore += mlFactor.ScoreContribution;
+                    totalScore = Math.Min(totalScore, 100);
+
+                    _logger.LogInformation(
+                        "ML enhanced scoring for {TransactionId}: +{MLScore} pts (P(fraud)={Prob:F3})",
+                        transaction.Id, mlResult.ScoreContribution, mlResult.FraudProbability);
+                }
+            }
+            catch (Exception ex)
+            {
+                // ML failure is non-fatal — fall back to rule-only scoring
+                _logger.LogWarning(ex, "ML scoring failed for {TransactionId}, using rule-only score",
+                    transaction.Id);
+            }
+        }
 
         // Determine risk level
         var riskLevel = totalScore switch

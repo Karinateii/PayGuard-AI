@@ -243,6 +243,10 @@ builder.Services.AddScoped<IMagicLinkService, MagicLinkService>();
 // Register email notification service — uses Resend HTTP API, self-disables if no API key
 builder.Services.AddScoped<IEmailNotificationService, EmailNotificationService>();
 
+// Register ML scoring and training services — learns from HITL feedback
+builder.Services.AddScoped<IMLScoringService, MLScoringService>();
+builder.Services.AddScoped<IMLTrainingService, MLTrainingService>();
+
 // Add controllers for API endpoints (webhooks)
 builder.Services.AddControllers();
 

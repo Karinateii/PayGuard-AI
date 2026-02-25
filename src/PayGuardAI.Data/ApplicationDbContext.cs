@@ -58,6 +58,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<CustomRole> CustomRoles => Set<CustomRole>();
     public DbSet<MagicLinkToken> MagicLinkTokens => Set<MagicLinkToken>();
     public DbSet<CustomReport> CustomReports => Set<CustomReport>();
+    public DbSet<MLModel> MLModels => Set<MLModel>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -80,6 +81,7 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<NotificationPreference>().HasQueryFilter(e => e.TenantId == TenantId);
         modelBuilder.Entity<CustomRole>().HasQueryFilter(e => e.TenantId == TenantId);
         modelBuilder.Entity<CustomReport>().HasQueryFilter(e => e.TenantId == TenantId);
+        modelBuilder.Entity<MLModel>().HasQueryFilter(e => e.TenantId == TenantId);
 
         // Entity configuration
 
@@ -138,6 +140,14 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(e => new { e.TenantId, e.RuleCode }).IsUnique();
             entity.HasIndex(e => e.IsEnabled);
             entity.Property(e => e.Threshold).HasPrecision(18, 4);
+        });
+
+        // MLModel configuration
+        modelBuilder.Entity<MLModel>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.TenantId, e.IsActive });
+            entity.HasIndex(e => e.TrainedAt);
         });
 
         // AuditLog configuration

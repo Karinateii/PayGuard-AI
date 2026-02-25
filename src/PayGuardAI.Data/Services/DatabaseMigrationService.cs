@@ -46,6 +46,9 @@ public class DatabaseMigrationService : IDatabaseMigrationService
             // Create CustomReports table if it doesn't exist (added for Advanced Analytics)
             await CreateCustomReportsTableAsync(dbType);
 
+            // Create MLModels table if it doesn't exist (added for ML Risk Scoring)
+            await CreateMLModelsTableAsync(dbType);
+
             // Mark existing tenants as onboarded so they aren't redirected
             await MarkExistingTenantsOnboardedAsync(dbType);
 
@@ -390,6 +393,89 @@ public class DatabaseMigrationService : IDatabaseMigrationService
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Skipping CustomReports table creation");
+        }
+    }
+
+    /// <summary>
+    /// Creates the MLModels table if it doesn't already exist.
+    /// Added for the ML Risk Scoring feature — stores trained model binaries and metrics.
+    /// </summary>
+    private async Task CreateMLModelsTableAsync(string dbType)
+    {
+        try
+        {
+            if (dbType == "PostgreSQL")
+            {
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS "MLModels" (
+                        "Id" uuid NOT NULL PRIMARY KEY,
+                        "TenantId" text NOT NULL DEFAULT '',
+                        "Version" text NOT NULL DEFAULT '',
+                        "TrainerName" text NOT NULL DEFAULT 'FastTree',
+                        "TrainingSamples" integer NOT NULL DEFAULT 0,
+                        "FraudSamples" integer NOT NULL DEFAULT 0,
+                        "LegitSamples" integer NOT NULL DEFAULT 0,
+                        "Accuracy" double precision NOT NULL DEFAULT 0,
+                        "AUC" double precision NOT NULL DEFAULT 0,
+                        "F1Score" double precision NOT NULL DEFAULT 0,
+                        "PositivePrecision" double precision NOT NULL DEFAULT 0,
+                        "PositiveRecall" double precision NOT NULL DEFAULT 0,
+                        "IsActive" boolean NOT NULL DEFAULT false,
+                        "ModelData" bytea,
+                        "TrainedAt" timestamp with time zone NOT NULL DEFAULT now(),
+                        "TrainedBy" text NOT NULL DEFAULT 'system',
+                        "Notes" text
+                    )
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS "IX_MLModels_TenantId_IsActive"
+                    ON "MLModels" ("TenantId", "IsActive")
+                    """);
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS "IX_MLModels_TrainedAt"
+                    ON "MLModels" ("TrainedAt")
+                    """);
+            }
+            else
+            {
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS MLModels (
+                        Id TEXT NOT NULL PRIMARY KEY,
+                        TenantId TEXT NOT NULL DEFAULT '',
+                        Version TEXT NOT NULL DEFAULT '',
+                        TrainerName TEXT NOT NULL DEFAULT 'FastTree',
+                        TrainingSamples INTEGER NOT NULL DEFAULT 0,
+                        FraudSamples INTEGER NOT NULL DEFAULT 0,
+                        LegitSamples INTEGER NOT NULL DEFAULT 0,
+                        Accuracy REAL NOT NULL DEFAULT 0,
+                        AUC REAL NOT NULL DEFAULT 0,
+                        F1Score REAL NOT NULL DEFAULT 0,
+                        PositivePrecision REAL NOT NULL DEFAULT 0,
+                        PositiveRecall REAL NOT NULL DEFAULT 0,
+                        IsActive INTEGER NOT NULL DEFAULT 0,
+                        ModelData BLOB,
+                        TrainedAt TEXT NOT NULL DEFAULT (datetime('now')),
+                        TrainedBy TEXT NOT NULL DEFAULT 'system',
+                        Notes TEXT
+                    )
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS IX_MLModels_TenantId_IsActive
+                    ON MLModels (TenantId, IsActive)
+                    """);
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS IX_MLModels_TrainedAt
+                    ON MLModels (TrainedAt)
+                    """);
+            }
+
+            _logger.LogDebug("MLModels table ensured");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipping MLModels table creation");
         }
     }
 
