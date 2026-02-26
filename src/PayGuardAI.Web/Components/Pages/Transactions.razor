@@ -322,7 +322,9 @@ else
         else
         {
             <MudTable Items="@_transactions" Hover="true" Dense="true" OnRowClick="@OnRowClick" T="Transaction"
-                      @bind-RowsPerPage="_rowsPerPage" Breakpoint="Breakpoint.Sm">
+                      @bind-RowsPerPage="_rowsPerPage" Breakpoint="Breakpoint.Sm"
+                      RowStyleFunc="@((_, _) => "cursor: pointer;")"
+                      RowClass="transaction-row">
                 <HeaderContent>
                     <MudTh>External ID</MudTh>
                     <MudTh>Type</MudTh>
