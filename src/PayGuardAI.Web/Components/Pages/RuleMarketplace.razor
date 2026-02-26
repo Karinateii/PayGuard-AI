@@ -1,0 +1,432 @@
+@page "/rules/marketplace"
+@using Microsoft.AspNetCore.Authorization
+@using PayGuardAI.Core.Services
+@attribute [Authorize(Policy = "RequireManager")]
+@inject IRuleMarketplaceService MarketplaceService
+@inject PayGuardAI.Core.Services.ITenantContext TenantContext
+@inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Rule Marketplace - PayGuard AI</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4" Style="flex-wrap: wrap; gap: 12px;">
+    <MudText Typo="Typo.h4">
+        <MudIcon Icon="@Icons.Material.Filled.Store" Class="mr-2" />
+        Rule Marketplace
+    </MudText>
+    <MudStack Row="true" Spacing="2">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Assessment"
+                   OnClick="@(() => _selectedTab = 1)">
+            View Analytics
+        </MudButton>
+    </MudStack>
+</MudStack>
+
+<MudTabs @bind-ActivePanelIndex="@_selectedTab" Elevation="2" Rounded="true" ApplyEffectsToContainer="true" Class="mb-4">
+    @* ── Tab 1: Browse Templates ────────────────────────────────────── *@
+    <MudTabPanel Text="Browse Templates" Icon="@Icons.Material.Filled.Store">
+        <MudPaper Class="pa-4">
+            @* Industry filter chips *@
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4" Style="flex-wrap: wrap; gap: 8px;">
+                <MudText Typo="Typo.subtitle2" Class="mr-2">Industry:</MudText>
+                <MudChipSet T="string" SelectionMode="SelectionMode.SingleSelection" SelectedValue="@_selectedIndustry" SelectedValueChanged="@OnIndustryChanged">
+                    <MudChip T="string" Text="All" Value="@("")" Variant="Variant.Filled"
+                             Color="@(string.IsNullOrEmpty(_selectedIndustry) ? Color.Primary : Color.Default)">
+                        All
+                    </MudChip>
+                    @foreach (var industry in _industries)
+                    {
+                        <MudChip T="string" Text="@industry" Value="@industry" Variant="Variant.Filled"
+                                 Color="@(_selectedIndustry == industry ? Color.Primary : Color.Default)">
+                            @industry
+                        </MudChip>
+                    }
+                </MudChipSet>
+            </MudStack>
+
+            @* Import Pack button *@
+            @if (!string.IsNullOrEmpty(_selectedIndustry))
+            {
+                <MudAlert Severity="Severity.Info" Class="mb-4">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText>
+                            Import all <strong>@_selectedIndustry</strong> rules as a pack — optimized thresholds and weights for your industry.
+                        </MudText>
+                        <MudButton Variant="Variant.Filled" Color="Color.Success"
+                                   StartIcon="@Icons.Material.Filled.Download"
+                                   OnClick="@(() => ImportIndustryPack(_selectedIndustry))"
+                                   Disabled="@_importing">
+                            @if (_importing)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                            }
+                            Import Pack
+                        </MudButton>
+                    </MudStack>
+                </MudAlert>
+            }
+
+            @if (_loading)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+            }
+            else if (_templates.Count == 0)
+            {
+                <MudAlert Severity="Severity.Normal">No templates found matching your filters.</MudAlert>
+            }
+            else
+            {
+                <MudGrid>
+                    @foreach (var template in _templates)
+                    {
+                        <MudItem xs="12" md="6" lg="4">
+                            <MudCard Elevation="2" Class="h-100">
+                                <MudCardHeader>
+                                    <CardHeaderContent>
+                                        <MudStack>
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                <MudText Typo="Typo.subtitle1"><strong>@template.Name</strong></MudText>
+                                            </MudStack>
+                                            <MudStack Row="true" Spacing="1" Style="flex-wrap: wrap;">
+                                                <MudChip T="string" Size="Size.Small" Color="@GetIndustryColor(template.Industry)">
+                                                    @template.Industry
+                                                </MudChip>
+                                                <MudChip T="string" Size="Size.Small" Color="@GetCategoryColor(template.Category)">
+                                                    @template.Category
+                                                </MudChip>
+                                                @if (template.IsImported)
+                                                {
+                                                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">
+                                                        ✓ Active
+                                                    </MudChip>
+                                                }
+                                            </MudStack>
+                                        </MudStack>
+                                    </CardHeaderContent>
+                                </MudCardHeader>
+                                <MudCardContent>
+                                    <MudText Typo="Typo.body2" Class="mb-3" Style="min-height: 60px;">
+                                        @template.Description
+                                    </MudText>
+                                    <MudDivider Class="mb-3" />
+                                    <MudGrid>
+                                        <MudItem xs="6">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Threshold</MudText>
+                                            <MudText Typo="Typo.body1"><strong>@FormatThreshold(template)</strong></MudText>
+                                        </MudItem>
+                                        <MudItem xs="6">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Score Weight</MudText>
+                                            <MudText Typo="Typo.body1"><strong>@template.ScoreWeight pts</strong></MudText>
+                                        </MudItem>
+                                    </MudGrid>
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mt-2" Spacing="2">
+                                        <MudIcon Icon="@Icons.Material.Filled.Download" Size="Size.Small" Color="Color.Secondary" />
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @template.ImportCount imports
+                                        </MudText>
+                                        <MudSpacer />
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            v@(template.Version)
+                                        </MudText>
+                                    </MudStack>
+                                </MudCardContent>
+                                <MudCardActions>
+                                    <MudSpacer />
+                                    <MudButton Variant="Variant.Filled"
+                                               Color="@(template.IsImported ? Color.Warning : Color.Primary)"
+                                               Size="Size.Small"
+                                               StartIcon="@(template.IsImported ? Icons.Material.Filled.Update : Icons.Material.Filled.Add)"
+                                               OnClick="@(() => ImportTemplate(template))"
+                                               Disabled="@_importing">
+                                        @(template.IsImported ? "Update Rule" : "Import")
+                                    </MudButton>
+                                </MudCardActions>
+                            </MudCard>
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+        </MudPaper>
+    </MudTabPanel>
+
+    @* ── Tab 2: Rule Analytics ──────────────────────────────────────── *@
+    <MudTabPanel Text="Rule Analytics" Icon="@Icons.Material.Filled.Analytics">
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Class="mr-2" />
+                Rule Effectiveness
+            </MudText>
+            <MudText Typo="Typo.body2" Class="mb-4" Color="Color.Secondary">
+                How well each rule detects actual fraud vs. generating false alarms.
+                Precision = % of flagged transactions that were confirmed fraud.
+            </MudText>
+
+            @if (_analyticsLoading)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+            }
+            else if (_analytics.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info">
+                    No analytics data yet. Rules need transaction history and HITL reviews to compute effectiveness metrics.
+                </MudAlert>
+            }
+            else
+            {
+                <MudTable Items="@_analytics" Hover="true" Striped="true" Elevation="0" Dense="true">
+                    <HeaderContent>
+                        <MudTh>Rule</MudTh>
+                        <MudTh>Category</MudTh>
+                        <MudTh Style="text-align:center">Status</MudTh>
+                        <MudTh Style="text-align:right">Total Hits</MudTh>
+                        <MudTh Style="text-align:right">Hit Rate</MudTh>
+                        <MudTh Style="text-align:right">True Positives</MudTh>
+                        <MudTh Style="text-align:right">False Positives</MudTh>
+                        <MudTh Style="text-align:right">Precision</MudTh>
+                        <MudTh>Effectiveness</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>
+                            <MudText Typo="Typo.body2"><strong>@context.RuleName</strong></MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@context.RuleCode</MudText>
+                        </MudTd>
+                        <MudTd>
+                            <MudChip T="string" Size="Size.Small" Color="@GetCategoryColor(context.Category)">
+                                @context.Category
+                            </MudChip>
+                        </MudTd>
+                        <MudTd Style="text-align:center">
+                            <MudIcon Icon="@(context.IsEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
+                                     Color="@(context.IsEnabled ? Color.Success : Color.Error)"
+                                     Size="Size.Small" />
+                        </MudTd>
+                        <MudTd Style="text-align:right">@context.TotalHits</MudTd>
+                        <MudTd Style="text-align:right">@context.HitRatePercent.ToString("F1")%</MudTd>
+                        <MudTd Style="text-align:right">
+                            <MudText Color="Color.Success">@context.TruePositives</MudText>
+                        </MudTd>
+                        <MudTd Style="text-align:right">
+                            <MudText Color="Color.Error">@context.FalsePositives</MudText>
+                        </MudTd>
+                        <MudTd Style="text-align:right">
+                            <strong>@context.PrecisionPercent.ToString("F1")%</strong>
+                        </MudTd>
+                        <MudTd>
+                            <MudProgressLinear Color="@GetPrecisionColor(context.PrecisionPercent)"
+                                               Value="@context.PrecisionPercent"
+                                               Max="100"
+                                               Style="min-width: 80px;"
+                                               Rounded="true" />
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+
+                <MudAlert Severity="Severity.Info" Class="mt-4">
+                    <MudText Typo="Typo.body2">
+                        <strong>How to read this table:</strong>
+                        A rule with high precision (&gt;70%) is effectively catching real fraud.
+                        A rule with low precision (&lt;30%) creates too many false alarms — consider raising its threshold
+                        or lowering its weight. Rules with 0% precision have no reviewed data yet.
+                    </MudText>
+                </MudAlert>
+            }
+        </MudPaper>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private int _selectedTab;
+    private bool _loading = true;
+    private bool _importing;
+    private bool _analyticsLoading;
+    private string _selectedIndustry = "";
+    private List<string> _industries = [];
+    private List<RuleTemplateInfo> _templates = [];
+    private List<RuleAnalyticsInfo> _analytics = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadIndustriesAsync();
+        await LoadTemplatesAsync();
+        await LoadAnalyticsAsync();
+    }
+
+    private async Task LoadIndustriesAsync()
+    {
+        try
+        {
+            _industries = await MarketplaceService.GetIndustriesAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load industries: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadTemplatesAsync()
+    {
+        _loading = true;
+        try
+        {
+            var filter = string.IsNullOrEmpty(_selectedIndustry)
+                ? null
+                : new RuleTemplateFilter { Industry = _selectedIndustry };
+
+            _templates = await MarketplaceService.GetTemplatesAsync(
+                TenantContext.TenantId, filter);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load templates: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadAnalyticsAsync()
+    {
+        _analyticsLoading = true;
+        try
+        {
+            _analytics = await MarketplaceService.GetRuleAnalyticsAsync(TenantContext.TenantId);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load analytics: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _analyticsLoading = false;
+        }
+    }
+
+    private async Task OnIndustryChanged(string? industry)
+    {
+        _selectedIndustry = industry ?? "";
+        await LoadTemplatesAsync();
+    }
+
+    private async Task ImportTemplate(RuleTemplateInfo template)
+    {
+        string action = template.IsImported ? "update your existing" : "import a new";
+        var confirmed = await DialogService.ShowMessageBox(
+            template.IsImported ? "Update Rule" : "Import Rule",
+            $"This will {action} '{template.RuleCode}' rule with:\n\n" +
+            $"• Threshold: {FormatThreshold(template)}\n" +
+            $"• Score Weight: {template.ScoreWeight} points\n\n" +
+            $"Continue?",
+            yesText: template.IsImported ? "Update" : "Import",
+            cancelText: "Cancel");
+
+        if (confirmed != true) return;
+
+        _importing = true;
+        try
+        {
+            var result = await MarketplaceService.ImportTemplateAsync(
+                template.Id, TenantContext.TenantId, CurrentUser.UserName);
+
+            if (result.Success)
+            {
+                var verb = result.Action == ImportAction.Created ? "imported" : "updated";
+                Snackbar.Add($"Rule '{result.RuleCode}' {verb} successfully!", Severity.Success);
+                await LoadTemplatesAsync();
+                await LoadAnalyticsAsync();
+            }
+            else
+            {
+                Snackbar.Add($"Import failed: {result.ErrorMessage}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Import error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _importing = false;
+        }
+    }
+
+    private async Task ImportIndustryPack(string industry)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            $"Import {industry} Pack",
+            $"This will create or update all 6 risk rules with thresholds optimized for the {industry} industry.\n\n" +
+            $"Existing rules will be updated with new thresholds and weights. This can be reverted from the Risk Rules page.\n\n" +
+            $"Continue?",
+            yesText: "Import All", cancelText: "Cancel");
+
+        if (confirmed != true) return;
+
+        _importing = true;
+        try
+        {
+            var result = await MarketplaceService.ImportIndustryPackAsync(
+                industry, TenantContext.TenantId, CurrentUser.UserName);
+
+            if (result.Success)
+            {
+                Snackbar.Add(
+                    $"{industry} pack imported: {result.Created} created, {result.Updated} updated, {result.Skipped} skipped",
+                    Severity.Success);
+                await LoadTemplatesAsync();
+                await LoadAnalyticsAsync();
+            }
+            else
+            {
+                var firstError = result.Results.FirstOrDefault(r => !r.Success);
+                Snackbar.Add($"Pack import failed: {firstError?.ErrorMessage}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Pack import error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _importing = false;
+        }
+    }
+
+    // ── UI Helpers ────────────────────────────────────────────────────
+
+    private static string FormatThreshold(RuleTemplateInfo t) => t.RuleCode switch
+    {
+        "HIGH_AMOUNT" => $"${t.Threshold:N0}",
+        "ROUND_AMOUNT" => $"${t.Threshold:N0}",
+        "VELOCITY_24H" => $"{t.Threshold:N0} txns/day",
+        "NEW_CUSTOMER" => $"< {t.Threshold:N0} txns",
+        _ => t.Threshold.ToString("N0")
+    };
+
+    private static Color GetIndustryColor(string industry) => industry switch
+    {
+        "Remittance" => Color.Primary,
+        "E-Commerce" => Color.Secondary,
+        "Lending" => Color.Tertiary,
+        "Crypto" => Color.Warning,
+        _ => Color.Default
+    };
+
+    private static Color GetCategoryColor(string category) => category switch
+    {
+        "Amount" => Color.Primary,
+        "Velocity" => Color.Secondary,
+        "Geography" => Color.Error,
+        "Pattern" => Color.Info,
+        _ => Color.Default
+    };
+
+    private static Color GetPrecisionColor(double precision) => precision switch
+    {
+        >= 70 => Color.Success,
+        >= 40 => Color.Warning,
+        > 0 => Color.Error,
+        _ => Color.Default  // 0% = no data
+    };
+}

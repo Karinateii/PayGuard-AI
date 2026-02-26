@@ -250,6 +250,9 @@ builder.Services.AddScoped<IMLTrainingService, MLTrainingService>();
 // Register ML auto-retraining background service — checks hourly for new labeled data
 builder.Services.AddHostedService<MLRetrainingBackgroundService>();
 
+// Register Rule Marketplace service — browse, import, and analyze rule templates
+builder.Services.AddScoped<IRuleMarketplaceService, RuleMarketplaceService>();
+
 // Add controllers for API endpoints (webhooks)
 builder.Services.AddControllers();
 
