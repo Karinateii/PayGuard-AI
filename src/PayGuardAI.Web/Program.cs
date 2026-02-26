@@ -247,6 +247,9 @@ builder.Services.AddScoped<IEmailNotificationService, EmailNotificationService>(
 builder.Services.AddScoped<IMLScoringService, MLScoringService>();
 builder.Services.AddScoped<IMLTrainingService, MLTrainingService>();
 
+// Register ML auto-retraining background service — checks hourly for new labeled data
+builder.Services.AddHostedService<MLRetrainingBackgroundService>();
+
 // Add controllers for API endpoints (webhooks)
 builder.Services.AddControllers();
 
