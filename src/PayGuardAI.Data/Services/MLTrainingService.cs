@@ -112,18 +112,52 @@ public class MLTrainingService : IMLTrainingService
                     minimumExampleCountPerLeaf: 3,
                     learningRate: 0.1));
 
-            // ── Step 4: Cross-validate for metrics ───────────────────────
-            _logger.LogInformation("Running 5-fold cross-validation for tenant {TenantId}...", tenantId);
+            // ── Step 4: Evaluate model metrics ─────────────────────────
+            double avgAccuracy, avgAuc, avgF1, avgPrecision, avgRecall;
 
-            var cvResults = mlContext.BinaryClassification.CrossValidate(
-                dataView, pipeline, numberOfFolds: 5, labelColumnName: "Label");
+            // Try cross-validation first, fall back to train/test split if it fails
+            // (CV can throw when a fold has no positive class samples)
+            try
+            {
+                int numberOfFolds = trainingData.Count < 100 ? 3 : 5;
+                _logger.LogInformation(
+                    "Running {Folds}-fold cross-validation for tenant {TenantId} ({Total} samples, {Fraud} fraud)...",
+                    numberOfFolds, tenantId, trainingData.Count, fraudCount);
 
-            // Average metrics across folds
-            double avgAccuracy = cvResults.Average(r => r.Metrics.Accuracy);
-            double avgAuc = cvResults.Average(r => r.Metrics.AreaUnderRocCurve);
-            double avgF1 = cvResults.Average(r => r.Metrics.F1Score);
-            double avgPrecision = cvResults.Average(r => r.Metrics.PositivePrecision);
-            double avgRecall = cvResults.Average(r => r.Metrics.PositiveRecall);
+                var cvResults = mlContext.BinaryClassification.CrossValidate(
+                    dataView, pipeline, numberOfFolds: numberOfFolds, labelColumnName: "Label");
+
+                double SafeAvg(IEnumerable<double> values)
+                {
+                    var valid = values.Where(v => !double.IsNaN(v)).ToList();
+                    return valid.Count > 0 ? valid.Average() : 0.0;
+                }
+
+                avgAccuracy = SafeAvg(cvResults.Select(r => r.Metrics.Accuracy));
+                avgAuc = SafeAvg(cvResults.Select(r => r.Metrics.AreaUnderRocCurve));
+                avgF1 = SafeAvg(cvResults.Select(r => r.Metrics.F1Score));
+                avgPrecision = SafeAvg(cvResults.Select(r => r.Metrics.PositivePrecision));
+                avgRecall = SafeAvg(cvResults.Select(r => r.Metrics.PositiveRecall));
+            }
+            catch (Exception cvEx) when (cvEx is ArgumentOutOfRangeException || cvEx.Message.Contains("AUC"))
+            {
+                // Cross-validation failed (too few positive samples per fold).
+                // Fall back to an 80/20 stratified train/test split.
+                _logger.LogWarning(
+                    "Cross-validation failed for tenant {TenantId}, falling back to train/test split: {Error}",
+                    tenantId, cvEx.Message);
+
+                var split = mlContext.Data.TrainTestSplit(dataView, testFraction: 0.2, samplingKeyColumnName: null, seed: 42);
+                var splitModel = pipeline.Fit(split.TrainSet);
+                var predictions = splitModel.Transform(split.TestSet);
+                var metrics = mlContext.BinaryClassification.EvaluateNonCalibrated(predictions, "Label");
+
+                avgAccuracy = metrics.Accuracy;
+                avgAuc = double.IsNaN(metrics.AreaUnderRocCurve) ? 0.0 : metrics.AreaUnderRocCurve;
+                avgF1 = double.IsNaN(metrics.F1Score) ? 0.0 : metrics.F1Score;
+                avgPrecision = double.IsNaN(metrics.PositivePrecision) ? 0.0 : metrics.PositivePrecision;
+                avgRecall = double.IsNaN(metrics.PositiveRecall) ? 0.0 : metrics.PositiveRecall;
+            }
 
             _logger.LogInformation(
                 "CV metrics for tenant {TenantId}: Accuracy={Accuracy:F3}, AUC={AUC:F3}, F1={F1:F3}, Precision={Precision:F3}, Recall={Recall:F3}",

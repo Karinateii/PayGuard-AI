@@ -268,6 +268,15 @@ using (var scope = app.Services.CreateScope())
     // Seed demo data in development
     if (app.Environment.IsDevelopment())
     {
+        // Set tenant context so seeded data belongs to the demo tenant
+        var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>();
+        var defaultTenant = app.Configuration["MultiTenancy:DefaultTenantId"] ?? "afriex-demo";
+        tenantContext.TenantId = defaultTenant;
+        
+        // Also set tenant on DbContext so query filters work
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        dbContext.SetTenantId(defaultTenant);
+        
         var seeder = scope.ServiceProvider.GetRequiredService<DemoDataSeeder>();
         await seeder.SeedAsync(25);
     }

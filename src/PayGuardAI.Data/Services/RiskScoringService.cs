@@ -74,16 +74,15 @@ public class RiskScoringService : IRiskScoringService
         totalScore = Math.Min(totalScore, 100);
 
         // ── ML scoring enhancement ──────────────────────────────────
-        // If an ML model is loaded for this tenant, score the transaction
-        // and add the ML prediction as an additional risk factor.
-        if (_mlScoringService.IsModelAvailable(_tenantContext.TenantId))
+        // Try ML scoring for this tenant. ScoreTransactionAsync handles
+        // lazy-loading the model from DB and returns null if no model exists.
         {
             try
             {
                 var mlResult = await _mlScoringService.ScoreTransactionAsync(
                     transaction, customerProfile, cancellationToken);
 
-                if (mlResult != null && mlResult.ScoreContribution > 0)
+                if (mlResult != null)
                 {
                     var mlFactor = new RiskFactor
                     {
