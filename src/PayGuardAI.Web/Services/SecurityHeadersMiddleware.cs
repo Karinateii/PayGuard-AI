@@ -34,6 +34,7 @@ public class SecurityHeadersMiddleware
         // Content-Security-Policy — prevent XSS by restricting resource loading.
         // Blazor Server requires 'unsafe-inline' for styles and 'unsafe-eval' for scripts
         // because the SignalR connection and Blazor runtime need inline code execution.
+        // Swagger UI also requires 'unsafe-inline' for its embedded styles and scripts.
         context.Response.Headers["Content-Security-Policy"] =
             "default-src 'self'; " +
             "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
@@ -43,7 +44,7 @@ public class SecurityHeadersMiddleware
             "connect-src 'self' ws: wss:; " +   // SignalR WebSocket connections
             "frame-ancestors 'none'; " +
             "base-uri 'self'; " +
-            "form-action 'self';";
+            "form-action 'self' https://accounts.google.com;";
 
         // Cache control for API responses (don't cache sensitive data)
         if (context.Request.Path.StartsWithSegments("/api"))

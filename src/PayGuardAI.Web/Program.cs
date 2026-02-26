@@ -18,6 +18,7 @@ using Serilog;
 using Serilog.Events;
 using Serilog.Formatting.Compact;
 using System.Threading.RateLimiting;
+using Microsoft.OpenApi.Models;
 
 // Bootstrap logger captures fatal startup errors before DI is ready
 Log.Logger = new LoggerConfiguration()
@@ -258,6 +259,66 @@ builder.Services.AddScoped<IRuleMarketplaceService, RuleMarketplaceService>();
 // Add controllers for API endpoints (webhooks)
 builder.Services.AddControllers();
 
+// Add Swagger/OpenAPI documentation
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "PayGuard AI API",
+        Version = "v1",
+        Description = "AI-powered transaction risk monitoring, compliance automation, and fraud detection for cross-border payments.\n\n" +
+                    "## Authentication\n" +
+                    "Most webhook endpoints are unauthenticated (they verify via HMAC signatures instead). " +
+                    "The simulate endpoint requires cookie-based authentication.\n\n" +
+                    "## Webhook Signatures\n" +
+                    "All inbound webhooks **must** include a valid signature header:\n" +
+                    "- **Afriex**: `X-Afriex-Signature` (HMAC-SHA256)\n" +
+                    "- **Flutterwave**: `verif-hash` (shared secret)\n" +
+                    "- **Wise**: `X-Signature-SHA256` (RSA-SHA256)\n" +
+                    "- **Paystack**: `x-paystack-signature` (HMAC-SHA512)\n\n" +
+                    "## Rate Limiting\n" +
+                    "API endpoints are rate-limited per tenant (60 req/min) and per API key (120 req/min).",
+        Contact = new OpenApiContact
+        {
+            Name = "PayGuard AI Support",
+            Email = "support@payguardai.xyz",
+            Url = new Uri("https://payguard-ai-production.up.railway.app")
+        },
+        License = new OpenApiLicense
+        {
+            Name = "MIT",
+            Url = new Uri("https://opensource.org/licenses/MIT")
+        }
+    });
+
+    options.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme
+    {
+        Type = SecuritySchemeType.ApiKey,
+        In = ParameterLocation.Header,
+        Name = "X-API-Key",
+        Description = "API key for programmatic access. Generate keys from the Admin > API Keys page."
+    });
+
+    options.AddSecurityDefinition("WebhookSignature", new OpenApiSecurityScheme
+    {
+        Type = SecuritySchemeType.ApiKey,
+        In = ParameterLocation.Header,
+        Name = "X-Afriex-Signature",
+        Description = "HMAC-SHA256 webhook signature for payload verification."
+    });
+
+    // Include XML documentation comments
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+        options.IncludeXmlComments(xmlPath);
+
+    // Group endpoints by controller
+    options.TagActionsBy(api => new[] { api.GroupName ?? api.ActionDescriptor.RouteValues["controller"] ?? "Default" });
+    options.DocInclusionPredicate((_, _) => true);
+});
+
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -300,6 +361,18 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+
+// Swagger UI — available in all environments for API documentation
+app.UseSwagger();
+app.UseSwaggerUI(options =>
+{
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "PayGuard AI API v1");
+    options.RoutePrefix = "swagger";
+    options.DocumentTitle = "PayGuard AI - API Documentation";
+    options.DefaultModelsExpandDepth(1);
+    options.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.List);
+    options.EnableTryItOutByDefault();
+});
 
 // Only redirect to HTTPS in development (Railway handles HTTPS termination at edge)
 if (app.Environment.IsDevelopment())

@@ -1,0 +1,209 @@
+@page "/terms"
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+
+<PageTitle>Terms of Service - PayGuard AI</PageTitle>
+
+<div style="min-height: 100vh; background: linear-gradient(135deg, #0d1b2a 0%, #1b2838 50%, #1a3a5c 100%); padding: 40px 0;">
+    <MudContainer MaxWidth="MaxWidth.Medium">
+        <MudPaper Elevation="8" Class="pa-6 pa-sm-10 rounded-lg" Style="border-top: 4px solid var(--mud-palette-primary);">
+
+            @* ── Header ── *@
+            <div class="d-flex align-center mb-6">
+                <MudAvatar Color="Color.Primary" Size="Size.Medium" Class="mr-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Gavel" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.h4" Style="font-weight: 700;">Terms of Service</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Last updated: @DateTime.UtcNow.ToString("MMMM d, yyyy")
+                    </MudText>
+                </div>
+            </div>
+
+            @* ── 1. Acceptance ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">1. Acceptance of Terms</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                By accessing or using the PayGuard AI platform ("Service"), you agree to be bound by these
+                Terms of Service ("Terms"). If you are using the Service on behalf of an organization, you
+                represent that you have authority to bind that organization to these Terms. If you do not
+                agree, you may not use the Service.
+            </MudText>
+
+            @* ── 2. Description of Service ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">2. Description of Service</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                PayGuard AI is a multi-tenant SaaS platform that provides AI-powered transaction risk
+                monitoring, fraud detection, compliance automation, and analytics for cross-border payment
+                companies. Features include real-time webhook processing, ML-based risk scoring, configurable
+                risk rules, audit logging, compliance reporting, and multi-provider payment verification.
+            </MudText>
+
+            @* ── 3. Accounts & Registration ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">3. Accounts & Registration</MudText>
+            <MudText Typo="Typo.body1" Class="mb-3">
+                To use the Service, you must register for an account by providing accurate information.
+                You are responsible for:
+            </MudText>
+            <ul class="mb-4" style="padding-left: 24px;">
+                <li><MudText Typo="Typo.body1">Maintaining the confidentiality of your login credentials and API keys</MudText></li>
+                <li><MudText Typo="Typo.body1">All activity that occurs under your account</MudText></li>
+                <li><MudText Typo="Typo.body1">Ensuring authorized team members comply with these Terms</MudText></li>
+                <li><MudText Typo="Typo.body1">Promptly notifying us of any unauthorized access</MudText></li>
+            </ul>
+
+            @* ── 4. Permitted Use ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">4. Permitted Use</MudText>
+            <MudText Typo="Typo.body1" Class="mb-3">You agree to use the Service only for:</MudText>
+            <ul class="mb-4" style="padding-left: 24px;">
+                <li><MudText Typo="Typo.body1">Legitimate transaction monitoring and fraud detection</MudText></li>
+                <li><MudText Typo="Typo.body1">Compliance with applicable AML/KYC/CFT regulations</MudText></li>
+                <li><MudText Typo="Typo.body1">Authorized risk management activities</MudText></li>
+            </ul>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                You may <strong>not</strong> use the Service to facilitate money laundering, terrorist
+                financing, sanctions evasion, or any other illegal activity. Violation of this clause
+                will result in immediate account termination and may be reported to authorities.
+            </MudText>
+
+            @* ── 5. API & Webhook Usage ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">5. API & Webhook Usage</MudText>
+            <MudText Typo="Typo.body1" Class="mb-3">When integrating with our API and webhooks:</MudText>
+            <ul class="mb-4" style="padding-left: 24px;">
+                <li><MudText Typo="Typo.body1">All webhook payloads must include valid HMAC signatures</MudText></li>
+                <li><MudText Typo="Typo.body1">API keys are confidential — do not share or expose them in client-side code</MudText></li>
+                <li><MudText Typo="Typo.body1">Rate limits (60 requests/minute per tenant, 120/minute per API key) must be respected</MudText></li>
+                <li><MudText Typo="Typo.body1">You must not attempt to circumvent security controls or access other tenants' data</MudText></li>
+            </ul>
+
+            @* ── 6. Subscription & Billing ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">6. Subscription & Billing</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                Access to the Service is provided under subscription plans (Starter, Professional,
+                Enterprise). Billing is processed through our payment partners (Paystack, Flutterwave).
+                Subscription fees are non-refundable except as required by law. We reserve the right to
+                modify pricing with 30 days' written notice. Free-tier ("Starter") accounts may have
+                feature and volume limitations.
+            </MudText>
+
+            @* ── 7. Data Ownership ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">7. Data Ownership</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                You retain ownership of all data you submit to the Service ("Customer Data"). By using the
+                Service, you grant us a limited, non-exclusive license to process your Customer Data solely
+                for the purpose of providing and improving the Service. We may use anonymized, aggregated
+                data for platform analytics and ML model training, but will never identify individual
+                customers or their specific transaction data.
+            </MudText>
+
+            @* ── 8. Service Level ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">8. Service Level & Availability</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                We strive to maintain 99.9% uptime for the Service. Planned maintenance windows will be
+                communicated at least 48 hours in advance. We are not liable for downtime caused by
+                third-party services (payment providers, hosting infrastructure, internet outages),
+                force majeure events, or scheduled maintenance.
+            </MudText>
+
+            @* ── 9. Intellectual Property ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">9. Intellectual Property</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                The Service, including its software, algorithms, ML models, user interface, documentation,
+                and branding, is owned by PayGuard AI and protected by intellectual property laws.
+                Your subscription grants you a limited, revocable, non-transferable license to use the
+                Service. You may not reverse-engineer, decompile, or create derivative works from any
+                part of the Service.
+            </MudText>
+
+            @* ── 10. Confidentiality ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">10. Confidentiality</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                Both parties agree to maintain the confidentiality of any proprietary or sensitive
+                information exchanged during the use of the Service. This includes API keys, webhook
+                secrets, risk rule configurations, and internal risk scoring methodologies. Confidentiality
+                obligations survive termination of these Terms.
+            </MudText>
+
+            @* ── 11. Limitation of Liability ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">11. Limitation of Liability</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                TO THE MAXIMUM EXTENT PERMITTED BY LAW, PAYGUARD AI SHALL NOT BE LIABLE FOR ANY INDIRECT,
+                INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING BUT NOT LIMITED TO LOSS
+                OF PROFITS, DATA, OR BUSINESS OPPORTUNITIES, ARISING FROM YOUR USE OF THE SERVICE. OUR
+                TOTAL LIABILITY SHALL NOT EXCEED THE AMOUNT YOU PAID FOR THE SERVICE IN THE 12 MONTHS
+                PRECEDING THE CLAIM.
+            </MudText>
+
+            @* ── 12. Disclaimer ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">12. Disclaimer of Warranties</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER
+                EXPRESS OR IMPLIED. PAYGUARD AI DOES NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED,
+                ERROR-FREE, OR COMPLETELY SECURE. RISK SCORES AND FRAUD DETECTION OUTPUTS ARE PROBABILISTIC
+                AND SHOULD NOT BE THE SOLE BASIS FOR FINANCIAL DECISIONS. YOU ARE RESPONSIBLE FOR MAKING
+                FINAL TRANSACTION APPROVAL OR REJECTION DECISIONS.
+            </MudText>
+
+            @* ── 13. Indemnification ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">13. Indemnification</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                You agree to indemnify and hold harmless PayGuard AI, its officers, directors, employees,
+                and agents from any claims, damages, losses, or expenses (including reasonable legal fees)
+                arising from your use of the Service, your violation of these Terms, or your violation of
+                any applicable law or regulation.
+            </MudText>
+
+            @* ── 14. Termination ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">14. Termination</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                Either party may terminate these Terms at any time. You may cancel your subscription through
+                the platform's billing settings. We may suspend or terminate your account for breach of
+                these Terms, non-payment, or suspected fraudulent or illegal activity. Upon termination,
+                your access to the Service will cease, and your data will be retained for 90 days (or
+                longer if required by regulation) before deletion.
+            </MudText>
+
+            @* ── 15. Governing Law ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">15. Governing Law & Disputes</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                These Terms shall be governed by and construed in accordance with applicable law.
+                Any disputes arising from these Terms shall be resolved through good-faith negotiation
+                first, then mediation, and finally binding arbitration if necessary. Each party bears
+                its own costs unless otherwise determined by the arbitrator.
+            </MudText>
+
+            @* ── 16. Changes ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">16. Changes to These Terms</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                We reserve the right to modify these Terms at any time. Material changes will be communicated
+                via email or in-app notification at least 30 days before taking effect. Continued use of the
+                Service after the effective date constitutes acceptance of the updated Terms.
+            </MudText>
+
+            @* ── 17. Contact ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">17. Contact Us</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                If you have questions about these Terms, please contact us:
+            </MudText>
+            <MudPaper Elevation="0" Class="pa-4 rounded-lg mb-4" Style="background: var(--mud-palette-background-grey);">
+                <MudText Typo="Typo.body2"><strong>PayGuard AI</strong></MudText>
+                <MudText Typo="Typo.body2">Email: <MudLink Href="mailto:legal@payguardai.xyz" Color="Color.Primary">legal@payguardai.xyz</MudLink></MudText>
+                <MudText Typo="Typo.body2">Website: <MudLink Href="https://payguard-ai-production.up.railway.app" Target="_blank" Color="Color.Primary">payguard-ai-production.up.railway.app</MudLink></MudText>
+            </MudPaper>
+
+            @* ── Footer navigation ── *@
+            <MudDivider Class="my-4" />
+            <div class="d-flex justify-center gap-4 flex-wrap">
+                <MudLink Href="/privacy" Typo="Typo.body2" Color="Color.Primary">Privacy Policy</MudLink>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">·</MudText>
+                <MudLink Href="/login" Typo="Typo.body2" Color="Color.Primary">Sign In</MudLink>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">·</MudText>
+                <MudLink Href="/signup" Typo="Typo.body2" Color="Color.Primary">Sign Up</MudLink>
+            </div>
+
+            <MudText Typo="Typo.caption" Align="Align.Center" Color="Color.Secondary" Class="mt-4">
+                © @DateTime.Now.Year PayGuard AI — All rights reserved.
+            </MudText>
+        </MudPaper>
+    </MudContainer>
+</div>

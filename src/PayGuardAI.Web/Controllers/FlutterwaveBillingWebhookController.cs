@@ -29,7 +29,20 @@ public class FlutterwaveBillingWebhookController : ControllerBase
         _logger = logger;
     }
 
+    /// <summary>
+    /// Receives Flutterwave billing webhook events (subscription charges, cancellations, failures).
+    /// </summary>
+    /// <remarks>
+    /// Requires `verif-hash` header matching the configured webhook secret.
+    /// This is separate from the transaction webhook at `/api/webhooks/flutterwave`.
+    /// </remarks>
+    /// <response code="200">Webhook processed successfully</response>
+    /// <response code="400">Missing signature or invalid payload</response>
+    /// <response code="500">Internal processing error</response>
     [HttpPost("flutterwave-billing")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> ReceiveFlutterwaveBillingWebhook(CancellationToken cancellationToken)
     {
         using var reader = new StreamReader(Request.Body);

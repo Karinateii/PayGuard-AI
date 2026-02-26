@@ -26,7 +26,20 @@ public class PaystackWebhookController : ControllerBase
         _logger = logger;
     }
 
+    /// <summary>
+    /// Receives Paystack billing webhook events (subscription charges, cancellations).
+    /// </summary>
+    /// <remarks>
+    /// Requires `x-paystack-signature` header with HMAC-SHA512 signature.
+    /// Only processes events from verified Paystack IPs.
+    /// </remarks>
+    /// <response code="200">Webhook processed successfully</response>
+    /// <response code="400">Missing signature or invalid payload</response>
+    /// <response code="500">Internal processing error</response>
     [HttpPost("paystack")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> ReceivePaystackWebhook(CancellationToken cancellationToken)
     {
         using var reader = new StreamReader(Request.Body);

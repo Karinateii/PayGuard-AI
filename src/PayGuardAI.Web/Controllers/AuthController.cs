@@ -39,8 +39,12 @@ public class AuthController : ControllerBase
     /// SECURITY: Only available when OAuth is disabled (development/demo mode).
     /// In production (OAuthEnabled=true), this endpoint returns 404.
     /// </summary>
+    /// <response code="302">Login successful, redirecting to dashboard</response>
+    /// <response code="404">Demo login disabled (OAuth mode is active)</response>
     [HttpPost("demo-login")]
     [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status302Found)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult DemoLogin()
     {
         // SECURITY: Block demo login when OAuth is enabled (production mode)
@@ -64,8 +68,10 @@ public class AuthController : ControllerBase
     /// <summary>
     /// OAuth login endpoint - triggers OIDC challenge (redirects to Google/Azure AD)
     /// </summary>
+    /// <response code="302">Redirecting to OAuth provider</response>
     [HttpGet("oauth-login")]
     [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status302Found)]
     public IActionResult OAuthLogin()
     {
         _logger.LogInformation("[AUTH-CONTROLLER] OAuth login requested - triggering OIDC challenge");
@@ -82,8 +88,11 @@ public class AuthController : ControllerBase
     /// <summary>
     /// Request a magic link — sends a one-time login link to the user's email.
     /// </summary>
+    /// <param name="email">Email address to send the magic link to</param>
+    /// <response code="302">Redirecting to confirmation page (always, for security)</response>
     [HttpPost("magic-link/request")]
     [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status302Found)]
     public async Task<IActionResult> RequestMagicLink([FromForm] string email)
     {
         _logger.LogInformation("[AUTH] Magic link requested for {Email}", email);
@@ -98,8 +107,11 @@ public class AuthController : ControllerBase
     /// <summary>
     /// Verify a magic link token — validates it, looks up the user's org, and signs them in.
     /// </summary>
+    /// <param name="token">One-time magic link token from the email</param>
+    /// <response code="302">Login successful, redirecting to dashboard (or error page)</response>
     [HttpGet("magic-link/verify")]
     [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status302Found)]
     public async Task<IActionResult> VerifyMagicLink([FromQuery] string token)
     {
         var email = await _magicLink.ValidateTokenAsync(token);
@@ -160,10 +172,13 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Unified logout endpoint — handles both Demo and OAuth sign-out
+    /// Unified logout endpoint — handles both Demo and OAuth sign-out.
+    /// Clears session and cookies, redirects to login page.
     /// </summary>
+    /// <response code="302">Logged out, redirecting to login page</response>
     [HttpGet("logout")]
     [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status302Found)]
     public async Task<IActionResult> Logout()
     {
         _logger.LogInformation("[AUTH-CONTROLLER] Logout requested");
@@ -190,8 +205,15 @@ public class AuthController : ControllerBase
     /// SuperAdmin: switch to another tenant's context.
     /// Stores the impersonated tenant ID in the session so it survives page loads.
     /// </summary>
+    /// <param name="tenantId">Target tenant ID to impersonate</param>
+    /// <response code="302">Impersonation active, redirecting to dashboard</response>
+    /// <response code="400">Invalid tenant ID</response>
+    /// <response code="403">Not a SuperAdmin</response>
     [HttpGet("impersonate/{tenantId}")]
     [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(StatusCodes.Status302Found)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public IActionResult Impersonate(string tenantId)
     {
         if (string.IsNullOrWhiteSpace(tenantId))
@@ -207,8 +229,12 @@ public class AuthController : ControllerBase
     /// <summary>
     /// SuperAdmin: stop impersonating — return to home tenant.
     /// </summary>
+    /// <response code="302">Impersonation stopped, redirecting to dashboard</response>
+    /// <response code="403">Not a SuperAdmin</response>
     [HttpGet("stop-impersonating")]
     [Authorize(Roles = "SuperAdmin")]
+    [ProducesResponseType(StatusCodes.Status302Found)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public IActionResult StopImpersonating()
     {
         HttpContext.Session.Remove("ImpersonateTenantId");

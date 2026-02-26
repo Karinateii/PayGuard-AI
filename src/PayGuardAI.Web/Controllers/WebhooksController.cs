@@ -49,7 +49,37 @@ public class WebhooksController : ControllerBase
     /// Supports both TRANSACTION.CREATED and TRANSACTION.UPDATED events.
     /// Endpoint: POST /api/webhooks/afriex
     /// </summary>
+    /// <remarks>
+    /// Requires `X-Afriex-Signature` header with HMAC-SHA256 signature of the request body.
+    /// 
+    /// Sample Afriex webhook payload:
+    /// 
+    ///     POST /api/webhooks/afriex
+    ///     X-Afriex-Signature: sha256=abc123...
+    ///     
+    ///     {
+    ///       "event": "transaction.completed",
+    ///       "data": {
+    ///         "id": "txn-001",
+    ///         "type": "send",
+    ///         "status": "completed",
+    ///         "amount": 500,
+    ///         "currency": "USD",
+    ///         "source_country": "US",
+    ///         "destination_country": "NG",
+    ///         "customer": { "id": "cust-1", "email": "user@example.com" }
+    ///       }
+    ///     }
+    /// </remarks>
+    /// <response code="200">Transaction processed successfully with risk analysis</response>
+    /// <response code="401">Missing or invalid webhook signature</response>
+    /// <response code="400">Malformed payload or processing error</response>
+    /// <response code="429">Rate limit exceeded</response>
     [HttpPost("afriex")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> ReceiveAfriexWebhook(CancellationToken cancellationToken)
     {
         return await ProcessWebhook("afriex", cancellationToken);
@@ -59,7 +89,16 @@ public class WebhooksController : ControllerBase
     /// Receives transaction webhooks from Flutterwave.
     /// Endpoint: POST /api/webhooks/flutterwave
     /// </summary>
+    /// <remarks>
+    /// Requires `verif-hash` header matching your configured Flutterwave webhook secret.
+    /// </remarks>
+    /// <response code="200">Transaction processed successfully</response>
+    /// <response code="401">Missing or invalid signature</response>
+    /// <response code="400">Processing error</response>
     [HttpPost("flutterwave")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ReceiveFlutterwaveWebhook(CancellationToken cancellationToken)
     {
         return await ProcessWebhook("flutterwave", cancellationToken);
@@ -70,7 +109,16 @@ public class WebhooksController : ControllerBase
     /// Wise sends transfer state change events with RSA-SHA256 signed payloads.
     /// Endpoint: POST /api/webhooks/wise
     /// </summary>
+    /// <remarks>
+    /// Requires `X-Signature-SHA256` header with RSA-SHA256 signature.
+    /// </remarks>
+    /// <response code="200">Transaction processed successfully</response>
+    /// <response code="401">Missing or invalid signature</response>
+    /// <response code="400">Processing error</response>
     [HttpPost("wise")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ReceiveWiseWebhook(CancellationToken cancellationToken)
     {
         return await ProcessWebhook("wise", cancellationToken);
@@ -176,7 +224,9 @@ public class WebhooksController : ControllerBase
     /// Health check endpoint for webhook configuration verification.
     /// SECURITY: Only returns basic status — does NOT expose provider configuration details.
     /// </summary>
+    /// <response code="200">Service is healthy</response>
     [HttpGet("health")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     public IActionResult Health()
     {
         return Ok(new
@@ -192,8 +242,36 @@ public class WebhooksController : ControllerBase
     /// Creates a webhook payload locally and processes it through the full risk pipeline.
     /// No external API calls required.
     /// </summary>
+    /// <param name="request">Transaction simulation parameters</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Risk analysis result including score, level, and explanation</returns>
+    /// <remarks>
+    /// Requires authentication. The simulated transaction goes through the full pipeline:
+    /// 1. Rule-based risk scoring (6 configurable rules)
+    /// 2. ML model scoring (if trained model available)
+    /// 3. Risk level assignment (Low/Medium/High/Critical)
+    /// 4. Auto-approve or queue for HITL review
+    /// 5. Real-time SignalR notification broadcast
+    /// 6. Outbound webhook delivery to configured endpoints
+    /// 
+    /// Sample request:
+    /// 
+    ///     POST /api/webhooks/simulate
+    ///     {
+    ///       "amount": 50000,
+    ///       "sourceCountry": "US",
+    ///       "destinationCountry": "NG",
+    ///       "transactionType": "REMITTANCE"
+    ///     }
+    /// </remarks>
+    /// <response code="200">Transaction simulated and risk-scored successfully</response>
+    /// <response code="400">Invalid request or processing error</response>
+    /// <response code="401">Not authenticated</response>
     [HttpPost("simulate")]
     [Authorize]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> SimulateTransaction(
         [FromBody] SimulateTransactionRequest request,
         CancellationToken cancellationToken)
@@ -332,13 +410,34 @@ public class WebhooksController : ControllerBase
     }
 }
 
+/// <summary>
+/// Request model for simulating a transaction through the risk scoring pipeline.
+/// </summary>
 public class SimulateTransactionRequest
 {
+    /// <summary>Transaction amount in source currency (e.g., 100.00)</summary>
+    /// <example>5000</example>
     public decimal Amount { get; set; } = 100;
+
+    /// <summary>ISO 3166-1 alpha-2 source country code (e.g., "US", "GB", "NG")</summary>
+    /// <example>US</example>
     public string SourceCountry { get; set; } = "US";
+
+    /// <summary>ISO 3166-1 alpha-2 destination country code</summary>
+    /// <example>NG</example>
     public string DestinationCountry { get; set; } = "NG";
+
+    /// <summary>ISO 4217 source currency code (auto-detected from country if omitted)</summary>
+    /// <example>USD</example>
     public string? SourceCurrency { get; set; }
+
+    /// <summary>Sender identifier (auto-generated if omitted)</summary>
     public string? SenderId { get; set; }
+
+    /// <summary>Receiver identifier (auto-generated if omitted)</summary>
     public string? ReceiverId { get; set; }
+
+    /// <summary>Transaction type: REMITTANCE, PAYMENT, DEPOSIT, WITHDRAWAL</summary>
+    /// <example>REMITTANCE</example>
     public string? TransactionType { get; set; }
 }

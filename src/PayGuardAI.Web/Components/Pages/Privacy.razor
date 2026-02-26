@@ -1,0 +1,199 @@
+@page "/privacy"
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+
+<PageTitle>Privacy Policy - PayGuard AI</PageTitle>
+
+<div style="min-height: 100vh; background: linear-gradient(135deg, #0d1b2a 0%, #1b2838 50%, #1a3a5c 100%); padding: 40px 0;">
+    <MudContainer MaxWidth="MaxWidth.Medium">
+        <MudPaper Elevation="8" Class="pa-6 pa-sm-10 rounded-lg" Style="border-top: 4px solid var(--mud-palette-primary);">
+
+            @* ── Header ── *@
+            <div class="d-flex align-center mb-6">
+                <MudAvatar Color="Color.Primary" Size="Size.Medium" Class="mr-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Shield" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.h4" Style="font-weight: 700;">Privacy Policy</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Last updated: @DateTime.UtcNow.ToString("MMMM d, yyyy")
+                    </MudText>
+                </div>
+            </div>
+
+            @* ── 1. Overview ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">1. Overview</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                PayGuard AI ("we", "us", or "our") is an AI-powered transaction risk monitoring
+                and fraud detection platform designed for cross-border payment companies. This Privacy
+                Policy explains how we collect, use, disclose, and safeguard your information when you
+                use our platform.
+            </MudText>
+
+            @* ── 2. Information We Collect ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">2. Information We Collect</MudText>
+
+            <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1" Style="font-weight: 600;">2.1 Account Information</MudText>
+            <MudText Typo="Typo.body1" Class="mb-3">
+                When you register for an account, we collect your name, email address, organization name,
+                and authentication credentials (including OAuth tokens and magic link verification data).
+            </MudText>
+
+            <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1" Style="font-weight: 600;">2.2 Transaction Data</MudText>
+            <MudText Typo="Typo.body1" Class="mb-3">
+                We process transaction data that you submit via webhook integrations (Afriex, Flutterwave,
+                Wise, Paystack). This includes transaction IDs, amounts, currencies, sender/recipient
+                identifiers, country codes, and timestamps. We do <strong>not</strong> store payment card
+                numbers, bank account numbers, or other direct financial credentials.
+            </MudText>
+
+            <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1" Style="font-weight: 600;">2.3 Risk & Analytics Data</MudText>
+            <MudText Typo="Typo.body1" Class="mb-3">
+                Our platform generates risk scores, risk factors, compliance reports, audit logs, and ML
+                model outputs. These are derived from transaction patterns and your configured risk rules.
+            </MudText>
+
+            <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1" Style="font-weight: 600;">2.4 Usage & Technical Data</MudText>
+            <MudText Typo="Typo.body1" Class="mb-3">
+                We automatically collect IP addresses, browser type, device information, pages visited,
+                and feature usage metrics to improve our services and ensure platform security.
+            </MudText>
+
+            @* ── 3. How We Use Your Information ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">3. How We Use Your Information</MudText>
+            <MudText Typo="Typo.body1" Class="mb-2">We use the information we collect to:</MudText>
+            <ul class="mb-4" style="padding-left: 24px;">
+                <li><MudText Typo="Typo.body1">Provide, operate, and maintain the PayGuard AI platform</MudText></li>
+                <li><MudText Typo="Typo.body1">Perform real-time transaction risk scoring and fraud detection</MudText></li>
+                <li><MudText Typo="Typo.body1">Generate compliance reports and audit trails</MudText></li>
+                <li><MudText Typo="Typo.body1">Train and improve our ML-based risk models</MudText></li>
+                <li><MudText Typo="Typo.body1">Send security alerts, notifications, and service updates</MudText></li>
+                <li><MudText Typo="Typo.body1">Enforce sanctioned country and sanctions list screening</MudText></li>
+                <li><MudText Typo="Typo.body1">Manage tenant accounts, billing, and subscriptions</MudText></li>
+                <li><MudText Typo="Typo.body1">Comply with legal and regulatory requirements (AML/KYC/CFT)</MudText></li>
+            </ul>
+
+            @* ── 4. Data Sharing ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">4. Data Sharing & Disclosure</MudText>
+            <MudText Typo="Typo.body1" Class="mb-3">
+                We do <strong>not</strong> sell your personal data. We may share information only in
+                the following circumstances:
+            </MudText>
+            <ul class="mb-4" style="padding-left: 24px;">
+                <li><MudText Typo="Typo.body1"><strong>Service Providers:</strong> Infrastructure hosting (Railway), payment processors (Paystack, Flutterwave), and email delivery services</MudText></li>
+                <li><MudText Typo="Typo.body1"><strong>Legal Compliance:</strong> When required by law, regulation, or valid legal process</MudText></li>
+                <li><MudText Typo="Typo.body1"><strong>Safety & Security:</strong> To investigate fraud, protect rights, or prevent harm</MudText></li>
+                <li><MudText Typo="Typo.body1"><strong>With Your Consent:</strong> When you explicitly authorize sharing</MudText></li>
+            </ul>
+
+            @* ── 5. Data Security ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">5. Data Security</MudText>
+            <MudText Typo="Typo.body1" Class="mb-3">
+                We implement industry-standard security measures to protect your data:
+            </MudText>
+            <ul class="mb-4" style="padding-left: 24px;">
+                <li><MudText Typo="Typo.body1">HTTPS/TLS encryption for all data in transit</MudText></li>
+                <li><MudText Typo="Typo.body1">HMAC-SHA256/SHA512 webhook signature verification</MudText></li>
+                <li><MudText Typo="Typo.body1">Hashed API keys (SHA-256) — we never store plaintext keys</MudText></li>
+                <li><MudText Typo="Typo.body1">Multi-factor authentication (MFA/TOTP) support</MudText></li>
+                <li><MudText Typo="Typo.body1">Role-based access control (RBAC) with tenant isolation</MudText></li>
+                <li><MudText Typo="Typo.body1">Security headers (CSP, HSTS, X-Frame-Options, etc.)</MudText></li>
+                <li><MudText Typo="Typo.body1">Rate limiting and IP-based throttling</MudText></li>
+                <li><MudText Typo="Typo.body1">Complete audit logging of all user actions</MudText></li>
+            </ul>
+
+            @* ── 6. Data Retention ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">6. Data Retention</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                Transaction data and risk analyses are retained for the duration of your subscription
+                plus 90 days after account closure for compliance purposes. Audit logs are retained for
+                a minimum of 7 years in accordance with AML/CFT regulatory requirements. You may request
+                earlier deletion of non-regulated data by contacting us.
+            </MudText>
+
+            @* ── 7. Multi-Tenancy & Data Isolation ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">7. Multi-Tenancy & Data Isolation</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                PayGuard AI is a multi-tenant platform. Each tenant's data (transactions, risk rules, team
+                members, API keys, and reports) is logically isolated and inaccessible to other tenants.
+                Platform administrators may only access tenant data for legitimate support or compliance
+                purposes, and all such access is fully audited.
+            </MudText>
+
+            @* ── 8. Your Rights ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">8. Your Rights</MudText>
+            <MudText Typo="Typo.body1" Class="mb-2">
+                Depending on your jurisdiction, you may have the following rights:
+            </MudText>
+            <ul class="mb-4" style="padding-left: 24px;">
+                <li><MudText Typo="Typo.body1"><strong>Access:</strong> Request a copy of your personal data</MudText></li>
+                <li><MudText Typo="Typo.body1"><strong>Correction:</strong> Request correction of inaccurate data</MudText></li>
+                <li><MudText Typo="Typo.body1"><strong>Deletion:</strong> Request deletion of your data (subject to regulatory retention requirements)</MudText></li>
+                <li><MudText Typo="Typo.body1"><strong>Portability:</strong> Request your data in a machine-readable format</MudText></li>
+                <li><MudText Typo="Typo.body1"><strong>Objection:</strong> Object to certain processing activities</MudText></li>
+                <li><MudText Typo="Typo.body1"><strong>Restriction:</strong> Request restricted processing under certain conditions</MudText></li>
+            </ul>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                To exercise any of these rights, please contact us at
+                <MudLink Href="mailto:privacy@payguardai.xyz" Color="Color.Primary">privacy@payguardai.xyz</MudLink>.
+            </MudText>
+
+            @* ── 9. International Transfers ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">9. International Data Transfers</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                As a cross-border payment monitoring platform, data may be processed in jurisdictions
+                outside your country of residence. We ensure appropriate safeguards are in place,
+                including standard contractual clauses where required, to protect your data during
+                international transfers.
+            </MudText>
+
+            @* ── 10. Cookies & Tracking ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">10. Cookies & Session Management</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                We use essential session cookies for authentication (including "remember me" functionality)
+                and anti-forgery tokens. We do not use third-party advertising or tracking cookies.
+                Our service worker caches application assets for PWA offline support.
+            </MudText>
+
+            @* ── 11. Children ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">11. Children's Privacy</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                PayGuard AI is a B2B platform and is not intended for use by individuals under the age
+                of 18. We do not knowingly collect personal information from children.
+            </MudText>
+
+            @* ── 12. Changes ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">12. Changes to This Policy</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                We may update this Privacy Policy from time to time. We will notify registered users
+                of material changes via email or in-app notification. Your continued use of the platform
+                after changes constitutes acceptance of the updated policy.
+            </MudText>
+
+            @* ── 13. Contact ── *@
+            <MudText Typo="Typo.h6" Class="mt-6 mb-2" Style="font-weight: 600;">13. Contact Us</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                If you have questions about this Privacy Policy or our data practices, please contact us:
+            </MudText>
+            <MudPaper Elevation="0" Class="pa-4 rounded-lg mb-4" Style="background: var(--mud-palette-background-grey);">
+                <MudText Typo="Typo.body2"><strong>PayGuard AI</strong></MudText>
+                <MudText Typo="Typo.body2">Email: <MudLink Href="mailto:privacy@payguardai.xyz" Color="Color.Primary">privacy@payguardai.xyz</MudLink></MudText>
+                <MudText Typo="Typo.body2">Website: <MudLink Href="https://payguard-ai-production.up.railway.app" Target="_blank" Color="Color.Primary">payguard-ai-production.up.railway.app</MudLink></MudText>
+            </MudPaper>
+
+            @* ── Footer navigation ── *@
+            <MudDivider Class="my-4" />
+            <div class="d-flex justify-center gap-4 flex-wrap">
+                <MudLink Href="/terms" Typo="Typo.body2" Color="Color.Primary">Terms of Service</MudLink>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">·</MudText>
+                <MudLink Href="/login" Typo="Typo.body2" Color="Color.Primary">Sign In</MudLink>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">·</MudText>
+                <MudLink Href="/signup" Typo="Typo.body2" Color="Color.Primary">Sign Up</MudLink>
+            </div>
+
+            <MudText Typo="Typo.caption" Align="Align.Center" Color="Color.Secondary" Class="mt-4">
+                © @DateTime.Now.Year PayGuard AI — All rights reserved.
+            </MudText>
+        </MudPaper>
+    </MudContainer>
+</div>
