@@ -312,7 +312,6 @@ h1:focus {
         border-bottom: 2px solid var(--mud-palette-lines-default) !important;
         padding-bottom: 8px !important;
         margin-bottom: 4px;
-        cursor: pointer;
     }
 
     /* Compact cell padding in responsive mode */

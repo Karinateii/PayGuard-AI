@@ -322,9 +322,7 @@ else
         else
         {
             <MudTable Items="@_transactions" Hover="true" Dense="true" OnRowClick="@OnRowClick" T="Transaction"
-                      @bind-RowsPerPage="_rowsPerPage" Breakpoint="Breakpoint.Sm"
-                      RowStyleFunc="@((_, _) => "cursor: pointer;")"
-                      RowClass="transaction-row">
+                      @bind-RowsPerPage="_rowsPerPage" Breakpoint="Breakpoint.Sm">
                 <HeaderContent>
                     <MudTh>External ID</MudTh>
                     <MudTh>Type</MudTh>
@@ -334,6 +332,7 @@ else
                     <MudTh>Risk Level</MudTh>
                     <MudTh>Status</MudTh>
                     <MudTh>Received</MudTh>
+                    <MudTh></MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="External ID">@(context.ExternalId.Length > 12 ? context.ExternalId[..12] + "..." : context.ExternalId)</MudTd>
@@ -356,6 +355,10 @@ else
                         </MudChip>
                     </MudTd>
                     <MudTd DataLabel="Received">@context.ReceivedAt.ToString("MM/dd HH:mm")</MudTd>
+                    <MudTd DataLabel="">
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary"
+                                       OnClick="@(() => OpenQuickView(context))" />
+                    </MudTd>
                 </RowTemplate>
                 <PagerContent>
                     <MudTablePager PageSizeOptions="new int[]{10, 25, 50}" RowsPerPageString="Per page:" />
@@ -637,17 +640,20 @@ else
         _drawerOpen = true;
     }
 
+    private void OpenQuickView(Transaction transaction)
+    {
+        _selectedTransaction = transaction;
+        _drawerOpen = true;
+    }
+
     private void CloseDrawer()
     {
         _drawerOpen = false;
-        // Navigate back to returnTo page or default to /transactions
+        _selectedTransaction = null;
+        // Only navigate away if we came from another page
         if (!string.IsNullOrEmpty(ReturnTo))
         {
             NavigationManager.NavigateTo(ReturnTo);
-        }
-        else
-        {
-            NavigationManager.NavigateTo("/transactions");
         }
     }
     
