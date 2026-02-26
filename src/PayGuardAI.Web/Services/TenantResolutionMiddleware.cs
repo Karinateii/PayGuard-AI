@@ -49,7 +49,18 @@ public class TenantResolutionMiddleware
         {
             tenantContext.TenantId = headerTenant.FirstOrDefault()!;
         }
-        // 3. Fall back to config default
+        // 3. Fall back to config default (only for non-API requests like Blazor pages)
+        //    API endpoints MUST supply tenant via auth claim or X-Tenant-Id header
+        //    Exception: webhook endpoints and auth endpoints don't require tenant context
+        else if (context.Request.Path.StartsWithSegments("/api")
+                 && !context.Request.Path.StartsWithSegments("/api/webhooks")
+                 && !context.Request.Path.StartsWithSegments("/api/Auth"))
+        {
+            // SECURITY: reject API calls with no identifiable tenant
+            context.Response.StatusCode = 400;
+            await context.Response.WriteAsJsonAsync(new { error = "Missing tenant context. Provide X-Tenant-Id header or authenticate." });
+            return;
+        }
         else
         {
             tenantContext.TenantId = defaultTenant;

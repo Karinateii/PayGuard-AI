@@ -334,9 +334,9 @@ public class WiseProviderTests
     }
 
     [Fact]
-    public void VerifyWebhookSignature_ShouldReturnTrue_WhenPublicKeyNotConfigured()
+    public void VerifyWebhookSignature_ShouldReturnFalse_WhenPublicKeyNotConfigured()
     {
-        // Arrange - provider without webhook public key should skip verification
+        // Arrange - provider without webhook public key should REJECT (fail-closed)
         var mockConfig = new Mock<IConfiguration>();
         mockConfig.Setup(x => x["Wise:ApiToken"]).Returns("test-token");
 
@@ -356,8 +356,8 @@ public class WiseProviderTests
         // Act
         var result = provider.VerifyWebhookSignature("{}", "any-signature");
 
-        // Assert - should return true (skip verification in dev)
-        result.Should().BeTrue();
+        // Assert - SECURITY: fail-closed when no key configured
+        result.Should().BeFalse();
     }
 
     [Fact]

@@ -35,12 +35,21 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Demo login endpoint - sets session and redirects to home
+    /// Demo login endpoint - sets session and redirects to home.
+    /// SECURITY: Only available when OAuth is disabled (development/demo mode).
+    /// In production (OAuthEnabled=true), this endpoint returns 404.
     /// </summary>
     [HttpPost("demo-login")]
     [AllowAnonymous]
     public IActionResult DemoLogin()
     {
+        // SECURITY: Block demo login when OAuth is enabled (production mode)
+        if (_configuration.IsOAuthEnabled())
+        {
+            _logger.LogWarning("[AUTH] Demo login attempt blocked — OAuth is enabled (production mode)");
+            return NotFound();
+        }
+
         _logger.LogInformation("[AUTH-CONTROLLER] Demo login requested");
         
         // Set session to mark user as authenticated

@@ -97,8 +97,9 @@ public class FlutterwaveProvider : IPaymentProvider
     {
         if (string.IsNullOrEmpty(_webhookSecretHash))
         {
-            _logger.LogWarning("Flutterwave webhook secret hash not configured, skipping verification");
-            return true; // Allow in development
+            // SECURITY: fail-closed — reject if no webhook secret configured
+            _logger.LogWarning("Flutterwave webhook rejected — webhook secret hash not configured");
+            return false;
         }
 
         try
@@ -106,9 +107,12 @@ public class FlutterwaveProvider : IPaymentProvider
             // Flutterwave uses SHA256 HMAC for webhook verification
             using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_webhookSecretHash));
             var computedHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(payload));
-            var computedSignature = BitConverter.ToString(computedHash).Replace("-", "").ToLower();
+            var computedSignature = Convert.ToHexStringLower(computedHash);
 
-            return signature.ToLower() == computedSignature;
+            // SECURITY: use constant-time comparison to prevent timing attacks
+            return CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(signature.ToLower()),
+                Encoding.UTF8.GetBytes(computedSignature));
         }
         catch (Exception ex)
         {

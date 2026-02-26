@@ -34,11 +34,10 @@ public class WebhooksControllerIntegrationTests
         var content = await response.Content.ReadAsStringAsync();
         content.Should().Contain("healthy");
         content.Should().Contain("PayGuard AI");
-        content.Should().Contain("afriex");
     }
 
     [Fact]
-    public async Task HealthEndpoint_ShouldReturnProvidersList()
+    public async Task HealthEndpoint_ShouldReturnBasicStatus()
     {
         // Act
         var response = await _client.GetAsync("/api/webhooks/health");
@@ -49,8 +48,7 @@ public class WebhooksControllerIntegrationTests
         var content = await response.Content.ReadFromJsonAsync<HealthCheckResponse>();
         content.Should().NotBeNull();
         content!.Status.Should().Be("healthy");
-        content.Providers.Should().NotBeEmpty();
-        content.Providers.Should().Contain(p => p.Name == "afriex");
+        content.Service.Should().Be("PayGuard AI");
     }
 
     [Fact]
@@ -85,11 +83,11 @@ public class WebhooksControllerIntegrationTests
         var response = await _client.PostAsync("/api/webhooks/afriex", content);
 
         // Assert
-        // Note: This might fail signature verification, which is expected
-        // In a real test, you'd set up proper signature mocking
+        // Webhook signature is now mandatory — requests without a valid signature get rejected
         response.StatusCode.Should().BeOneOf(
             HttpStatusCode.OK,
-            HttpStatusCode.BadRequest // Expected if signature verification fails
+            HttpStatusCode.Unauthorized, // Expected — no signature header
+            HttpStatusCode.BadRequest
         );
     }
 
@@ -130,10 +128,11 @@ public class WebhooksControllerIntegrationTests
         var response = await _client.PostAsync("/api/webhooks/flutterwave", content);
 
         // Assert
-        // Note: This might fail signature verification or provider not configured
+        // Signature verification is mandatory — invalid hash or unconfigured key returns 401
         response.StatusCode.Should().BeOneOf(
             HttpStatusCode.OK,
-            HttpStatusCode.BadRequest // Expected if signature verification fails or provider disabled
+            HttpStatusCode.Unauthorized,
+            HttpStatusCode.BadRequest
         );
     }
 
@@ -169,8 +168,10 @@ public class WebhooksControllerIntegrationTests
         var response = await _client.PostAsync("/api/webhooks/transaction", content);
 
         // Assert
+        // Signature verification is mandatory — missing signature returns 401
         response.StatusCode.Should().BeOneOf(
             HttpStatusCode.OK,
+            HttpStatusCode.Unauthorized,
             HttpStatusCode.BadRequest
         );
     }
@@ -189,7 +190,8 @@ public class WebhooksControllerIntegrationTests
         var response = await _client.PostAsync("/api/webhooks/afriex", content);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        // Signature verification runs before JSON parsing, so no-sig returns 401
+        response.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.Unauthorized);
     }
 
     [Fact]
@@ -206,7 +208,8 @@ public class WebhooksControllerIntegrationTests
         var response = await _client.PostAsync("/api/webhooks/afriex", content);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        // Signature verification runs before payload parsing, so no-sig returns 401
+        response.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.Unauthorized);
     }
 
     [Fact]

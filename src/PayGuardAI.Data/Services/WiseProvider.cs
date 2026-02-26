@@ -102,8 +102,9 @@ public class WiseProvider : IPaymentProvider
     {
         if (string.IsNullOrEmpty(_webhookPublicKey))
         {
-            _logger.LogWarning("Wise webhook public key not configured, skipping verification");
-            return true; // Allow in development
+            // SECURITY: fail-closed — reject if no public key configured
+            _logger.LogWarning("Wise webhook rejected — webhook public key not configured");
+            return false;
         }
 
         try

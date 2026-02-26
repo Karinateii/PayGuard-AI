@@ -52,9 +52,9 @@ public class WebhookSignatureService : IWebhookSignatureService
     {
         if (!_verificationEnabled)
         {
-            // If no public key is configured, skip verification (for hackathon demo)
-            _logger.LogDebug("Signature verification skipped - not configured");
-            return true;
+            // SECURITY: fail-closed — reject if no public key is configured
+            _logger.LogWarning("Webhook rejected — signature verification not configured (no public key)");
+            return false;
         }
         
         if (string.IsNullOrEmpty(signature))

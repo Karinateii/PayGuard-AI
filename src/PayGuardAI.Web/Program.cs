@@ -70,7 +70,7 @@ builder.Services.AddSession(options =>
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
     options.Cookie.SameSite = SameSiteMode.Lax;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
 });
 
 // Add authentication with feature flag support (OAuth or Demo)
@@ -137,8 +137,10 @@ var usePostgres = builder.Configuration.IsPostgresEnabled();
 
 if (usePostgres)
 {
-    var pgConnString = builder.Configuration.GetConnectionString("PostgresConnection") 
-        ?? "Host=localhost;Port=5432;Database=payguard_dev;Username=postgres;Password=postgres";
+    var pgConnString = builder.Configuration.GetConnectionString("PostgresConnection")
+        ?? throw new InvalidOperationException(
+            "PostgreSQL is enabled but no connection string configured. " +
+            "Set ConnectionStrings:PostgresConnection or DATABASE_URL environment variable.");
     
     // Railway provides postgresql:// URL format — convert to ADO.NET format for Npgsql
     if (pgConnString.StartsWith("postgresql://") || pgConnString.StartsWith("postgres://"))
@@ -341,8 +343,8 @@ app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
-app.MapHealthChecks("/health");
-app.MapMetrics("/metrics");  // Prometheus scrape endpoint
+app.MapHealthChecks("/health").RequireAuthorization();
+app.MapMetrics("/metrics").RequireAuthorization("RequireAdmin");  // Prometheus scrape endpoint
 app.MapControllers(); // Map API controllers
 app.MapHub<TransactionHub>("/hubs/transactions"); // SignalR hub
 app.MapRazorComponents<App>()

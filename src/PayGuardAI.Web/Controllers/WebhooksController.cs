@@ -100,23 +100,27 @@ public class WebhooksController : ControllerBase
             var payload = await reader.ReadToEndAsync(cancellationToken);
 
             _metrics.RecordWebhookReceived(providerName);
-            _logger.LogInformation("[{Provider}] Received webhook: {PayloadPreview}...",
-                providerName, payload.Length > 100 ? payload[..100] : payload);
+            _logger.LogInformation("[{Provider}] Received webhook ({PayloadLength} bytes)",
+                providerName, payload.Length);
 
-            // Verify signature based on provider
+            // Verify webhook signature — MANDATORY for all providers.
+            // Reject if no signature header is present (prevents unsigned payload injection).
             var signature = Request.Headers["x-webhook-signature"].FirstOrDefault()
                            ?? Request.Headers["verif-hash"].FirstOrDefault()       // Flutterwave uses verif-hash
                            ?? Request.Headers["X-Signature-SHA256"].FirstOrDefault(); // Wise uses X-Signature-SHA256
 
-            if (!string.IsNullOrEmpty(signature))
+            if (string.IsNullOrEmpty(signature))
             {
-                if (!provider.VerifyWebhookSignature(payload, signature))
-                {
-                    _logger.LogWarning("[{Provider}] Webhook signature verification failed", providerName);
-                    return Unauthorized(new { success = false, error = "Invalid signature" });
-                }
-                _logger.LogInformation("[{Provider}] Webhook signature verified successfully", providerName);
+                _logger.LogWarning("[{Provider}] Webhook rejected — no signature header present", providerName);
+                return Unauthorized(new { success = false, error = "Missing webhook signature" });
             }
+
+            if (!provider.VerifyWebhookSignature(payload, signature))
+            {
+                _logger.LogWarning("[{Provider}] Webhook signature verification failed", providerName);
+                return Unauthorized(new { success = false, error = "Invalid signature" });
+            }
+            _logger.LogInformation("[{Provider}] Webhook signature verified successfully", providerName);
 
             // Normalize the webhook to unified format
             var normalizedTransaction = await provider.NormalizeWebhookAsync(payload);
@@ -164,26 +168,22 @@ public class WebhooksController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "[{Provider}] Error processing webhook", providerName);
-            return BadRequest(new { success = false, error = ex.Message });
+            return BadRequest(new { success = false, error = "Webhook processing failed" });
         }
     }
 
     /// <summary>
     /// Health check endpoint for webhook configuration verification.
+    /// SECURITY: Only returns basic status — does NOT expose provider configuration details.
     /// </summary>
     [HttpGet("health")]
     public IActionResult Health()
     {
-        var providers = _providerFactory.GetAllProviders()
-            .Select(p => new { name = p.ProviderName, configured = p.IsConfigured() })
-            .ToList();
-
         return Ok(new
         {
             status = "healthy",
             service = "PayGuard AI",
-            timestamp = DateTime.UtcNow,
-            providers
+            timestamp = DateTime.UtcNow
         });
     }
 
@@ -270,7 +270,7 @@ public class WebhooksController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "[SIMULATE] Error simulating transaction");
-            return BadRequest(new { success = false, error = ex.Message });
+            return BadRequest(new { success = false, error = "Transaction simulation failed" });
         }
     }
 

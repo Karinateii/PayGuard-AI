@@ -90,7 +90,7 @@ public class SecurityIntegrationTests
         var content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json");
         var response = await _client.PostAsync("/api/webhooks/wise", content);
 
-        // Should get 400 (bad payload) not 404 (not found)
+        // Should get 401 (no signature) or 400, not 404 (not found)
         response.StatusCode.Should().NotBe(HttpStatusCode.NotFound);
     }
 
