@@ -2,48 +2,120 @@
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
 
 <MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.AddCircle" />
+            <MudText Typo="Typo.h6">Create Custom Rule</MudText>
+        </MudStack>
+    </TitleContent>
     <DialogContent>
         <MudStack Spacing="3">
-            <MudTextField @bind-Value="_name" Label="Rule Name" Required="true" 
-                          Variant="Variant.Outlined" 
-                          Placeholder="e.g., High Value Transaction" />
-            
-            <MudTextField @bind-Value="_ruleCode" Label="Rule Code" Required="true"
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-1">
+                <MudText Typo="Typo.body2">
+                    Build a custom rule: choose what to check, how to compare it, and how many risk points to add when triggered.
+                </MudText>
+            </MudAlert>
+
+            <MudTextField @bind-Value="_name" Label="Rule Name" Required="true"
                           Variant="Variant.Outlined"
-                          Placeholder="e.g., CUSTOM_RULE_001" />
-            
-            <MudTextField @bind-Value="_description" Label="Description" 
-                          Variant="Variant.Outlined" Lines="2"
-                          Placeholder="Describe what this rule detects" />
-            
-            <MudSelect T="string" @bind-Value="_category" Label="Category" 
-                       Variant="Variant.Outlined" Required="true">
-                <MudSelectItem Value="@("Amount")">Amount</MudSelectItem>
-                <MudSelectItem Value="@("Velocity")">Velocity</MudSelectItem>
-                <MudSelectItem Value="@("Geography")">Geography</MudSelectItem>
-                <MudSelectItem Value="@("Pattern")">Pattern</MudSelectItem>
+                          Placeholder="e.g., Large Nigeria Transfers"
+                          HelperText="A descriptive name for this rule" />
+
+            <MudDivider />
+            <MudText Typo="Typo.subtitle2" Color="Color.Primary">
+                <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Size="Size.Small" Class="mr-1" />
+                Flag transactions where…
+            </MudText>
+
+            @* Field selector *@
+            <MudSelect T="string" @bind-Value="_selectedField" Label="Field to Check" Required="true"
+                       Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                <MudSelectItem T="string" Value="@("")" Disabled="true">— Select a field —</MudSelectItem>
+                
+                <MudText Typo="Typo.overline" Class="px-4 pt-2" Style="color: var(--mud-palette-text-secondary);">
+                    Transaction Fields
+                </MudText>
+                @foreach (var f in RiskRule.ExpressionFields.Where(f => !IsProfileField(f.Key)))
+                {
+                    <MudSelectItem T="string" Value="@f.Key">
+                        @f.Value.DisplayName
+                    </MudSelectItem>
+                }
+
+                <MudText Typo="Typo.overline" Class="px-4 pt-2" Style="color: var(--mud-palette-text-secondary);">
+                    Customer Profile Fields
+                </MudText>
+                @foreach (var f in RiskRule.ExpressionFields.Where(f => IsProfileField(f.Key)))
+                {
+                    <MudSelectItem T="string" Value="@f.Key">
+                        @f.Value.DisplayName
+                    </MudSelectItem>
+                }
             </MudSelect>
-            
+
+            @if (!string.IsNullOrEmpty(_selectedField))
+            {
+                @* Operator selector — dynamically shows numeric or string operators *@
+                <MudSelect T="string" @bind-Value="_selectedOperator" Label="Condition" Required="true"
+                           Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                    @foreach (var op in GetOperatorsForField(_selectedField))
+                    {
+                        <MudSelectItem T="string" Value="@op.Key">@op.Value</MudSelectItem>
+                    }
+                </MudSelect>
+
+                @* Value input — with contextual hints *@
+                <MudTextField @bind-Value="_expressionValue" Label="Value" Required="true"
+                              Variant="Variant.Outlined"
+                              Placeholder="@GetFieldHint(_selectedField)"
+                              HelperText="@GetFieldHelperText()" />
+
+                @* Preview sentence *@
+                @if (!string.IsNullOrEmpty(_selectedOperator) && !string.IsNullOrEmpty(_expressionValue))
+                {
+                    <MudPaper Class="pa-3" Elevation="0" Style="background-color: var(--mud-palette-background-grey);">
+                        <MudText Typo="Typo.body2">
+                            <MudIcon Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Class="mr-1" />
+                            <strong>Rule preview:</strong> Flag when
+                            <em>@GetFieldDisplayName(_selectedField)</em>
+                            @GetOperatorDisplay(_selectedOperator)
+                            <strong>@_expressionValue</strong>
+                        </MudText>
+                    </MudPaper>
+                }
+            }
+
+            <MudDivider />
+
+            @* Category and weight *@
             <MudGrid>
                 <MudItem xs="6">
-                    <MudNumericField T="decimal" @bind-Value="_threshold" 
-                                     Label="Threshold" Variant="Variant.Outlined"
-                                     Min="0" />
+                    <MudSelect T="string" @bind-Value="_category" Label="Category"
+                               Variant="Variant.Outlined" Required="true">
+                        <MudSelectItem Value="@("Amount")">Amount</MudSelectItem>
+                        <MudSelectItem Value="@("Velocity")">Velocity</MudSelectItem>
+                        <MudSelectItem Value="@("Geography")">Geography</MudSelectItem>
+                        <MudSelectItem Value="@("Pattern")">Pattern</MudSelectItem>
+                    </MudSelect>
                 </MudItem>
                 <MudItem xs="6">
-                    <MudNumericField T="int" @bind-Value="_scoreWeight" 
-                                     Label="Score Weight" Variant="Variant.Outlined"
-                                     Min="1" Max="50" />
+                    <MudNumericField T="int" @bind-Value="_scoreWeight"
+                                     Label="Risk Points" Variant="Variant.Outlined"
+                                     Min="1" Max="50"
+                                     HelperText="1 (low) to 50 (critical)" />
                 </MudItem>
             </MudGrid>
-            
-            <MudSwitch T="bool" @bind-Value="_isEnabled" Label="Enable Rule" Color="Color.Success" />
+
+            <MudTextField @bind-Value="_description" Label="Description (optional)"
+                          Variant="Variant.Outlined" Lines="2"
+                          Placeholder="Explain why this rule matters for your compliance team" />
         </MudStack>
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancel">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" 
-                   OnClick="Submit" Disabled="@(!IsValid)">
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   OnClick="Submit" Disabled="@(!IsValid)"
+                   StartIcon="@Icons.Material.Filled.Add">
             Create Rule
         </MudButton>
     </DialogActions>
@@ -54,35 +126,124 @@
     private IMudDialogInstance? MudDialog { get; set; }
 
     private string _name = "";
-    private string _ruleCode = "";
+    private string _selectedField = "";
+    private string _selectedOperator = "";
+    private string _expressionValue = "";
     private string _description = "";
-    private string _category = "Amount";
-    private decimal _threshold = 1000;
-    private int _scoreWeight = 10;
-    private bool _isEnabled = true;
+    private string _category = "Pattern";
+    private int _scoreWeight = 15;
 
-    private bool IsValid => !string.IsNullOrWhiteSpace(_name) && 
-                            !string.IsNullOrWhiteSpace(_ruleCode) &&
-                            !string.IsNullOrWhiteSpace(_category);
+    private bool IsValid =>
+        !string.IsNullOrWhiteSpace(_name) &&
+        !string.IsNullOrEmpty(_selectedField) &&
+        !string.IsNullOrEmpty(_selectedOperator) &&
+        !string.IsNullOrWhiteSpace(_expressionValue);
 
     private void Cancel() => MudDialog?.Cancel();
 
     private void Submit()
     {
+        // Auto-generate a unique rule code for expression rules
+        var ruleCode = $"EXPR_{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}";
+
+        // Auto-generate description if not provided
+        var desc = string.IsNullOrWhiteSpace(_description)
+            ? $"Flag when {GetFieldDisplayName(_selectedField)} {GetOperatorDisplay(_selectedOperator)} {_expressionValue}"
+            : _description;
+
+        // For numeric fields, also set Threshold so it displays nicely
+        decimal threshold = 0;
+        if (decimal.TryParse(_expressionValue, out var numVal))
+        {
+            threshold = numVal;
+        }
+
+        // Auto-detect category from field if user hasn't changed it
+        if (_category == "Pattern")
+        {
+            _category = _selectedField switch
+            {
+                "Amount" or "TotalVolume" or "AvgTransaction" or "MaxTransaction" => "Amount",
+                "SourceCountry" or "DestinationCountry" => "Geography",
+                "TransactionHour" => "Pattern",
+                _ => "Pattern"
+            };
+        }
+
         var rule = new RiskRule
         {
             Id = Guid.NewGuid(),
             Name = _name,
-            RuleCode = _ruleCode.ToUpperInvariant().Replace(" ", "_"),
-            Description = _description,
+            RuleCode = ruleCode,
+            Description = desc,
             Category = _category,
-            Threshold = _threshold,
+            Threshold = threshold,
             ScoreWeight = _scoreWeight,
-            IsEnabled = _isEnabled,
+            IsEnabled = true,
+            ExpressionField = _selectedField,
+            ExpressionOperator = _selectedOperator,
+            ExpressionValue = _expressionValue,
             UpdatedAt = DateTime.UtcNow,
             UpdatedBy = CurrentUser.UserName
         };
-        
+
         MudDialog?.Close(DialogResult.Ok(rule));
     }
+
+    // ── Helpers ──────────────────────────────────────────────────────
+
+    private static bool IsProfileField(string field) =>
+        field is "TotalTransactions" or "TotalVolume" or "AvgTransaction"
+             or "MaxTransaction" or "FlaggedCount";
+
+    private static Dictionary<string, string> GetOperatorsForField(string field)
+    {
+        if (!RiskRule.ExpressionFields.TryGetValue(field, out var info))
+            return RiskRule.StringOperators;
+
+        return info.FieldType is "decimal" or "int"
+            ? RiskRule.NumericOperators
+            : RiskRule.StringOperators;
+    }
+
+    private static string GetFieldHint(string field)
+    {
+        return RiskRule.ExpressionFields.TryGetValue(field, out var info)
+            ? info.Hint
+            : "Enter a value";
+    }
+
+    private static string GetFieldDisplayName(string field)
+    {
+        return RiskRule.ExpressionFields.TryGetValue(field, out var info)
+            ? info.DisplayName
+            : field;
+    }
+
+    private string GetFieldHelperText()
+    {
+        if (!RiskRule.ExpressionFields.TryGetValue(_selectedField, out var info))
+            return "";
+
+        return info.FieldType switch
+        {
+            "decimal" => "Enter a number (e.g., 5000)",
+            "int" => "Enter a whole number (e.g., 10)",
+            "string" => "Enter text (case-insensitive)",
+            _ => ""
+        };
+    }
+
+    private static string GetOperatorDisplay(string op) => op switch
+    {
+        ">=" => "is ≥",
+        "<=" => "is ≤",
+        ">"  => "is >",
+        "<"  => "is <",
+        "==" => "equals",
+        "!=" => "does not equal",
+        "contains" => "contains",
+        "not_contains" => "does not contain",
+        _ => op
+    };
 }

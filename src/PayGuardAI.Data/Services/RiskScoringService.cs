@@ -47,10 +47,16 @@ public class RiskScoringService : IRiskScoringService
     {
         _logger.LogInformation("Starting risk analysis for transaction {TransactionId}", transaction.Id);
 
-        // Get active rules
-        var rules = await _context.RiskRules
+        // Get active rules — deduplicate so tenant-scoped rules override globals
+        var allRules = await _context.RiskRules
             .Where(r => r.IsEnabled)
             .ToListAsync(cancellationToken);
+
+        // Group by RuleCode: if a tenant has their own version, skip the global (TenantId=="")
+        var rules = allRules
+            .GroupBy(r => r.RuleCode)
+            .Select(g => g.FirstOrDefault(r => r.TenantId != "") ?? g.First())
+            .ToList();
 
         // Get customer profile (or create one)
         var customerProfile = await GetOrCreateCustomerProfileAsync(transaction.SenderId, cancellationToken);
@@ -217,7 +223,9 @@ public class RiskScoringService : IRiskScoringService
             "HIGH_RISK_CORRIDOR" => await EvaluateHighRiskCorridorAsync(rule, transaction, cancellationToken),
             "ROUND_AMOUNT" => EvaluateRoundAmount(rule, transaction),
             "UNUSUAL_TIME" => EvaluateUnusualTime(rule, transaction),
-            _ => null
+            _ => !string.IsNullOrEmpty(rule.ExpressionField)
+                ? EvaluateExpressionRule(rule, transaction, profile)
+                : null
         };
     }
 
@@ -354,6 +362,140 @@ public class RiskScoringService : IRiskScoringService
             };
         }
         return null;
+    }
+
+    // ── Expression rule evaluation ──────────────────────────────────
+
+    /// <summary>
+    /// Evaluates a user-defined expression rule dynamically.
+    /// Extracts the field value from the transaction/profile, applies the operator,
+    /// and compares against the configured value.
+    /// </summary>
+    private RiskFactor? EvaluateExpressionRule(RiskRule rule, Transaction transaction, CustomerProfile profile)
+    {
+        if (string.IsNullOrEmpty(rule.ExpressionField) ||
+            string.IsNullOrEmpty(rule.ExpressionOperator) ||
+            string.IsNullOrEmpty(rule.ExpressionValue))
+        {
+            return null;
+        }
+
+        try
+        {
+            var fieldValue = GetExpressionFieldValue(rule.ExpressionField, transaction, profile);
+            if (fieldValue == null) return null;
+
+            bool triggered = EvaluateCondition(fieldValue, rule.ExpressionOperator, rule.ExpressionValue);
+
+            if (triggered)
+            {
+                var fieldInfo = RiskRule.ExpressionFields.TryGetValue(rule.ExpressionField, out var info)
+                    ? info.DisplayName
+                    : rule.ExpressionField;
+
+                var opDisplay = rule.ExpressionOperator switch
+                {
+                    ">=" => "≥",
+                    "<=" => "≤",
+                    ">"  => ">",
+                    "<"  => "<",
+                    "==" => "=",
+                    "!=" => "≠",
+                    "contains" => "contains",
+                    "not_contains" => "does not contain",
+                    _ => rule.ExpressionOperator
+                };
+
+                return new RiskFactor
+                {
+                    Category = rule.Category,
+                    RuleName = rule.Name,
+                    Description = $"{fieldInfo} ({fieldValue}) {opDisplay} {rule.ExpressionValue}",
+                    ScoreContribution = rule.ScoreWeight,
+                    Severity = rule.ScoreWeight >= 25 ? FactorSeverity.Warning : FactorSeverity.Info,
+                    ContextData = $"{{\"field\": \"{rule.ExpressionField}\", \"operator\": \"{rule.ExpressionOperator}\", " +
+                                  $"\"expected\": \"{rule.ExpressionValue}\", \"actual\": \"{fieldValue}\"}}"
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Expression rule '{RuleCode}' failed to evaluate: {Error}",
+                rule.RuleCode, ex.Message);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Extracts a field value from the transaction or customer profile.
+    /// </summary>
+    private static object? GetExpressionFieldValue(string field, Transaction transaction, CustomerProfile profile)
+    {
+        return field switch
+        {
+            "Amount"              => transaction.Amount,
+            "SourceCountry"       => transaction.SourceCountry,
+            "DestinationCountry"  => transaction.DestinationCountry,
+            "SourceCurrency"      => transaction.SourceCurrency,
+            "DestinationCurrency" => transaction.DestinationCurrency,
+            "TransactionHour"     => transaction.CreatedAt.Hour,
+            "TotalTransactions"   => profile.TotalTransactions,
+            "TotalVolume"         => profile.TotalVolume,
+            "AvgTransaction"      => profile.AverageTransactionAmount,
+            "MaxTransaction"      => profile.MaxTransactionAmount,
+            "FlaggedCount"        => profile.FlaggedTransactionCount,
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Evaluates a comparison between a field value and a target value.
+    /// Handles numeric (decimal, int) and string comparisons.
+    /// </summary>
+    private static bool EvaluateCondition(object fieldValue, string op, string targetValue)
+    {
+        // Try numeric comparison first
+        if (fieldValue is decimal decVal && decimal.TryParse(targetValue, out var decTarget))
+        {
+            return op switch
+            {
+                ">="  => decVal >= decTarget,
+                "<="  => decVal <= decTarget,
+                ">"   => decVal > decTarget,
+                "<"   => decVal < decTarget,
+                "=="  => decVal == decTarget,
+                "!="  => decVal != decTarget,
+                _ => false
+            };
+        }
+
+        if (fieldValue is int intVal && int.TryParse(targetValue, out var intTarget))
+        {
+            return op switch
+            {
+                ">="  => intVal >= intTarget,
+                "<="  => intVal <= intTarget,
+                ">"   => intVal > intTarget,
+                "<"   => intVal < intTarget,
+                "=="  => intVal == intTarget,
+                "!="  => intVal != intTarget,
+                _ => false
+            };
+        }
+
+        // String comparison (case-insensitive)
+        var strVal = fieldValue.ToString() ?? "";
+        var strTarget = targetValue;
+
+        return op switch
+        {
+            "=="           => strVal.Equals(strTarget, StringComparison.OrdinalIgnoreCase),
+            "!="           => !strVal.Equals(strTarget, StringComparison.OrdinalIgnoreCase),
+            "contains"     => strVal.Contains(strTarget, StringComparison.OrdinalIgnoreCase),
+            "not_contains" => !strVal.Contains(strTarget, StringComparison.OrdinalIgnoreCase),
+            _ => false
+        };
     }
 
     private string GenerateExplanation(List<RiskFactor> factors, int score, RiskLevel level)

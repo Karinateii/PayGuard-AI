@@ -113,6 +113,11 @@ public class DatabaseMigrationService : IDatabaseMigrationService
             // ── NotificationPreference extras ──
             ("NotificationPreferences", "DisplayName", ""),
 
+            // ── RiskRule expression engine columns ──
+            ("RiskRules",               "ExpressionField", ""),
+            ("RiskRules",               "ExpressionOperator", ""),
+            ("RiskRules",               "ExpressionValue", ""),
+
             // ── CustomRole extras ──
             // (IsBuiltIn is boolean — handled separately below)
         };

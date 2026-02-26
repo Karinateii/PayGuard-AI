@@ -17,14 +17,15 @@
     <MudButton Variant="Variant.Filled" Color="Color.Primary" 
                StartIcon="@Icons.Material.Filled.Add"
                OnClick="@OpenAddRuleDialog">
-        Add New Rule
+        Add Custom Rule
     </MudButton>
 </MudStack>
 
 <MudAlert Severity="Severity.Info" Class="mb-4">
     <MudText>
-        Configure risk scoring thresholds and weights. Changes apply to new transactions immediately.
-        Existing transactions can be re-analyzed with updated rules.
+        Configure risk scoring thresholds and weights. <strong>System rules</strong> (built-in) have hardcoded
+        evaluation logic — adjust their thresholds and weights. <strong>Custom rules</strong> evaluate dynamically
+        based on the condition you define. Changes apply to new transactions immediately.
     </MudText>
 </MudAlert>
 
@@ -34,8 +35,17 @@
 }
 else
 {
+    @* ── System Rules (built-in) ──────────────────────────────────── *@
+    <MudText Typo="Typo.h6" Class="mb-2">
+        <MudIcon Icon="@Icons.Material.Filled.Shield" Size="Size.Small" Class="mr-1" />
+        System Rules
+    </MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+        Built-in fraud detection rules. Adjust thresholds and weights to tune sensitivity.
+    </MudText>
+
     <MudGrid>
-        @foreach (var rule in _rules)
+        @foreach (var rule in _rules.Where(r => r.IsBuiltIn))
         {
             <MudItem xs="12" md="6">
                 <MudCard Elevation="2">
@@ -44,9 +54,14 @@ else
                             <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
                                 <MudStack>
                                     <MudText Typo="Typo.h6">@rule.Name</MudText>
-                                    <MudChip T="string" Size="Size.Small" Color="@GetCategoryColor(rule.Category)">
-                                        @rule.Category
-                                    </MudChip>
+                                    <MudStack Row="true" Spacing="1">
+                                        <MudChip T="string" Size="Size.Small" Color="@GetCategoryColor(rule.Category)">
+                                            @rule.Category
+                                        </MudChip>
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Default">
+                                            System
+                                        </MudChip>
+                                    </MudStack>
                                 </MudStack>
                                 <MudSwitch T="bool" Value="@rule.IsEnabled" 
                                            ValueChanged="@((val) => ToggleRule(rule, val))"
@@ -59,11 +74,22 @@ else
                         
                         <MudGrid>
                             <MudItem xs="6">
-                                <MudNumericField T="decimal" Label="Threshold" 
-                                                 Value="@rule.Threshold"
-                                                 ValueChanged="@((val) => UpdateThreshold(rule, val))"
-                                                 Variant="Variant.Outlined" 
-                                                 Disabled="@(!rule.IsEnabled)" />
+                                @if (IsThresholdUsed(rule.RuleCode))
+                                {
+                                    <MudNumericField T="decimal" Label="@GetThresholdLabel(rule.RuleCode)" 
+                                                     Value="@rule.Threshold"
+                                                     ValueChanged="@((val) => UpdateThreshold(rule, val))"
+                                                     Variant="Variant.Outlined" 
+                                                     Min="0"
+                                                     Disabled="@(!rule.IsEnabled)" />
+                                }
+                                else
+                                {
+                                    <MudTextField T="string" Label="Threshold" 
+                                                  Value="@("N/A")" ReadOnly="true"
+                                                  Variant="Variant.Outlined" Disabled="true"
+                                                  HelperText="@GetThresholdHint(rule.RuleCode)" />
+                                }
                             </MudItem>
                             <MudItem xs="6">
                                 <MudNumericField T="int" Label="Score Weight" 
@@ -75,23 +101,122 @@ else
                             </MudItem>
                         </MudGrid>
                         
-                        <MudText Typo="Typo.caption" Class="mt-2">
-                            Code: @rule.RuleCode
-                        </MudText>
-                        <MudText Typo="Typo.caption">
+                        @if (IsThresholdUsed(rule.RuleCode))
+                        {
+                            <MudText Typo="Typo.caption" Class="mt-2" Color="Color.Secondary">
+                                @GetThresholdExplanation(rule)
+                            </MudText>
+                        }
+                        
+                        <MudText Typo="Typo.caption" Class="mt-1">
                             Last updated: @rule.UpdatedAt.ToString("MM/dd HH:mm") by <strong>@(rule.UpdatedBy ?? "system")</strong>
                         </MudText>
                     </MudCardContent>
-                    <MudCardActions>
-                        <MudSpacer />
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete" 
-                                       Color="Color.Error" Size="Size.Small"
-                                       OnClick="@(() => DeleteRule(rule))" />
-                    </MudCardActions>
                 </MudCard>
             </MudItem>
         }
     </MudGrid>
+
+    @* ── Custom Expression Rules ──────────────────────────────────── *@
+    <MudText Typo="Typo.h6" Class="mb-2 mt-6">
+        <MudIcon Icon="@Icons.Material.Filled.Tune" Size="Size.Small" Class="mr-1" />
+        Custom Rules
+        @if (_expressionRules.Count > 0)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Info" Class="ml-2">@_expressionRules.Count</MudChip>
+        }
+    </MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+        User-defined rules that evaluate dynamically. Create rules with the "Add Custom Rule" button.
+    </MudText>
+
+    @if (_expressionRules.Count == 0)
+    {
+        <MudPaper Class="pa-6 mb-4" Elevation="0" Style="border: 2px dashed var(--mud-palette-lines-default); text-align: center;">
+            <MudIcon Icon="@Icons.Material.Filled.AddCircleOutline" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mt-2">
+                No custom rules yet. Click <strong>"Add Custom Rule"</strong> to create your first one.
+            </MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-1">
+                Example: Flag transfers over $50,000 to Nigeria, or flag customers with more than 3 flagged transactions.
+            </MudText>
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var rule in _expressionRules)
+            {
+                <MudItem xs="12" md="6">
+                    <MudCard Elevation="2">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                    <MudStack>
+                                        <MudText Typo="Typo.h6">@rule.Name</MudText>
+                                        <MudStack Row="true" Spacing="1">
+                                            <MudChip T="string" Size="Size.Small" Color="@GetCategoryColor(rule.Category)">
+                                                @rule.Category
+                                            </MudChip>
+                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Info">
+                                                Custom
+                                            </MudChip>
+                                        </MudStack>
+                                    </MudStack>
+                                    <MudSwitch T="bool" Value="@rule.IsEnabled" 
+                                               ValueChanged="@((val) => ToggleRule(rule, val))"
+                                               Color="Color.Success" />
+                                </MudStack>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            @* Show the expression condition *@
+                            <MudPaper Class="pa-2 mb-3" Elevation="0" Style="background-color: var(--mud-palette-background-grey);">
+                                <MudText Typo="Typo.body2">
+                                    <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Size="Size.Small" Class="mr-1" />
+                                    When <strong>@GetFieldDisplayName(rule.ExpressionField)</strong>
+                                    @GetOperatorDisplay(rule.ExpressionOperator)
+                                    <strong>@rule.ExpressionValue</strong>
+                                    → add <strong>@rule.ScoreWeight pts</strong>
+                                </MudText>
+                            </MudPaper>
+
+                            @if (!string.IsNullOrEmpty(rule.Description))
+                            {
+                                <MudText Typo="Typo.body2" Class="mb-2">@rule.Description</MudText>
+                            }
+
+                            <MudGrid>
+                                <MudItem xs="6">
+                                    <MudTextField T="string" Label="Condition Value"
+                                                  Value="@rule.ExpressionValue" ReadOnly="true"
+                                                  Variant="Variant.Outlined" Disabled="true" />
+                                </MudItem>
+                                <MudItem xs="6">
+                                    <MudNumericField T="int" Label="Score Weight" 
+                                                     Value="@rule.ScoreWeight"
+                                                     ValueChanged="@((val) => UpdateWeight(rule, val))"
+                                                     Variant="Variant.Outlined"
+                                                     Min="0" Max="50"
+                                                     Disabled="@(!rule.IsEnabled)" />
+                                </MudItem>
+                            </MudGrid>
+                            
+                            <MudText Typo="Typo.caption" Class="mt-2">
+                                Last updated: @rule.UpdatedAt.ToString("MM/dd HH:mm") by <strong>@(rule.UpdatedBy ?? "system")</strong>
+                            </MudText>
+                        </MudCardContent>
+                        <MudCardActions>
+                            <MudSpacer />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                           Color="Color.Error" Size="Size.Small"
+                                           OnClick="@(() => DeleteRule(rule))" />
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
 
     <MudPaper Class="pa-4 mt-4" Elevation="2">
         <MudText Typo="Typo.h6" Class="mb-3">Risk Level Thresholds</MudText>
@@ -134,6 +259,7 @@ else
 @code {
     private bool _loading = true;
     private List<RiskRule> _rules = new();
+    private List<RiskRule> _expressionRules = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -145,7 +271,21 @@ else
         _loading = true;
         try
         {
-            _rules = await DbContext.RiskRules.OrderBy(r => r.Category).ThenBy(r => r.Name).ToListAsync();
+            var allRules = await DbContext.RiskRules
+                .OrderBy(r => r.Category).ThenBy(r => r.Name)
+                .ToListAsync();
+
+            // Deduplicate: if a tenant has their own version of a built-in rule,
+            // hide the global (TenantId=="") version. Expression rules are always unique.
+            _rules = allRules
+                .GroupBy(r => r.RuleCode)
+                .Select(g => g.FirstOrDefault(r => r.TenantId != "") ?? g.First())
+                .OrderBy(r => r.IsExpression)  // system rules first
+                .ThenBy(r => r.Category)
+                .ThenBy(r => r.Name)
+                .ToList();
+
+            _expressionRules = _rules.Where(r => r.IsExpression).ToList();
         }
         finally
         {
@@ -185,22 +325,29 @@ else
     {
         var parameters = new DialogParameters<AddRuleDialog>();
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<AddRuleDialog>("Add New Risk Rule", parameters, options);
+        var dialog = await DialogService.ShowAsync<AddRuleDialog>("Create Custom Rule", parameters, options);
         var result = await dialog.Result;
         
         if (result is { Canceled: false, Data: RiskRule newRule })
         {
             DbContext.RiskRules.Add(newRule);
             await DbContext.SaveChangesAsync();
-            Snackbar.Add($"Rule '{newRule.Name}' created successfully!", Severity.Success);
+            Snackbar.Add($"Custom rule '{newRule.Name}' created!", Severity.Success);
             await LoadRules();
         }
     }
     
     private async Task DeleteRule(RiskRule rule)
     {
+        // Only allow deleting expression (custom) rules, not built-in system rules
+        if (rule.IsBuiltIn)
+        {
+            Snackbar.Add("System rules cannot be deleted — disable them instead.", Severity.Warning);
+            return;
+        }
+
         var confirmed = await DialogService.ShowMessageBox(
-            "Delete Rule",
+            "Delete Custom Rule",
             $"Are you sure you want to delete '{rule.Name}'? This action cannot be undone.",
             yesText: "Delete", cancelText: "Cancel");
         
@@ -213,6 +360,8 @@ else
         }
     }
 
+    // ── UI Helpers ──────────────────────────────────────────────────
+
     private Color GetCategoryColor(string category) => category switch
     {
         "Amount" => Color.Primary,
@@ -220,5 +369,62 @@ else
         "Geography" => Color.Error,
         "Pattern" => Color.Info,
         _ => Color.Default
+    };
+
+    /// <summary>Whether the threshold field is meaningful for this built-in rule.</summary>
+    private static bool IsThresholdUsed(string ruleCode) => ruleCode switch
+    {
+        "HIGH_AMOUNT" => true,
+        "VELOCITY_24H" => true,
+        "NEW_CUSTOMER" => true,
+        "ROUND_AMOUNT" => true,
+        _ => false  // HIGH_RISK_CORRIDOR and UNUSUAL_TIME ignore threshold
+    };
+
+    /// <summary>Contextual label for the threshold field.</summary>
+    private static string GetThresholdLabel(string ruleCode) => ruleCode switch
+    {
+        "HIGH_AMOUNT" => "Amount ($)",
+        "VELOCITY_24H" => "Max Txns/Day",
+        "NEW_CUSTOMER" => "Min Txns",
+        "ROUND_AMOUNT" => "Min Amount ($)",
+        _ => "Threshold"
+    };
+
+    /// <summary>Hint shown when threshold is not applicable.</summary>
+    private static string GetThresholdHint(string ruleCode) => ruleCode switch
+    {
+        "HIGH_RISK_CORRIDOR" => "Uses sanctioned country list",
+        "UNUSUAL_TIME" => "Hardcoded: 2-5 AM UTC",
+        _ => "Not configurable"
+    };
+
+    /// <summary>Human-readable explanation of what the current threshold means.</summary>
+    private static string GetThresholdExplanation(RiskRule rule) => rule.RuleCode switch
+    {
+        "HIGH_AMOUNT" => $"Flags transactions ≥ ${rule.Threshold:N0}",
+        "VELOCITY_24H" => $"Flags when ≥ {rule.Threshold:N0} transactions in 24 hours",
+        "NEW_CUSTOMER" => $"Flags customers with < {rule.Threshold:N0} total transactions",
+        "ROUND_AMOUNT" => $"Flags round amounts (÷1000) when ≥ ${rule.Threshold:N0}",
+        _ => ""
+    };
+
+    private static string GetFieldDisplayName(string? field)
+    {
+        if (string.IsNullOrEmpty(field)) return "Unknown";
+        return RiskRule.ExpressionFields.TryGetValue(field, out var info) ? info.DisplayName : field;
+    }
+
+    private static string GetOperatorDisplay(string? op) => op switch
+    {
+        ">=" => "is ≥",
+        "<=" => "is ≤",
+        ">"  => "is >",
+        "<"  => "is <",
+        "==" => "equals",
+        "!=" => "does not equal",
+        "contains" => "contains",
+        "not_contains" => "does not contain",
+        _ => op ?? ""
     };
 }
