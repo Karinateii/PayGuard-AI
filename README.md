@@ -75,6 +75,14 @@ PayGuard AI automates the first line of defense while keeping humans in control 
 - 🚩 **Feature Flags** — Safe deployment with instant rollback
 - 🐘 **PostgreSQL** — Production database on Railway (SQLite for local dev)
 
+### Mobile & PWA
+- 📱 **Progressive Web App** — Installable on mobile with offline shell caching
+- 🔽 **Mobile Bottom Navigation** — Touch-friendly nav bar with badge counts
+- 👆 **Swipe-to-Review** — Swipe right to approve, left to reject on mobile review queue
+- 🔄 **Pull-to-Refresh** — Touch-native refresh gesture on review and transaction lists
+- 📐 **Responsive Layout** — Auto-closing drawer on mobile, compact cards, 48px touch targets
+- 🔔 **Web Push Notifications** — Service worker push support for real-time alerts
+
 ## Tech Stack
 
 | Layer | Technology |

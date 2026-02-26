@@ -3,6 +3,9 @@
 
 html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior-y: contain; /* prevent pull-to-refresh in Chrome */
 }
 
 h1:focus {
@@ -30,4 +33,280 @@ h1:focus {
 
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
+}
+
+/* ─── Mobile Bottom Navigation ─────────────────────────────────── */
+.mobile-bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1100;
+    background: var(--mud-palette-surface);
+    border-top: 1px solid var(--mud-palette-lines-default);
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.15);
+    padding: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.mobile-bottom-nav-inner {
+    display: flex;
+    justify-content: space-around;
+    align-items: stretch;
+    height: 60px;
+}
+
+.mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    text-decoration: none;
+    color: var(--mud-palette-text-secondary);
+    font-size: 0.65rem;
+    font-weight: 500;
+    padding: 4px 0;
+    min-height: 48px;
+    position: relative;
+    transition: color 0.2s ease;
+    cursor: pointer;
+    border: none;
+    background: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-nav-item:hover,
+.mobile-nav-item:active {
+    color: var(--mud-palette-primary);
+}
+
+.mobile-nav-item.active {
+    color: var(--mud-palette-primary);
+}
+
+.mobile-nav-item.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 25%;
+    right: 25%;
+    height: 3px;
+    background: var(--mud-palette-primary);
+    border-radius: 0 0 3px 3px;
+}
+
+.mobile-nav-item .mud-icon-root {
+    font-size: 1.4rem;
+    margin-bottom: 2px;
+}
+
+.mobile-nav-badge {
+    position: absolute;
+    top: 4px;
+    right: calc(50% - 18px);
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    background: var(--mud-palette-error);
+    color: white;
+    font-size: 0.6rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+}
+
+/* ─── Mobile Review Card (Swipe-friendly) ──────────────────────── */
+.review-card-mobile {
+    touch-action: pan-y;
+    overflow: hidden;
+    position: relative;
+    will-change: transform;
+}
+
+.review-card-mobile .swipe-hint-left,
+.review-card-mobile .swipe-hint-right {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+}
+
+.review-card-mobile .swipe-hint-left {
+    right: 0;
+    background: linear-gradient(to left, rgba(244, 67, 54, 0.15), transparent);
+}
+
+.review-card-mobile .swipe-hint-right {
+    left: 0;
+    background: linear-gradient(to right, rgba(76, 175, 80, 0.15), transparent);
+}
+
+/* Mobile swipe action buttons (larger touch targets) */
+.mobile-action-btn {
+    min-height: 48px !important;
+    min-width: 48px !important;
+    font-size: 0.85rem;
+}
+
+/* ─── Pull to Refresh ──────────────────────────────────────────── */
+.pull-indicator {
+    height: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: height 0.2s ease;
+    color: var(--mud-palette-text-secondary);
+}
+
+.pull-indicator.ready {
+    color: var(--mud-palette-primary);
+}
+
+.pull-indicator .mud-icon-root {
+    transition: transform 0.3s ease;
+}
+
+.pull-indicator.ready .mud-icon-root {
+    transform: rotate(180deg);
+}
+
+/* ─── Mobile Responsive Overrides ──────────────────────────────── */
+@media (max-width: 959.98px) {
+    /* Show bottom nav on mobile */
+    .mobile-bottom-nav {
+        display: block;
+    }
+
+    /* Add bottom padding for fixed bottom nav */
+    .mud-main-content {
+        padding-bottom: 76px !important;
+    }
+
+    /* Compact page titles on mobile */
+    .mud-typography-h4 {
+        font-size: 1.3rem !important;
+    }
+
+    /* Compact main content padding */
+    .mud-main-content {
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+    }
+
+    .mud-main-content > .mud-container {
+        padding-left: 4px;
+        padding-right: 4px;
+    }
+
+    /* Make all buttons touch-friendly (48px minimum) */
+    .mud-button-root {
+        min-height: 44px;
+    }
+
+    /* Larger select/input touch targets */
+    .mud-input-control {
+        min-height: 48px;
+    }
+
+    /* Full-width dialogs on mobile */
+    .mud-overlay .mud-paper {
+        max-width: 95vw !important;
+        margin: 16px;
+    }
+
+    /* Stats cards: 2-column on small phones */
+    .stats-card-grid > .mud-grid-item {
+        padding: 4px !important;
+    }
+
+    /* Compact review cards on mobile */
+    .review-card-mobile .mud-card-content {
+        padding: 12px !important;
+    }
+
+    /* Mobile-friendly pagination */
+    .mud-pagination .mud-pagination-item {
+        min-width: 36px;
+        min-height: 36px;
+    }
+
+    /* Hide less important table columns on mobile */
+    .hide-mobile {
+        display: none !important;
+    }
+}
+
+/* Extra small screens (< 600px) */
+@media (max-width: 599.98px) {
+    /* Even more compact on phones */
+    .mud-typography-h4 {
+        font-size: 1.15rem !important;
+    }
+
+    .mud-appbar .mud-typography-h5 span {
+        font-size: 0.85rem !important;
+    }
+
+    /* Stack review action buttons horizontally on phones */
+    .review-actions-mobile {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+    }
+
+    .review-actions-mobile .mud-button-root {
+        flex: 1;
+        min-height: 48px;
+    }
+
+    /* Single column stats on very small screens */
+    .mud-grid-item.stats-card {
+        flex-basis: 50% !important;
+        max-width: 50% !important;
+    }
+}
+
+/* ─── PWA Standalone Mode ──────────────────────────────────────── */
+@media (display-mode: standalone) {
+    /* Extra top padding for notch/status bar in PWA */
+    .mud-appbar {
+        padding-top: env(safe-area-inset-top, 0px);
+    }
+}
+
+/* ─── Touch Interaction Helpers ────────────────────────────────── */
+.touch-ripple {
+    position: relative;
+    overflow: hidden;
+}
+
+.touch-ripple::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.touch-ripple:active::after {
+    opacity: 1;
+}
+
+/* ─── Dark Mode Adjustments for Mobile ─────────────────────────── */
+.mud-theme-dark .mobile-bottom-nav {
+    border-top-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.4);
 }

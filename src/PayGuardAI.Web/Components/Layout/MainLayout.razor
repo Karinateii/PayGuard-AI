@@ -7,6 +7,7 @@
 @inject ITenantContext TenantContext
 @inject IDbContextFactory<PayGuardAI.Data.ApplicationDbContext> DbFactory
 @inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JS
 @implements IAsyncDisposable
 @using Microsoft.AspNetCore.SignalR.Client
 @using Microsoft.EntityFrameworkCore
@@ -100,6 +101,36 @@
                     @Body
                 </MudContainer>
             </MudMainContent>
+
+            <!-- Mobile Bottom Navigation -->
+            <nav class="mobile-bottom-nav" aria-label="Mobile navigation">
+                <div class="mobile-bottom-nav-inner">
+                    <a href="/" class="mobile-nav-item @(IsActive("/") ? "active" : "")">
+                        <MudIcon Icon="@Icons.Material.Filled.Dashboard" />
+                        <span>Dashboard</span>
+                    </a>
+                    <a href="/reviews" class="mobile-nav-item @(IsActive("/reviews") ? "active" : "")">
+                        <MudIcon Icon="@Icons.Material.Filled.RateReview" />
+                        <span>Reviews</span>
+                        @if (_pendingReviewCount > 0)
+                        {
+                            <span class="mobile-nav-badge">@(_pendingReviewCount > 99 ? "99+" : _pendingReviewCount.ToString())</span>
+                        }
+                    </a>
+                    <a href="/transactions" class="mobile-nav-item @(IsActive("/transactions") ? "active" : "")">
+                        <MudIcon Icon="@Icons.Material.Filled.Receipt" />
+                        <span>Transactions</span>
+                    </a>
+                    <a href="/send" class="mobile-nav-item @(IsActive("/send") ? "active" : "")">
+                        <MudIcon Icon="@Icons.Material.Filled.Science" />
+                        <span>Simulate</span>
+                    </a>
+                    <button class="mobile-nav-item" @onclick="ToggleDrawer">
+                        <MudIcon Icon="@Icons.Material.Filled.Menu" />
+                        <span>More</span>
+                    </button>
+                </div>
+            </nav>
         </MudLayout>
     </Authorized>
     <NotAuthorized>
@@ -115,6 +146,7 @@
     private bool _drawerOpen = true;
     private bool _isDarkMode = true;
     private int _notificationCount = 0;
+    private int _pendingReviewCount = 0;
     private string? _organizationName;
     private string? _homeTenantId;
     private bool _isSuperAdmin;
@@ -126,9 +158,55 @@
 
     protected override async Task OnInitializedAsync()
     {
+        NavigationManager.LocationChanged += OnLocationChanged;
         await LoadHomeTenant();
         await LoadOrganizationName();
+        await LoadPendingReviewCount();
         await SetupSignalRConnection();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Auto-close drawer on mobile (viewport < 960px)
+            try
+            {
+                var isMobile = await JS.InvokeAsync<bool>("eval", "window.innerWidth < 960");
+                if (isMobile && _drawerOpen)
+                {
+                    _drawerOpen = false;
+                    StateHasChanged();
+                }
+            }
+            catch { /* SSR fallback - keep drawer open */ }
+        }
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        // Auto-close drawer on mobile when navigating
+        InvokeAsync(async () =>
+        {
+            try
+            {
+                var isMobile = await JS.InvokeAsync<bool>("eval", "window.innerWidth < 960");
+                if (isMobile && _drawerOpen)
+                {
+                    _drawerOpen = false;
+                    StateHasChanged();
+                }
+            }
+            catch { }
+        });
+    }
+
+    private bool IsActive(string href)
+    {
+        var relativePath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        if (href == "/")
+            return string.IsNullOrEmpty(relativePath);
+        return ("/" + relativePath).StartsWith(href, StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task LoadHomeTenant()
@@ -162,6 +240,21 @@
         }
     }
 
+    private async Task LoadPendingReviewCount()
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenantId(TenantContext.TenantId);
+            _pendingReviewCount = await db.RiskAnalyses
+                .CountAsync(r => r.ReviewStatus == ReviewStatus.Pending || r.ReviewStatus == ReviewStatus.Escalated);
+        }
+        catch
+        {
+            _pendingReviewCount = 0;
+        }
+    }
+
     private async Task SetupSignalRConnection()
     {
         _hubConnection = new HubConnectionBuilder()
@@ -172,6 +265,12 @@
         _hubConnection.On<TransactionNotification>("NewTransaction", (notification) =>
         {
             _notificationCount++;
+            
+            // Update pending review badge for flagged transactions
+            if (notification.RiskLevel >= RiskLevel.Medium)
+            {
+                _pendingReviewCount++;
+            }
             
             var severity = notification.RiskLevel switch
             {
@@ -233,6 +332,7 @@
     
     public async ValueTask DisposeAsync()
     {
+        NavigationManager.LocationChanged -= OnLocationChanged;
         if (_hubConnection is not null)
         {
             await _hubConnection.DisposeAsync();

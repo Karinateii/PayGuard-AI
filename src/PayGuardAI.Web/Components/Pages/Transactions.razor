@@ -458,22 +458,22 @@ else
                             @:Quick Actions
                         }
                     </MudText>
-                    <MudStack Row="true" Spacing="2">
-                        <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small"
-                                   StartIcon="@Icons.Material.Filled.CheckCircle"
+                    <MudStack Row="true" Spacing="2" Style="flex-wrap: wrap;">
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" 
+                                   StartIcon="@Icons.Material.Filled.CheckCircle" Class="mobile-action-btn"
                                    OnClick="@(() => OpenApproveDialog())" Disabled="@_processing">
                             Approve
                         </MudButton>
-                        <MudButton Variant="Variant.Filled" Color="Color.Error" Size="Size.Small"
-                                   StartIcon="@Icons.Material.Filled.Cancel"
+                        <MudButton Variant="Variant.Filled" Color="Color.Error" 
+                                   StartIcon="@Icons.Material.Filled.Cancel" Class="mobile-action-btn"
                                    OnClick="@(() => OpenRejectDialog())" Disabled="@_processing">
                             Reject
                         </MudButton>
                         @if (_selectedTransaction.RiskAnalysis?.ReviewStatus == ReviewStatus.Pending
                              && !_isManagerOrAbove)
                         {
-                            <MudButton Variant="Variant.Outlined" Color="Color.Warning" Size="Size.Small"
-                                       StartIcon="@Icons.Material.Filled.Escalator"
+                            <MudButton Variant="Variant.Outlined" Color="Color.Warning" 
+                                       StartIcon="@Icons.Material.Filled.Escalator" Class="mobile-action-btn"
                                        OnClick="@(() => EscalateFromDrawer())" Disabled="@_processing">
                                 Escalate
                             </MudButton>

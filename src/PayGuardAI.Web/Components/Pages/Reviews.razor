@@ -6,6 +6,7 @@
 @inject NavigationManager NavigationManager
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
 @inject ITenantContext TenantContext
+@inject IJSRuntime JS
 @implements IAsyncDisposable
 @using Microsoft.AspNetCore.SignalR.Client
 @using PayGuardAI.Core.Entities
@@ -15,14 +16,19 @@
 
 <MudText Typo="Typo.h4" Class="mb-4">
     <MudIcon Icon="@Icons.Material.Filled.RateReview" Class="mr-2" />
-    Pending Reviews (Human-in-the-Loop)
+    Pending Reviews
 </MudText>
 
-<MudAlert Severity="Severity.Info" Class="mb-4">
+<MudAlert Severity="Severity.Info" Class="mb-4 d-none d-md-flex">
     <MudText>
         <strong>HITL Workflow:</strong> Transactions flagged by the AI require human review before processing. 
         Review each transaction's risk factors and make an informed decision.
     </MudText>
+</MudAlert>
+
+<!-- Mobile swipe hint (shown once) -->
+<MudAlert Severity="Severity.Info" Class="mb-3 d-flex d-md-none" Dense="true" Icon="@Icons.Material.Filled.SwipeRight">
+    <MudText Typo="Typo.caption">Swipe right to approve, left to reject</MudText>
 </MudAlert>
 
 <!-- Approve Dialog using MudOverlay -->
@@ -45,8 +51,8 @@
                               RequiredError="Approval notes are required for compliance" />
             }
             <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="1">
-                <MudButton OnClick="@(() => _showApproveDialog = false)" Size="Size.Small">Cancel</MudButton>
-                <MudButton Color="Color.Success" Variant="Variant.Filled" Size="Size.Small" OnClick="@ApproveReview"
+                <MudButton OnClick="@(() => _showApproveDialog = false)" Class="mobile-action-btn">Cancel</MudButton>
+                <MudButton Color="Color.Success" Variant="Variant.Filled" Class="mobile-action-btn" OnClick="@ApproveReview"
                            Disabled="@string.IsNullOrWhiteSpace(_reviewNotes)">Approve</MudButton>
             </MudStack>
         </MudStack>
@@ -73,18 +79,24 @@
                               RequiredError="A rejection reason is required for compliance" />
             }
             <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="1">
-                <MudButton OnClick="@(() => _showRejectDialog = false)" Size="Size.Small">Cancel</MudButton>
-                <MudButton Color="Color.Error" Variant="Variant.Filled" Size="Size.Small" OnClick="@RejectReview"
+                <MudButton OnClick="@(() => _showRejectDialog = false)" Class="mobile-action-btn">Cancel</MudButton>
+                <MudButton Color="Color.Error" Variant="Variant.Filled" Class="mobile-action-btn" OnClick="@RejectReview"
                            Disabled="@string.IsNullOrWhiteSpace(_reviewNotes)">Reject</MudButton>
             </MudStack>
         </MudStack>
     </MudPaper>
 </MudOverlay>
 
-<MudPaper Class="pa-4" Elevation="2">
+<MudPaper Class="pa-4 pa-sm-4" Elevation="2" id="reviews-container">
+    <!-- Pull-to-refresh indicator -->
+    <div class="pull-indicator">
+        <MudIcon Icon="@Icons.Material.Filled.ArrowDownward" />
+        <MudText Typo="Typo.caption" Class="ml-2">Pull to refresh</MudText>
+    </div>
+
     <MudGrid Spacing="2" Class="mb-3">
         <!-- Min Risk Level Filter -->
-        <MudItem xs="12" sm="6" md="4">
+        <MudItem xs="6" sm="6" md="4">
             <MudSelect T="RiskLevel?" Label="Min Risk Level" Value="@_minRiskLevel" 
                        ValueChanged="@OnFilterChanged" Dense="true" FullWidth="true">
                 <MudSelectItem T="RiskLevel?" Value="@((RiskLevel?)null)">All</MudSelectItem>
@@ -95,12 +107,12 @@
         </MudItem>
 
         <!-- Reviews Count -->
-        <MudItem xs="12" sm="6" md="4" Class="d-flex align-center">
+        <MudItem xs="6" sm="6" md="4" Class="d-flex align-center">
             <MudChip T="string" Color="Color.Warning" Size="Size.Medium">@_reviews.Count Pending</MudChip>
         </MudItem>
 
-        <!-- Per Page Filter & Refresh -->
-        <MudItem xs="12" sm="6" md="2">
+        <!-- Per Page Filter (hidden on mobile - uses infinite scroll feel) -->
+        <MudItem xs="6" sm="6" md="2" Class="d-none d-md-flex">
             <MudSelect T="int" Value="_pageSize" ValueChanged="OnPageSizeChanged" Label="Per page" Dense="true" FullWidth="true">
                 <MudSelectItem T="int" Value="5">5</MudSelectItem>
                 <MudSelectItem T="int" Value="10">10</MudSelectItem>
@@ -109,9 +121,9 @@
         </MudItem>
 
         <!-- Refresh Button -->
-        <MudItem xs="12" sm="6" md="2" Class="d-flex align-center">
+        <MudItem xs="6" sm="6" md="2" Class="d-flex align-center">
             <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" 
-                       OnClick="@LoadReviews" FullWidth="true">Refresh</MudButton>
+                       OnClick="@LoadReviews" FullWidth="true" Class="mobile-action-btn">Refresh</MudButton>
         </MudItem>
     </MudGrid>
 
@@ -135,7 +147,9 @@
     {
         @foreach (var review in PagedReviews)
         {
-            <MudCard Class="mb-3" Elevation="1">
+            var cardId = $"review-card-{review.Id}";
+            <!-- Desktop layout -->
+            <MudCard Class="mb-3 d-none d-md-block" Elevation="1">
                 <MudCardContent>
                     <MudGrid>
                         <MudItem xs="12" md="3">
@@ -201,6 +215,67 @@
                     </MudGrid>
                 </MudCardContent>
             </MudCard>
+
+            <!-- Mobile layout (swipe-friendly compact card) -->
+            <MudCard Class="mb-3 d-block d-md-none review-card-mobile" Elevation="1" id="@cardId">
+                <MudCardContent Style="padding: 12px;">
+                    <!-- Top row: Amount + Risk Score -->
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.h6" Style="font-size: 1.1rem;">
+                                @review.Transaction.Amount.ToString("N2") @review.Transaction.SourceCurrency
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @review.Transaction.SourceCountry → @review.Transaction.DestinationCountry
+                            </MudText>
+                        </MudStack>
+                        <MudStack AlignItems="AlignItems.Center" Spacing="0">
+                            <MudProgressCircular Color="@GetRiskColor(review.RiskLevel)" 
+                                                 Size="Size.Small" Value="@review.RiskScore">
+                                <MudText Typo="Typo.caption" Style="font-size: 0.65rem;">@review.RiskScore</MudText>
+                            </MudProgressCircular>
+                            <MudChip T="string" Color="@GetRiskColor(review.RiskLevel)" Size="Size.Small" 
+                                     Style="@(GetRiskStyle(review.RiskLevel) + "font-size:0.7rem; height:22px;")">
+                                @review.RiskLevel
+                            </MudChip>
+                        </MudStack>
+                    </MudStack>
+
+                    <!-- Risk summary (truncated on mobile) -->
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2" 
+                             Style="font-size: 0.8rem; max-height: 36px; overflow: hidden; text-overflow: ellipsis;">
+                        @review.Explanation
+                    </MudText>
+
+                    @if (review.ReviewStatus == ReviewStatus.Escalated)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="mt-1" Style="font-size:0.7rem;">
+                            Escalated by @review.ReviewedBy
+                        </MudChip>
+                    }
+
+                    <!-- Mobile action buttons (large touch targets) -->
+                    <div class="review-actions-mobile mt-2">
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" 
+                                   StartIcon="@Icons.Material.Filled.Check"
+                                   OnClick="@(() => OpenApproveDialog(review))"
+                                   Disabled="@_processing"
+                                   Class="mobile-action-btn" Style="flex:1;">
+                            Approve
+                        </MudButton>
+                        <MudButton Variant="Variant.Filled" Color="Color.Error" 
+                                   StartIcon="@Icons.Material.Filled.Close"
+                                   OnClick="@(() => OpenRejectDialog(review))"
+                                   Disabled="@_processing"
+                                   Class="mobile-action-btn" Style="flex:1;">
+                            Reject
+                        </MudButton>
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" Color="Color.Primary"
+                                       Href="@($"/transactions/{review.TransactionId}?returnTo=/reviews")"
+                                       Class="mobile-action-btn" />
+                    </div>
+                </MudCardContent>
+            </MudCard>
         }
 
         @if (TotalPages > 1)
@@ -224,6 +299,7 @@
     private bool _showApproveDialog = false;
     private bool _showRejectDialog = false;
     private HubConnection? _hubConnection;
+    private Dictionary<Guid, DotNetObjectReference<SwipeHandler>> _swipeRefs = new();
 
     // Pagination - smaller page size since review cards are larger than table rows
     private int _currentPage = 1;
@@ -240,6 +316,89 @@
     {
         await LoadReviews();
         await SetupSignalRConnection();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        
+        // Initialize pull-to-refresh
+        try
+        {
+            var dotNetRef = DotNetObjectReference.Create(new PullRefreshHandler(this));
+            await JS.InvokeVoidAsync("PayGuardMobile.initPullToRefresh", "reviews-container", dotNetRef);
+        }
+        catch { /* JS interop not available during prerender */ }
+        
+        // Initialize swipe on mobile cards
+        await InitSwipeHandlers();
+    }
+
+    private async Task InitSwipeHandlers()
+    {
+        foreach (var review in PagedReviews)
+        {
+            try
+            {
+                var handler = new SwipeHandler(this, review);
+                var dotNetRef = DotNetObjectReference.Create(handler);
+                _swipeRefs[review.Id] = dotNetRef;
+                await JS.InvokeVoidAsync("PayGuardMobile.initSwipe", $"review-card-{review.Id}", dotNetRef);
+            }
+            catch { /* Prerender or SSR */ }
+        }
+    }
+
+    // Swipe handler class for JS interop callbacks
+    public class SwipeHandler
+    {
+        private readonly Reviews _parent;
+        private readonly RiskAnalysis _review;
+        
+        public SwipeHandler(Reviews parent, RiskAnalysis review)
+        {
+            _parent = parent;
+            _review = review;
+        }
+        
+        [JSInvokable]
+        public async Task OnSwipeRight()
+        {
+            // Swipe right = Approve
+            await _parent.InvokeAsync(() =>
+            {
+                _parent.OpenApproveDialog(_review);
+                _parent.StateHasChanged();
+            });
+        }
+        
+        [JSInvokable]
+        public async Task OnSwipeLeft()
+        {
+            // Swipe left = Reject
+            await _parent.InvokeAsync(() =>
+            {
+                _parent.OpenRejectDialog(_review);
+                _parent.StateHasChanged();
+            });
+        }
+    }
+
+    // Pull-to-refresh handler
+    public class PullRefreshHandler
+    {
+        private readonly Reviews _parent;
+        public PullRefreshHandler(Reviews parent) => _parent = parent;
+        
+        [JSInvokable]
+        public async Task OnPullRefresh()
+        {
+            await _parent.InvokeAsync(async () =>
+            {
+                await _parent.LoadReviews();
+                _parent.StateHasChanged();
+            });
+        }
     }
 
     private async Task SetupSignalRConnection()
@@ -373,6 +532,13 @@
 
     public async ValueTask DisposeAsync()
     {
+        // Clean up swipe handler references
+        foreach (var kvp in _swipeRefs)
+        {
+            kvp.Value.Dispose();
+        }
+        _swipeRefs.Clear();
+        
         if (_hubConnection is not null)
         {
             await _hubConnection.DisposeAsync();
