@@ -214,7 +214,7 @@ public class RiskScoringService : IRiskScoringService
             "HIGH_AMOUNT" => EvaluateHighAmount(rule, transaction),
             "VELOCITY_24H" => await EvaluateVelocity24hAsync(rule, transaction, cancellationToken),
             "NEW_CUSTOMER" => EvaluateNewCustomer(rule, profile),
-            "HIGH_RISK_CORRIDOR" => EvaluateHighRiskCorridor(rule, transaction),
+            "HIGH_RISK_CORRIDOR" => await EvaluateHighRiskCorridorAsync(rule, transaction, cancellationToken),
             "ROUND_AMOUNT" => EvaluateRoundAmount(rule, transaction),
             "UNUSUAL_TIME" => EvaluateUnusualTime(rule, transaction),
             _ => null
@@ -276,10 +276,25 @@ public class RiskScoringService : IRiskScoringService
         return null;
     }
 
-    private RiskFactor? EvaluateHighRiskCorridor(RiskRule rule, Transaction transaction)
+    private async Task<RiskFactor?> EvaluateHighRiskCorridorAsync(RiskRule rule, Transaction transaction, CancellationToken cancellationToken)
     {
-        // List of high-risk country codes (for demo purposes)
-        var highRiskCountries = new HashSet<string> { "IR", "KP", "SY", "YE", "VE", "CU" };
+        // Load tenant-configurable high-risk country list from OrganizationSettings.
+        // Falls back to the static OFAC/FATF default if no tenant settings exist.
+        HashSet<string> highRiskCountries;
+        try
+        {
+            var settings = await _context.OrganizationSettings
+                .AsNoTracking()
+                .FirstOrDefaultAsync(cancellationToken);
+
+            highRiskCountries = settings?.GetHighRiskCountrySet()
+                ?? OrganizationSettings.DefaultHighRiskCountries;
+        }
+        catch
+        {
+            // If the column doesn't exist yet (pre-migration), use defaults
+            highRiskCountries = OrganizationSettings.DefaultHighRiskCountries;
+        }
 
         bool isHighRisk = highRiskCountries.Contains(transaction.SourceCountry) || 
                           highRiskCountries.Contains(transaction.DestinationCountry);

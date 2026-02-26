@@ -16,6 +16,12 @@ public class OrganizationSettings
     public int AutoApproveThreshold { get; set; } = 20;
     public int AutoRejectThreshold { get; set; } = 80;
     /// <summary>
+    /// Comma-separated list of high-risk country codes (ISO 3166-1 alpha-2)
+    /// used by the HIGH_RISK_CORRIDOR rule. Defaults to OFAC-sanctioned countries.
+    /// Admins can customise per tenant from Organization Settings.
+    /// </summary>
+    public string HighRiskCountries { get; set; } = "IR,KP,SY,YE,VE,CU,MM,AF";
+    /// <summary>
     /// Comma-separated list of allowed IP addresses for API access.
     /// Empty = all IPs allowed.
     /// </summary>
@@ -33,4 +39,26 @@ public class OrganizationSettings
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public string UpdatedBy { get; set; } = "system";
+
+    /// <summary>
+    /// Default OFAC/FATF high-risk country codes used when no tenant override exists.
+    /// </summary>
+    public static readonly HashSet<string> DefaultHighRiskCountries = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "IR", "KP", "SY", "YE", "VE", "CU", "MM", "AF"
+    };
+
+    /// <summary>
+    /// Parse the comma-separated <see cref="HighRiskCountries"/> string into a HashSet.
+    /// Falls back to <see cref="DefaultHighRiskCountries"/> if the string is empty.
+    /// </summary>
+    public HashSet<string> GetHighRiskCountrySet()
+    {
+        if (string.IsNullOrWhiteSpace(HighRiskCountries))
+            return DefaultHighRiskCountries;
+
+        return new HashSet<string>(
+            HighRiskCountries.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+            StringComparer.OrdinalIgnoreCase);
+    }
 }

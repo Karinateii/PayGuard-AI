@@ -85,6 +85,32 @@ else if (_settings != null)
 
             <MudPaper Class="pa-6 mt-4" Elevation="2">
                 <MudText Typo="Typo.h6" Class="mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Security" Class="mr-1" />
+                    High-Risk Countries (Sanctions List)
+                </MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                    ISO 3166-1 alpha-2 country codes used by the HIGH_RISK_CORRIDOR rule.
+                    Transactions involving these countries are flagged as critical risk.
+                </MudText>
+                <MudTextField @bind-Value="_settings.HighRiskCountries"
+                              Label="Sanctioned Country Codes" Variant="Variant.Outlined"
+                              Placeholder="IR,KP,SY,YE,VE,CU,MM,AF"
+                              HelperText="Comma-separated ISO codes. Default: IR, KP, SY, YE, VE, CU, MM, AF (OFAC/FATF)" />
+                <MudStack Row="true" Spacing="1" Class="mt-2 flex-wrap">
+                    @foreach (var countryCode in GetHighRiskCodes())
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Outlined">@countryCode</MudChip>
+                    }
+                </MudStack>
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                    <strong>@GetHighRiskCodes().Length</strong> countries on your sanctions list.
+                    Changes take effect on the next transaction scored.
+                    This also affects the ML model's corridor-risk feature.
+                </MudAlert>
+            </MudPaper>
+
+            <MudPaper Class="pa-6 mt-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-2">
                     <MudIcon Icon="@Icons.Custom.Brands.GitHub" Class="mr-1" />
                     Slack Alerts
                 </MudText>
@@ -180,5 +206,14 @@ else if (!_loading && _settings == null)
         {
             _saving = false;
         }
+    }
+
+    private string[] GetHighRiskCodes()
+    {
+        if (_settings == null || string.IsNullOrWhiteSpace(_settings.HighRiskCountries))
+            return Array.Empty<string>();
+
+        return _settings.HighRiskCountries
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 }

@@ -9,11 +9,9 @@ namespace PayGuardAI.Data.ML;
 /// </summary>
 public static class MLFeatureExtractor
 {
-    // Countries with elevated AML/CFT risk (FATF high-risk jurisdictions)
-    private static readonly HashSet<string> HighRiskCountries = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "IR", "KP", "SY", "YE", "VE", "CU", "MM", "AF"
-    };
+    // Countries with elevated AML/CFT risk — sourced from OrganizationSettings.DefaultHighRiskCountries
+    // so there is a single source of truth for the default OFAC/FATF list.
+    private static readonly HashSet<string> HighRiskCountries = OrganizationSettings.DefaultHighRiskCountries;
 
     /// <summary>
     /// Extract features for real-time prediction (requires DB for velocity).
