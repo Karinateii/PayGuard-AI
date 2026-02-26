@@ -175,7 +175,7 @@ else
                     <MudTd DataLabel="">
                         <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
                                        Size="Size.Small" Color="Color.Primary"
-                                       Href="@($"/transactions/{context.Id}")" />
+                                       OnClick="@(() => NavigationManager.NavigateTo($"/transactions/{context.Id}?returnTo=/"))" />
                     </MudTd>
                 </RowTemplate>
             </MudTable>

@@ -321,7 +321,7 @@ else
         }
         else
         {
-            <MudTable Items="@_transactions" Hover="true" Dense="true" OnRowClick="@OnRowClick" T="Transaction"
+            <MudTable Items="@_transactions" Hover="true" Dense="true" T="Transaction"
                       @bind-RowsPerPage="_rowsPerPage" Breakpoint="Breakpoint.Sm">
                 <HeaderContent>
                     <MudTh>External ID</MudTh>
@@ -366,10 +366,11 @@ else
             </MudTable>
         }
     </MudPaper>
-    
-    <!-- Quick View Drawer -->
-    <MudDrawer @bind-Open="_drawerOpen" Anchor="Anchor.End" Elevation="4" 
-               Width="@GetDrawerWidth()" Variant="DrawerVariant.Temporary">
+}
+
+<!-- Quick View Drawer (always rendered, outside if/else) -->
+<MudDrawer @bind-Open="_drawerOpen" Anchor="Anchor.End" Elevation="4" 
+           Width="@GetDrawerWidth()" Variant="DrawerVariant.Temporary">
         @if (_selectedTransaction != null)
         {
             <MudDrawerHeader>
@@ -502,7 +503,6 @@ else
             </MudDrawerContainer>
         }
     </MudDrawer>
-}
 
 @code {
     [Parameter]
@@ -544,7 +544,20 @@ else
     {
         if (TransactionId.HasValue)
         {
-            _selectedTransaction = await TransactionService.GetByIdAsync(TransactionId.Value);
+            try
+            {
+                _selectedTransaction = await TransactionService.GetByIdAsync(TransactionId.Value);
+                if (_selectedTransaction == null)
+                {
+                    Snackbar.Add("Transaction not found", Severity.Warning);
+                    NavigationManager.NavigateTo("/transactions");
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error loading transaction: {ex.Message}", Severity.Error);
+                NavigationManager.NavigateTo("/transactions");
+            }
         }
         else
         {
@@ -632,12 +645,6 @@ else
         _filterMinAmount = null;
         _filterMaxAmount = null;
         await LoadTransactions();
-    }
-
-    private void OnRowClick(TableRowClickEventArgs<Transaction> args)
-    {
-        _selectedTransaction = args.Item;
-        _drawerOpen = true;
     }
 
     private void OpenQuickView(Transaction transaction)
