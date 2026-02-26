@@ -49,6 +49,12 @@ public class DatabaseMigrationService : IDatabaseMigrationService
             // Create MLModels table if it doesn't exist (added for ML Risk Scoring)
             await CreateMLModelsTableAsync(dbType);
 
+            // Create RuleTemplates table if it doesn't exist (added for Rule Marketplace)
+            await CreateRuleTemplatesTableAsync(dbType);
+
+            // Seed default rule templates if the table is empty
+            await SeedRuleTemplatesDataAsync(dbType);
+
             // Mark existing tenants as onboarded so they aren't redirected
             await MarkExistingTenantsOnboardedAsync(dbType);
 
@@ -476,6 +482,159 @@ public class DatabaseMigrationService : IDatabaseMigrationService
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Skipping MLModels table creation");
+        }
+    }
+
+    /// <summary>
+    /// Creates the RuleTemplates table if it doesn't already exist.
+    /// Added for the Rule Marketplace feature — stores pre-built rule templates
+    /// that tenants can import into their own rule sets.
+    /// </summary>
+    private async Task CreateRuleTemplatesTableAsync(string dbType)
+    {
+        try
+        {
+            if (dbType == "PostgreSQL")
+            {
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS "RuleTemplates" (
+                        "Id" uuid NOT NULL PRIMARY KEY,
+                        "Name" text NOT NULL DEFAULT '',
+                        "Description" text NOT NULL DEFAULT '',
+                        "RuleCode" text NOT NULL DEFAULT '',
+                        "Category" text NOT NULL DEFAULT '',
+                        "Threshold" numeric(18,4) NOT NULL DEFAULT 0,
+                        "ScoreWeight" integer NOT NULL DEFAULT 0,
+                        "Industry" text NOT NULL DEFAULT 'General',
+                        "Tags" text NOT NULL DEFAULT '',
+                        "IsBuiltIn" boolean NOT NULL DEFAULT true,
+                        "ImportCount" integer NOT NULL DEFAULT 0,
+                        "Author" text NOT NULL DEFAULT 'PayGuard AI',
+                        "Version" text NOT NULL DEFAULT '1.0',
+                        "CreatedAt" timestamp with time zone NOT NULL DEFAULT now(),
+                        "UpdatedAt" timestamp with time zone NOT NULL DEFAULT now()
+                    )
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS "IX_RuleTemplates_RuleCode"
+                    ON "RuleTemplates" ("RuleCode")
+                    """);
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS "IX_RuleTemplates_Industry"
+                    ON "RuleTemplates" ("Industry")
+                    """);
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS "IX_RuleTemplates_IsBuiltIn"
+                    ON "RuleTemplates" ("IsBuiltIn")
+                    """);
+            }
+            else
+            {
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS RuleTemplates (
+                        Id TEXT NOT NULL PRIMARY KEY,
+                        Name TEXT NOT NULL DEFAULT '',
+                        Description TEXT NOT NULL DEFAULT '',
+                        RuleCode TEXT NOT NULL DEFAULT '',
+                        Category TEXT NOT NULL DEFAULT '',
+                        Threshold TEXT NOT NULL DEFAULT '0',
+                        ScoreWeight INTEGER NOT NULL DEFAULT 0,
+                        Industry TEXT NOT NULL DEFAULT 'General',
+                        Tags TEXT NOT NULL DEFAULT '',
+                        IsBuiltIn INTEGER NOT NULL DEFAULT 1,
+                        ImportCount INTEGER NOT NULL DEFAULT 0,
+                        Author TEXT NOT NULL DEFAULT 'PayGuard AI',
+                        Version TEXT NOT NULL DEFAULT '1.0',
+                        CreatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+                        UpdatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+                    )
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS IX_RuleTemplates_RuleCode
+                    ON RuleTemplates (RuleCode)
+                    """);
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS IX_RuleTemplates_Industry
+                    ON RuleTemplates (Industry)
+                    """);
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS IX_RuleTemplates_IsBuiltIn
+                    ON RuleTemplates (IsBuiltIn)
+                    """);
+            }
+
+            _logger.LogDebug("RuleTemplates table ensured");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipping RuleTemplates table creation");
+        }
+    }
+
+    /// <summary>
+    /// Seeds the 24 default rule templates (4 industries × 6 rules) if the table is empty.
+    /// Safe to run repeatedly — only inserts if no rows exist.
+    /// </summary>
+    private async Task SeedRuleTemplatesDataAsync(string dbType)
+    {
+        try
+        {
+            var count = await _context.RuleTemplates.CountAsync();
+            if (count > 0)
+            {
+                _logger.LogDebug("RuleTemplates already seeded ({Count} rows), skipping", count);
+                return;
+            }
+
+            _logger.LogInformation("Seeding 24 default rule templates...");
+
+            var now = DateTime.UtcNow;
+
+            var templates = new[]
+            {
+                // ── Remittance Pack ──
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("aaaaaaaa-0001-4000-8000-000000000001"), Name = "Remittance: Large Transfer Alert", Description = "Optimized for cross-border remittance. Flags transfers above $10,000 — the threshold where most jurisdictions require enhanced due diligence under AML regulations.", RuleCode = "HIGH_AMOUNT", Category = "Amount", Threshold = 10000m, ScoreWeight = 35, Industry = "Remittance", Tags = new[] { "cross-border", "aml", "high-value" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("aaaaaaaa-0002-4000-8000-000000000002"), Name = "Remittance: Rapid Send Detection", Description = "Flags senders with 3+ transfers in 24 hours. Legitimate remittance users rarely send more than 1-2 times per day.", RuleCode = "VELOCITY_24H", Category = "Velocity", Threshold = 3m, ScoreWeight = 35, Industry = "Remittance", Tags = new[] { "velocity", "structuring", "smurfing" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("aaaaaaaa-0003-4000-8000-000000000003"), Name = "Remittance: New Sender Screening", Description = "Enhanced scrutiny for senders with fewer than 3 prior transactions. First-time remittance senders carry higher fraud risk.", RuleCode = "NEW_CUSTOMER", Category = "Pattern", Threshold = 3m, ScoreWeight = 30, Industry = "Remittance", Tags = new[] { "new-customer", "onboarding", "kyc" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("aaaaaaaa-0004-4000-8000-000000000004"), Name = "Remittance: Sanctioned Corridor Check", Description = "Critical check for transfers involving OFAC-sanctioned corridors (IR, KP, SY, YE, VE, CU). Mandatory for all licensed money transmitters.", RuleCode = "HIGH_RISK_CORRIDOR", Category = "Geography", Threshold = 1m, ScoreWeight = 40, Industry = "Remittance", Tags = new[] { "sanctions", "ofac", "compliance" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("aaaaaaaa-0005-4000-8000-000000000005"), Name = "Remittance: Structuring Detection", Description = "Detects round amounts above $500 that may indicate structuring (splitting transfers to avoid reporting thresholds).", RuleCode = "ROUND_AMOUNT", Category = "Pattern", Threshold = 500m, ScoreWeight = 15, Industry = "Remittance", Tags = new[] { "structuring", "sar", "ctr" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("aaaaaaaa-0006-4000-8000-000000000006"), Name = "Remittance: Off-Hours Transfer", Description = "Flags transfers between 2-5 AM UTC. Legitimate remittance users rarely initiate transfers at these hours.", RuleCode = "UNUSUAL_TIME", Category = "Pattern", Threshold = 1m, ScoreWeight = 15, Industry = "Remittance", Tags = new[] { "off-hours", "behavioral" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+
+                // ── E-Commerce Pack ──
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("bbbbbbbb-0001-4000-8000-000000000001"), Name = "E-Commerce: High-Value Purchase", Description = "Flags online purchases above $2,000. E-commerce fraud skews toward high-value single orders with stolen cards.", RuleCode = "HIGH_AMOUNT", Category = "Amount", Threshold = 2000m, ScoreWeight = 30, Industry = "E-Commerce", Tags = new[] { "card-fraud", "chargeback", "high-value" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("bbbbbbbb-0002-4000-8000-000000000002"), Name = "E-Commerce: Rapid Purchase Velocity", Description = "Allows up to 15 orders/day before flagging. E-commerce has legitimately higher velocity than remittance.", RuleCode = "VELOCITY_24H", Category = "Velocity", Threshold = 15m, ScoreWeight = 25, Industry = "E-Commerce", Tags = new[] { "bot-detection", "card-testing" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("bbbbbbbb-0003-4000-8000-000000000003"), Name = "E-Commerce: First-Time Buyer", Description = "Strict scrutiny for first-time buyers (fewer than 2 orders). Account takeover and stolen card fraud heavily target new accounts.", RuleCode = "NEW_CUSTOMER", Category = "Pattern", Threshold = 2m, ScoreWeight = 35, Industry = "E-Commerce", Tags = new[] { "first-purchase", "account-takeover" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("bbbbbbbb-0004-4000-8000-000000000004"), Name = "E-Commerce: Cross-Border Purchase", Description = "Moderate weight for cross-border e-commerce — common for legitimate buyers but also for carding rings.", RuleCode = "HIGH_RISK_CORRIDOR", Category = "Geography", Threshold = 1m, ScoreWeight = 25, Industry = "E-Commerce", Tags = new[] { "cross-border", "carding" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("bbbbbbbb-0005-4000-8000-000000000005"), Name = "E-Commerce: Round Amount Alert", Description = "Flags round amounts above $100. Gift card fraud and card testing often use exact round numbers.", RuleCode = "ROUND_AMOUNT", Category = "Pattern", Threshold = 100m, ScoreWeight = 20, Industry = "E-Commerce", Tags = new[] { "gift-card", "card-testing" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("bbbbbbbb-0006-4000-8000-000000000006"), Name = "E-Commerce: Late-Night Purchase", Description = "Low weight for off-hours purchases. Online shopping is 24/7 so time is less indicative of fraud.", RuleCode = "UNUSUAL_TIME", Category = "Pattern", Threshold = 1m, ScoreWeight = 10, Industry = "E-Commerce", Tags = new[] { "behavioral", "time-based" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+
+                // ── Lending Pack ──
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("cccccccc-0001-4000-8000-000000000001"), Name = "Lending: Large Loan Application", Description = "Flags loan applications above $5,000. Higher loan amounts carry proportionally higher default and fraud risk.", RuleCode = "HIGH_AMOUNT", Category = "Amount", Threshold = 5000m, ScoreWeight = 30, Industry = "Lending", Tags = new[] { "loan-fraud", "default-risk" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("cccccccc-0002-4000-8000-000000000002"), Name = "Lending: Multiple Applications", Description = "Flags 2+ loan applications in 24 hours. Rapid applications across lenders is a strong indicator of loan stacking fraud.", RuleCode = "VELOCITY_24H", Category = "Velocity", Threshold = 2m, ScoreWeight = 40, Industry = "Lending", Tags = new[] { "loan-stacking", "application-fraud" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("cccccccc-0003-4000-8000-000000000003"), Name = "Lending: First-Time Borrower", Description = "Maximum scrutiny for first-time borrowers (0 prior transactions). Identity fraud disproportionately targets new accounts.", RuleCode = "NEW_CUSTOMER", Category = "Pattern", Threshold = 1m, ScoreWeight = 40, Industry = "Lending", Tags = new[] { "identity-fraud", "synthetic-identity" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("cccccccc-0004-4000-8000-000000000004"), Name = "Lending: Sanctioned Country", Description = "Moderate weight for sanctioned corridor checks. Lending is typically domestic, so cross-border is inherently unusual.", RuleCode = "HIGH_RISK_CORRIDOR", Category = "Geography", Threshold = 1m, ScoreWeight = 25, Industry = "Lending", Tags = new[] { "sanctions", "compliance" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("cccccccc-0005-4000-8000-000000000005"), Name = "Lending: Round Loan Amount", Description = "Low weight — loan amounts are often round by nature. Only flags amounts at $1,000 intervals.", RuleCode = "ROUND_AMOUNT", Category = "Pattern", Threshold = 1000m, ScoreWeight = 10, Industry = "Lending", Tags = new[] { "low-signal" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("cccccccc-0006-4000-8000-000000000006"), Name = "Lending: Off-Hours Application", Description = "Moderate weight for loan applications filed between 2-5 AM. Automated fraud bots often operate during off-peak hours.", RuleCode = "UNUSUAL_TIME", Category = "Pattern", Threshold = 1m, ScoreWeight = 20, Industry = "Lending", Tags = new[] { "bot-detection", "behavioral" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+
+                // ── Crypto Pack ──
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("dddddddd-0001-4000-8000-000000000001"), Name = "Crypto: Whale Transaction", Description = "High threshold ($50,000) reflects that large crypto transfers are common. Only the largest transactions warrant extra scrutiny.", RuleCode = "HIGH_AMOUNT", Category = "Amount", Threshold = 50000m, ScoreWeight = 25, Industry = "Crypto", Tags = new[] { "whale", "large-transfer" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("dddddddd-0002-4000-8000-000000000002"), Name = "Crypto: Rapid Trading", Description = "Allows up to 10 transactions/day — active trading is normal. Flags velocity indicative of automated laundering.", RuleCode = "VELOCITY_24H", Category = "Velocity", Threshold = 10m, ScoreWeight = 30, Industry = "Crypto", Tags = new[] { "automated", "wash-trading" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("dddddddd-0003-4000-8000-000000000003"), Name = "Crypto: New Wallet", Description = "Standard threshold (5 transactions) for new wallets. Crypto users frequently create new addresses.", RuleCode = "NEW_CUSTOMER", Category = "Pattern", Threshold = 5m, ScoreWeight = 25, Industry = "Crypto", Tags = new[] { "new-wallet", "pseudonymous" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("dddddddd-0004-4000-8000-000000000004"), Name = "Crypto: OFAC Corridor", Description = "Maximum weight for OFAC-sanctioned corridors. Travel Rule and FATF compliance are critical for crypto VASPs.", RuleCode = "HIGH_RISK_CORRIDOR", Category = "Geography", Threshold = 1m, ScoreWeight = 40, Industry = "Crypto", Tags = new[] { "ofac", "travel-rule", "fatf" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("dddddddd-0005-4000-8000-000000000005"), Name = "Crypto: Round Amount Pattern", Description = "Higher threshold ($10,000) — crypto amounts are often unround due to exchange rates. Round amounts stand out more.", RuleCode = "ROUND_AMOUNT", Category = "Pattern", Threshold = 10000m, ScoreWeight = 15, Industry = "Crypto", Tags = new[] { "structuring", "layering" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+                new PayGuardAI.Core.Entities.RuleTemplate { Id = Guid.Parse("dddddddd-0006-4000-8000-000000000006"), Name = "Crypto: Always-On Market", Description = "Minimal weight — crypto markets operate 24/7 so time-of-day is a weak fraud signal.", RuleCode = "UNUSUAL_TIME", Category = "Pattern", Threshold = 1m, ScoreWeight = 5, Industry = "Crypto", Tags = new[] { "24-7", "low-signal" }, IsBuiltIn = true, Author = "PayGuard AI", Version = "1.0", CreatedAt = now, UpdatedAt = now },
+            };
+
+            _context.RuleTemplates.AddRange(templates);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Seeded {Count} default rule templates", templates.Length);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipping RuleTemplates seeding");
         }
     }
 

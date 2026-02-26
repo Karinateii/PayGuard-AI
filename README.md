@@ -1,52 +1,79 @@
 # PayGuard AI
 
-> Real-time transaction risk monitoring and compliance system for cross-border payments
+> AI-powered transaction risk monitoring, compliance automation, and fraud detection for cross-border payments
 
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
 [![Blazor](https://img.shields.io/badge/Blazor-Server-512BD4)](https://blazor.net/)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/Karinateii/PayGuard-AI/build-and-test.yml?branch=main&label=build)](https://github.com/Karinateii/PayGuard-AI/actions)
-[![Tests](https://img.shields.io/badge/tests-70%2F70%20passing-brightgreen)](https://github.com/Karinateii/PayGuard-AI/actions)
+[![Tests](https://img.shields.io/badge/tests-266%20passing-brightgreen)](https://github.com/Karinateii/PayGuard-AI/actions)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ## Overview
 
-PayGuard AI is a compliance and risk tooling solution built for the [Afriex Cross-Border Fintech Hackathon](https://afriex.com). It provides financial institutions with real-time transaction monitoring, automated risk scoring, and a Human-in-the-Loop (HITL) review workflow for flagged transactions.
+PayGuard AI is a compliance and risk tooling SaaS platform built for the [Afriex Cross-Border Fintech Hackathon](https://afriex.com). It provides financial institutions with real-time transaction monitoring, ML-powered risk scoring, a Human-in-the-Loop (HITL) review workflow, multi-tenancy, and a Rule Marketplace — all deployed on Railway with PostgreSQL.
 
 ### The Problem
 
 Cross-border payment platforms process thousands of transactions daily. Compliance teams struggle with:
-- **Manual review bottlenecks** - Can't keep up with transaction volume
-- **Delayed fraud detection** - Suspicious activity caught too late
-- **Inconsistent decisions** - No standardized risk assessment framework
-- **Audit trail gaps** - Difficulty proving compliance to regulators
+- **Manual review bottlenecks** — Can't keep up with transaction volume
+- **Delayed fraud detection** — Suspicious activity caught too late
+- **Inconsistent decisions** — No standardized risk assessment framework
+- **Audit trail gaps** — Difficulty proving compliance to regulators
+- **One-size-fits-all rules** — No industry-specific tuning for risk thresholds
 
 ### The Solution
 
 PayGuard AI automates the first line of defense while keeping humans in control of critical decisions:
 
-1. **Real-time Risk Scoring** - Every transaction is analyzed instantly using configurable rules
-2. **Smart Routing** - Low-risk transactions auto-approve; high-risk ones go to human reviewers
-3. **Human-in-the-Loop** - Compliance officers review, approve, or reject flagged transactions
-4. **Complete Audit Trail** - Every decision is logged for regulatory compliance
+1. **Real-time Risk Scoring** — Every transaction analyzed instantly via configurable rules + ML model
+2. **ML-Powered Fraud Detection** — Learns from HITL feedback, auto-retrains hourly
+3. **Smart Routing** — Low-risk transactions auto-approve; high-risk ones go to human reviewers
+4. **Human-in-the-Loop** — Compliance officers review, approve, or reject flagged transactions
+5. **Rule Marketplace** — Pre-built industry packs (Remittance, E-Commerce, Lending, Crypto) with one-click import
+6. **Complete Audit Trail** — Every decision logged for regulatory compliance
+7. **Multi-Tenancy** — Full data isolation per organization with RBAC
 
 ## Features
 
-- 📊 **Live Dashboard** - Real-time stats, charts, and transaction monitoring
-- 🔍 **Risk Analysis Engine** - Configurable rules-based scoring system
-- 👥 **HITL Review Queue** - Prioritized list of transactions needing human review
-- ⚡ **Real-time Updates** - SignalR-powered instant notifications
-- 📋 **Rules Management** - Create, edit, and toggle risk detection rules
-- 📈 **Compliance Reports** - Visual analytics with risk distribution charts
-- 📝 **Audit Logging** - Complete history of all actions and decisions
-- � **Multi-Provider Support** - Unified abstraction for Afriex, Flutterwave, Wise, and other payment platforms
-- 🔐 **OAuth 2.0 & MFA** - Production-ready authentication with Azure AD/Google/Okta + TOTP two-factor authentication
-- 🏢 **Multi-Tenancy** - Tenant-scoped data isolation via middleware
-- 🚦 **Rate Limiting** - Fixed-window rate limiter scoped per tenant
-- 💾 **Response Caching** - In-memory caching for dashboard stats, transactions, and exchange rates
-- 🚨 **Alerting Service** - Automatic alerts for critical-risk transactions
-- 📡 **Health Checks** - `/health` endpoint for uptime monitoring
-- 📊 **Request Logging** - Structured request/response logging with slow-request warnings
-- 🚩 **Feature Flags** - Safe deployment with instant rollback (OAuth, PostgreSQL, Flutterwave)
+### Core Platform
+- 📊 **Live Dashboard** — Real-time stats, charts, and transaction monitoring
+- 🔍 **Risk Analysis Engine** — 6 configurable rules + ML scoring with per-rule analytics
+- 👥 **HITL Review Queue** — Prioritized list of transactions needing human review
+- ⚡ **Real-time Updates** — SignalR-powered instant notifications
+- 📋 **Rules Management** — Create, edit, toggle, and import risk detection rules
+- 📈 **Compliance Reports** — Visual analytics with risk distribution charts
+- 📝 **Audit Logging** — Complete history of all actions and decisions
+
+### AI & Machine Learning
+- 🤖 **ML Risk Scoring** — Binary classification model trained on HITL feedback (FastTree)
+- 🔄 **Auto-Retraining** — Background service checks hourly for new labeled data
+- 📊 **Model Management** — View training metrics (AUC, F1, precision/recall), activate/deactivate models
+- 🧠 **Feature Engineering** — 12 features extracted from transaction context (amount, velocity, time, corridor risk)
+
+### Rule Marketplace
+- 🏪 **Template Catalog** — 24 pre-built templates across 4 industries
+- 📦 **Industry Packs** — One-click import of all 6 rules optimized for your industry
+- 📊 **Rule Analytics** — Per-rule effectiveness: hit rate, precision, false positive rate
+- 🔄 **Import/Update** — Import new rules or update existing ones with recommended thresholds
+
+### Enterprise Features
+- 🏢 **Multi-Tenancy** — Tenant-scoped data isolation via middleware + EF Core query filters
+- 🔐 **OAuth 2.0 & Magic Links** — Production-ready auth (Azure AD/Google/Okta) + passwordless login
+- 👮 **RBAC** — 4-tier roles: Reviewer, Manager, Admin, SuperAdmin with custom permissions
+- 🚀 **Tenant Onboarding** — Guided wizard for new organizations
+- 💳 **Billing** — Paystack-powered subscription management with usage-based pricing tiers
+- 📧 **Email Notifications** — Resend-powered alerts for critical risk events
+- 🔑 **API Keys & Webhooks** — Self-service API key management and webhook configuration
+- 💱 **Multi-Provider Support** — Afriex, Flutterwave, Wise payment provider abstraction
+
+### Infrastructure
+- 🚦 **Rate Limiting** — Fixed-window rate limiter scoped per tenant
+- 💾 **Response Caching** — In-memory caching for dashboard stats and transactions
+- 🚨 **Alerting Service** — Automatic alerts for critical-risk transactions
+- 📡 **Health Checks** — `/health` endpoint for uptime monitoring
+- 📊 **Prometheus Metrics** — Request logging with slow-request warnings
+- 🚩 **Feature Flags** — Safe deployment with instant rollback
+- 🐘 **PostgreSQL** — Production database on Railway (SQLite for local dev)
 
 ## Tech Stack
 
@@ -54,14 +81,16 @@ PayGuard AI automates the first line of defense while keeping humans in control 
 |-------|------------|
 | **Frontend** | Blazor Server, MudBlazor 8.x |
 | **Backend** | ASP.NET Core 10 |
-| **Database** | SQLite with Entity Framework Core |
+| **Database** | PostgreSQL (production) / SQLite (development) |
+| **ML** | ML.NET (FastTree binary classification) |
 | **Real-time** | SignalR WebSockets |
-| **Auth** | OAuth 2.0 / OpenID Connect + TOTP MFA |
-| **Providers** | Afriex (primary), Flutterwave (feature flag) |
+| **Auth** | OAuth 2.0 / Magic Links / Demo mode |
+| **Email** | Resend HTTP API |
+| **Billing** | Paystack |
+| **Providers** | Afriex, Flutterwave, Wise |
 | **Caching** | IMemoryCache (tenant-scoped) |
-| **Rate Limiting** | ASP.NET Core Rate Limiting (per-tenant) |
-| **Monitoring** | Health checks, structured request logging |
-| **API** | Afriex Business API |
+| **Monitoring** | Prometheus, Health Checks, Serilog |
+| **Deployment** | Railway (Docker) |
 | **Architecture** | Clean Architecture (3-layer) |
 
 ## Project Structure
@@ -69,50 +98,63 @@ PayGuard AI automates the first line of defense while keeping humans in control 
 ```
 PayGuardAI/
 ├── src/
-│   ├── PayGuardAI.Core/          # Domain entities and interfaces
+│   ├── PayGuardAI.Core/              # Domain entities and interfaces
 │   │   ├── Entities/
-│   │   │   ├── Transaction.cs
-│   │   │   ├── RiskAnalysis.cs
-│   │   │   ├── RiskRule.cs
-│   │   │   └── AuditLog.cs
+│   │   │   ├── Transaction.cs         # Transaction entity
+│   │   │   ├── RiskAnalysis.cs        # Risk scoring results
+│   │   │   ├── RiskRule.cs            # Configurable risk rules
+│   │   │   ├── RuleTemplate.cs        # Marketplace templates
+│   │   │   ├── MLModel.cs             # ML model storage
+│   │   │   ├── CustomerProfile.cs     # Customer risk profiles
+│   │   │   ├── AuditLog.cs            # Audit trail
+│   │   │   ├── TeamMember.cs          # RBAC team members
+│   │   │   ├── CustomRole.cs          # Custom permission roles
+│   │   │   └── ...                    # 15+ entities total
 │   │   └── Services/
-│   │       ├── ITenantContext.cs        # Multi-tenancy interface
-│   │       ├── IAlertingService.cs      # Alerting interface
 │   │       ├── IRiskScoringService.cs
-│   │       ├── IReviewService.cs
-│   │       └── ITransactionService.cs
+│   │       ├── IRuleMarketplaceService.cs
+│   │       ├── IMLScoringService.cs
+│   │       ├── ITenantContext.cs
+│   │       └── ...                    # 15+ service interfaces
 │   │
-│   ├── PayGuardAI.Data/          # Data access and services
-│   │   ├── ApplicationDbContext.cs
+│   ├── PayGuardAI.Data/              # Data access and service implementations
+│   │   ├── ApplicationDbContext.cs    # EF Core context with multi-tenant filters
 │   │   └── Services/
-│   │       ├── TransactionService.cs    # Cached, tenant-scoped
-│   │       ├── RiskScoringService.cs    # With alerting
-│   │       ├── ReviewService.cs         # Cache-invalidating
-│   │       ├── AfriexApiService.cs      # Cached API client
-│   │       ├── TenantContext.cs         # Tenant resolution
-│   │       ├── AlertingService.cs       # Alert dispatcher
-│   │       └── WebhookSignatureService.cs
+│   │       ├── RiskScoringService.cs      # Rule evaluation + ML scoring
+│   │       ├── RuleMarketplaceService.cs  # Template browsing, import, analytics
+│   │       ├── MLScoringService.cs        # ML prediction engine
+│   │       ├── MLTrainingService.cs       # Model training pipeline
+│   │       ├── TransactionService.cs      # Cached, tenant-scoped
+│   │       ├── ReviewService.cs           # HITL review workflow
+│   │       ├── TenantOnboardingService.cs # Guided tenant setup
+│   │       ├── DatabaseMigrationService.cs # Auto-migration for PostgreSQL/SQLite
+│   │       └── ...                        # 15+ service implementations
 │   │
-│   └── PayGuardAI.Web/           # Blazor UI and API controllers
-│       ├── Components/
-│       │   ├── Pages/
-│       │   │   ├── Home.razor         # Dashboard
-│       │   │   ├── Transactions.razor # Transaction list
-│       │   │   ├── Reviews.razor      # HITL review queue
-│       │   │   ├── Rules.razor        # Rules management
-│       │   │   ├── Reports.razor      # Analytics
-│       │   │   ├── Audit.razor        # Audit log
-│       │   │   └── Send.razor         # Send money
-│       │   └── Layout/
+│   └── PayGuardAI.Web/              # Blazor UI, API controllers, middleware
+│       ├── Components/Pages/
+│       │   ├── Home.razor             # Dashboard with live stats
+│       │   ├── Transactions.razor     # Transaction list with filters
+│       │   ├── Reviews.razor          # HITL review queue
+│       │   ├── Rules.razor            # Rule management
+│       │   ├── RuleMarketplace.razor  # Template browsing + analytics
+│       │   ├── MLModels.razor         # ML model management
+│       │   ├── Reports.razor          # Compliance analytics
+│       │   ├── Audit.razor            # Audit log viewer
+│       │   ├── Send.razor             # Transaction simulator
+│       │   └── ...                    # 20+ pages total
 │       ├── Controllers/
-│       │   └── WebhooksController.cs  # Webhook endpoint
+│       │   └── WebhooksController.cs  # Multi-provider webhooks
 │       ├── Services/
-│       │   ├── DemoAuthenticationHandler.cs  # Auth handler
-│       │   ├── TenantResolutionMiddleware.cs # Multi-tenancy
-│       │   ├── RequestLoggingMiddleware.cs   # Observability
-│       │   └── CurrentUserService.cs         # User identity
+│       │   ├── TenantResolutionMiddleware.cs
+│       │   ├── MLRetrainingBackgroundService.cs
+│       │   └── CurrentUserService.cs
 │       └── Hubs/
-│           └── TransactionHub.cs      # SignalR hub
+│           └── TransactionHub.cs      # SignalR real-time hub
+│
+└── tests/
+    └── PayGuardAI.Tests/             # 266 tests
+        ├── Services/                  # Unit tests (10 test classes)
+        └── Integration/              # API integration tests
 ```
 
 ## Getting Started
@@ -125,257 +167,183 @@ PayGuardAI/
 
 ### Installation
 
-#### Option 1: Local Development (Recommended for Development)
+#### Option 1: Local Development (Recommended)
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/Karinateii/PayGuard-AI.git
-   cd PayGuard-AI
-   ```
+```bash
+# Clone the repository
+git clone https://github.com/Karinateii/PayGuard-AI.git
+cd PayGuard-AI
 
-2. **Restore dependencies**
-   ```bash
-   dotnet restore
-   ```
+# Restore dependencies
+dotnet restore
 
-3. **Run the application**
-   ```bash
-   cd src/PayGuardAI.Web
-   dotnet run
-   ```
+# Run the application (uses SQLite by default)
+cd src/PayGuardAI.Web
+dotnet run
 
-4. **Open in browser**
-   ```
-   http://localhost:5054
-   ```
+# Open in browser
+open http://localhost:5054
+```
 
-#### Option 2: Docker (Recommended for Production)
+#### Option 2: Docker (Production)
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/Karinateii/PayGuard-AI.git
-   cd PayGuard-AI
-   ```
+```bash
+# Clone and start with Docker Compose
+git clone https://github.com/Karinateii/PayGuard-AI.git
+cd PayGuard-AI
+./start-docker.sh
+# Or: docker-compose up -d
 
-2. **Start with Docker Compose**
-   ```bash
-   ./start-docker.sh
-   # Or manually: docker-compose up -d
-   ```
+# Open in browser
+open http://localhost:5054
 
-3. **Open in browser**
-   ```
-   http://localhost:5054
-   ```
+# View logs / stop
+docker-compose logs -f payguard-web
+docker-compose down
+```
 
-4. **View logs**
-   ```bash
-   docker-compose logs -f payguard-web
-   ```
-
-5. **Stop containers**
-   ```bash
-   docker-compose down
-   ```
-
-The app comes with 25 demo transactions pre-seeded for testing.
+The app comes with 25 demo transactions and 24 rule templates pre-seeded for testing.
 
 ### Deployment
 
-For production deployment to Heroku or other cloud platforms, see [DOCKER-HEROKU-GUIDE.md](DOCKER-HEROKU-GUIDE.md).
+For production deployment to Railway, Heroku, or other cloud platforms, see [DEPLOYMENT.md](DEPLOYMENT.md) and [DOCKER-HEROKU-GUIDE.md](DOCKER-HEROKU-GUIDE.md).
 
 ## Authentication & Security
 
-PayGuard AI supports two authentication modes via feature flags:
+PayGuard AI supports three authentication modes:
 
 ### Development Mode (Default)
 Demo authentication is enabled by default for quick testing:
 - Access the dashboard immediately at `http://localhost:5054`
-- Demo user: `compliance_officer@payguard.ai` (Reviewer, Manager roles)
+- Demo user: `compliance_officer@payguard.ai` (SuperAdmin)
 - No login required
 
-### Production Mode (OAuth 2.0 + MFA)
+### Magic Link (Passwordless)
+Passwordless email authentication via magic links:
+- Users receive a one-time login link via email (Resend API)
+- No passwords to manage or forget
 
-Enable enterprise-grade authentication by setting `FeatureFlags:OAuthEnabled` to `true` in `appsettings.json`:
+### Production Mode (OAuth 2.0)
+Enable enterprise-grade authentication by setting `FeatureFlags:OAuthEnabled` to `true`:
 
 ```json
 {
-  "FeatureFlags": {
-    "OAuthEnabled": true
-  },
+  "FeatureFlags": { "OAuthEnabled": true },
   "OAuth": {
     "Provider": "AzureAD",
     "TenantId": "your-tenant-id",
     "ClientId": "your-client-id",
-    "ClientSecret": "your-client-secret",
-    "Authority": "https://login.microsoftonline.com/{tenant}/v2.0"
-  },
-  "Mfa": {
-    "EnforceMfaForAll": false,
-    "RequiredMfaRoles": ["Admin", "Manager"]
+    "ClientSecret": "your-client-secret"
   }
 }
 ```
 
-**Supported OAuth Providers:**
-- Azure Active Directory (Azure AD)
-- Google Workspace
-- Okta
-- Any OpenID Connect compliant provider
+**Supported Providers:** Azure AD, Google Workspace, Okta, any OIDC provider.
 
-**Multi-Factor Authentication (TOTP):**
-- RFC 6238 compliant TOTP implementation
-- Works with Google Authenticator, Microsoft Authenticator, Authy
-- Backup codes for account recovery
-- Role-based MFA enforcement
-- QR code setup flow at `/mfa/setup`
+### Role-Based Access Control
 
-**Quick Switch:**
-Toggle between Demo and OAuth mode instantly — no code changes, just restart the app after updating the feature flag.
-
-### Configure Afriex API (Optional)
-
-To use real Afriex API integration:
-
-```bash
-cd src/PayGuardAI.Web
-dotnet user-secrets set "Afriex:ApiKey" "your_api_key_here"
-```
+| Role | Access Level |
+|------|-------------|
+| **Reviewer** | View transactions, approve/reject flagged items |
+| **Manager** | + Rules, Billing, Audit, Rule Marketplace |
+| **Admin** | + Team, API Keys, Webhooks, Analytics, ML Models, Organization Settings |
+| **SuperAdmin** | + Tenant Management (platform owner) |
 
 ## Multi-Provider Integration
 
-PayGuard AI supports multiple payment providers through a unified abstraction layer. Add new providers without changing core business logic.
+PayGuard AI supports multiple payment providers through a unified abstraction layer:
 
-### Supported Providers
+| Provider | Endpoint | Status |
+|----------|----------|--------|
+| **Afriex** | `POST /api/webhooks/afriex` | ✅ Always enabled |
+| **Flutterwave** | `POST /api/webhooks/flutterwave` | ⚙️ Feature flag |
+| **Wise** | `POST /api/webhooks/wise` | ⚙️ Feature flag |
 
-**Afriex** (Primary)
-- Endpoint: `POST /api/webhooks/afriex`
-- Status: ✅ Always enabled
-- Configuration: `Afriex:ApiKey`, `Afriex:WebhookPublicKey`
+### Testing Webhooks
 
-**Flutterwave** (Feature Flag)
-- Endpoint: `POST /api/webhooks/flutterwave`
-- Status: ⚙️ Enable with `FeatureFlags:FlutterwaveEnabled = true`
-- Configuration: `Flutterwave:SecretKey`, `Flutterwave:WebhookSecretHash`
-
-**Adding New Providers:**
-1. Implement `IPaymentProvider` interface
-2. Add configuration to appsettings.json
-3. Register in `Program.cs`
-4. Add webhook endpoint in `WebhooksController`
-
-### Provider Configuration
-
-```json
-{
-  "FeatureFlags": {
-    "FlutterwaveEnabled": false
-  },
-  "Afriex": {
-    "BaseUrl": "https://staging.afx-server.com",
-    "ApiKey": "your-api-key",
-    "WebhookPublicKey": "your-webhook-public-key"
-  },
-  "Flutterwave": {
-    "BaseUrl": "https://api.flutterwave.com/v3",
-    "SecretKey": "your-secret-key",
-    "WebhookSecretHash": "your-webhook-hash"
-  }
-}
+```bash
+# Afriex
+curl -X POST http://localhost:5054/api/webhooks/afriex \
+  -H "Content-Type: application/json" \
+  -H "X-Afriex-Signature: test-signature" \
+  -d '{"event":"transaction.completed","data":{"id":"TEST-001","type":"send","status":"completed","amount":500,"currency":"USD","source_country":"US","destination_country":"NG","customer":{"id":"cust-001","email":"test@example.com","name":"Test User"},"created_at":"2026-02-26T10:00:00Z"}}'
 ```
 
-## Webhook Integration
+## Risk Scoring
 
-PayGuard AI receives transaction data via webhooks with automatic normalization across providers.
+### Rule-Based Scoring (6 configurable rules)
 
-### Webhook Endpoints
+| Rule Code | Description | Default Threshold |
+|-----------|-------------|-------------------|
+| `HIGH_AMOUNT` | Large transaction amount | $5,000 |
+| `VELOCITY_24H` | Too many transactions in 24h | 5 txns |
+| `NEW_CUSTOMER` | First-time or new customer | < 3 txns |
+| `HIGH_RISK_CORRIDOR` | OFAC-sanctioned countries | IR, KP, SY, YE, VE, CU |
+| `ROUND_AMOUNT` | Suspiciously round amounts | $1,000 |
+| `UNUSUAL_TIME` | Transactions at 2-5 AM UTC | Always flags |
 
-```
-POST /api/webhooks/afriex       # Afriex transactions
-POST /api/webhooks/flutterwave  # Flutterwave transactions
-POST /api/webhooks/transaction  # Legacy (defaults to Afriex)
-```
+### ML Risk Scoring
 
-### Supported Events
+The ML model augments rule-based scoring with learned patterns:
+- **Algorithm:** FastTree binary classification (ML.NET)
+- **Features:** 12 dimensions including amount, velocity, time, corridor risk, customer history
+- **Training:** Learns from HITL review decisions (Approved = legitimate, Rejected = fraud)
+- **Auto-retraining:** Background service checks hourly, retrains when 50+ new labeled samples exist
+- **Model management:** View metrics, compare versions, activate/deactivate from Admin panel
 
-**Afriex:**
-- `TRANSACTION.CREATED` - New transaction received
-- `TRANSACTION.UPDATED` - Transaction status changed
+### Risk Levels
 
-**Flutterwave:**
-- `charge.completed` - Payment successful
-- `transfer.completed` - Transfer completed
+| Level | Score Range | Action |
+|-------|-------------|--------|
+| Low | 0–25 | Auto-approved |
+| Medium | 26–50 | Flagged for review |
+| High | 51–75 | Requires manual review |
+| Critical | 76–100 | Requires manual review |
 
-### Example Payloads
+## Rule Marketplace
 
-**Afriex:**
-```json
-{
-  "event": "TRANSACTION.CREATED",
-  "data": {
-    "transactionId": "TXN-123",
-    "sourceAmount": "500",
-    "sourceCurrency": "USD",
-    "destinationAmount": "750000",
-    "destinationCurrency": "NGN",
-    "status": "PENDING",
-    "customerId": "cust-001"
-  }
-}
-```
+Pre-built rule templates optimized for different industries:
 
-**Flutterwave:**
-```json
-{
-  "event": "charge.completed",
-  "data": {
-    "id": 123456,
-    "tx_ref": "FLW-TXN-123",
-    "amount": 500,
-    "currency": "USD",
-    "status": "successful",
-    "customer": {
-      "email": "customer@example.com"
-    }
-  }
-}
-```
+| Industry | Templates | Example Threshold |
+|----------|-----------|-------------------|
+| **Remittance** | 6 rules | HIGH_AMOUNT: $10,000, VELOCITY: 3/day |
+| **E-Commerce** | 6 rules | HIGH_AMOUNT: $2,000, VELOCITY: 15/day |
+| **Lending** | 6 rules | HIGH_AMOUNT: $5,000, VELOCITY: 2/day |
+| **Crypto** | 6 rules | HIGH_AMOUNT: $50,000, VELOCITY: 10/day |
+
+**Features:**
+- Browse and filter by industry, category, or keyword
+- One-click import of individual templates or entire industry packs
+- Rule analytics with precision, hit rate, and false positive tracking
+- Import count (popularity) tracking across tenants
 
 ## Testing
 
-PayGuard AI includes comprehensive unit and integration tests to ensure reliability.
-
-### Running Tests
-
 ```bash
-# Run all tests
+# Run all 266 tests
 dotnet test
 
 # Run with detailed output
 dotnet test --logger "console;verbosity=detailed"
 
-# Run with code coverage
-dotnet test --collect:"XPlat Code Coverage"
+# Run specific test class
+dotnet test --filter "RuleMarketplaceServiceTests"
 ```
 
 ### Test Coverage
 
-- **Unit Tests**: 60+ tests covering payment providers, factory pattern, and business logic
-- **Integration Tests**: API endpoint testing with WebApplicationFactory
-- **CI/CD**: Automated testing on push via GitHub Actions
-
-### Test Structure
-
-```
-tests/
-├── Services/
-│   ├── AfriexProviderTests.cs          # Afriex provider unit tests
-│   ├── FlutterwaveProviderTests.cs     # Flutterwave provider unit tests
-│   └── PaymentProviderFactoryTests.cs  # Factory pattern tests
-└── Integration/
-    ├── PayGuardApiWebApplicationFactory.cs
-    └── WebhooksControllerIntegrationTests.cs
-```
+| Test Class | Tests | Coverage |
+|------------|-------|----------|
+| RuleMarketplaceServiceTests | 25 | Template browsing, import, analytics |
+| TenantOnboardingTests | 16 | Tenant setup, rule seeding |
+| RbacServiceTests | 24 | Roles, permissions, team management |
+| MLFeatureExtractorTests | 20 | Feature extraction for ML |
+| SecurityMiddlewareTests | 15 | Auth, rate limiting, CORS |
+| AfriexProviderTests | 30 | Afriex API integration |
+| FlutterwaveProviderTests | 28 | Flutterwave normalization |
+| WiseProviderTests | 20 | Wise transfer mapping |
+| PaymentProviderFactoryTests | 48 | Factory pattern, provider selection |
+| Integration Tests | 40 | End-to-end webhook processing |
 
 ### Continuous Integration
 
@@ -383,130 +351,89 @@ GitHub Actions workflow runs on every push:
 - ✅ Multi-platform testing (Ubuntu, Windows, macOS)
 - ✅ Code quality checks
 - ✅ Security vulnerability scanning
-- ✅ Test result reporting
 
-### Testing Webhooks
+## Database
 
-**Afriex:**
+### Local Development (SQLite)
 ```bash
-curl -X POST http://localhost:5054/api/webhooks/afriex \
-  -H "Content-Type: application/json" \
-  -d '{"event":"TRANSACTION.CREATED","data":{"transactionId":"TEST-001","sourceAmount":"100","sourceCurrency":"USD","destinationAmount":"150000","destinationCurrency":"NGN","status":"PENDING"}}'
+# Reset database
+rm src/PayGuardAI.Web/payguardai.db
+dotnet run  # Auto-recreates with seed data
 ```
 
-**Flutterwave:**
-```bash
-curl -X POST http://localhost:5054/api/webhooks/flutterwave \
-  -H "Content-Type: application/json" \
-  -H "verif-hash: your-webhook-hash" \
-  -d '{"event":"charge.completed","data":{"id":123,"amount":100,"currency":"USD","status":"successful"}}'
+### Production (PostgreSQL)
+PostgreSQL is enabled via feature flag. The `DatabaseMigrationService` automatically:
+- Creates all tables if they don't exist
+- Adds missing columns to existing tables
+- Seeds default data (rules, templates, demo transactions)
+- Fixes indexes for multi-tenancy
+
+```json
+{
+  "FeatureFlags": { "PostgresEnabled": true },
+  "ConnectionStrings": {
+    "PostgreSQL": "Host=...;Database=payguard;Username=...;Password=..."
+  }
+}
 ```
-
-## Risk Scoring
-
-Transactions are scored based on configurable rules:
-
-| Risk Level | Score Range | Action |
-|------------|-------------|--------|
-| Low | 0-25 | Auto-approved |
-| Medium | 26-50 | Flagged for review |
-| High | 51-75 | Requires manual review |
-| Critical | 76-100 | Requires manual review |
-
-### Default Risk Factors
-
-- Large transaction amounts (>$5,000)
-- New customer accounts
-- High-risk destination countries
-- Unusual transaction patterns
-- Velocity checks (frequency)
-
-## Screenshots
-
-### Dashboard
-Real-time overview with key metrics and recent high-risk transactions.
-
-### Review Queue
-Human-in-the-Loop interface for compliance officers to approve/reject flagged transactions.
-
-### Rules Management
-Configure and toggle risk detection rules without code changes.
 
 ## API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/webhooks/transaction` | Receive transaction webhooks |
-| GET | `/transactionHub` | SignalR connection for real-time updates |
+| POST | `/api/webhooks/afriex` | Receive Afriex transaction webhooks |
+| POST | `/api/webhooks/flutterwave` | Receive Flutterwave webhooks |
+| POST | `/api/webhooks/wise` | Receive Wise webhooks |
+| GET | `/health` | Application health check |
+| GET | `/transactionHub` | SignalR real-time connection |
 
-## Development
+## Multi-Tenancy
 
-### Build
+Each organization gets fully isolated data:
 
-```bash
-dotnet build
-```
+- **Middleware-based resolution:** `X-Tenant-Id` header or email→tenant lookup
+- **EF Core query filters:** All queries automatically scoped to current tenant
+- **Tenant onboarding:** Guided wizard seeds rules, settings, and team
+- **Default tenant:** `afriex-demo` for development
 
-### Security & Production Features
-
-#### Authentication & RBAC
-PayGuard AI uses a pluggable authentication scheme with role-based access control:
-
-| Role | Permissions |
-|------|-------------|
-| **Reviewer** | Approve/reject transactions, view dashboards |
-| **Manager** | All Reviewer permissions + escalation handling |
-| **Admin** | Full system access including rule management |
-
-Configure the default user in `appsettings.json`:
 ```json
 {
-  "Auth": {
-    "DefaultUser": "compliance_officer@payguard.ai",
-    "DefaultRoles": "Reviewer,Manager,Admin"
+  "MultiTenancy": {
+    "DefaultTenantId": "afriex-demo"
   }
 }
 ```
 
-#### Multi-Tenancy
-Tenant isolation is handled via middleware. Each request is scoped to a tenant:
-- Default tenant: `afriex-demo`
-- Override per request: `X-Tenant-Id` header
-- Cache keys, rate limits, and data are all tenant-scoped
+## Configuration
 
-#### Rate Limiting
-Fixed-window rate limiting protects API endpoints:
+Key settings in `appsettings.json`:
+
 ```json
 {
+  "FeatureFlags": {
+    "OAuthEnabled": false,
+    "PostgresEnabled": false,
+    "FlutterwaveEnabled": false,
+    "WiseEnabled": false
+  },
+  "Auth": {
+    "DefaultUser": "compliance_officer@payguard.ai",
+    "DefaultRoles": "Reviewer,Manager,Admin,SuperAdmin"
+  },
   "RateLimiting": {
     "PermitLimit": 60,
     "WindowSeconds": 60
+  },
+  "Afriex": {
+    "BaseUrl": "https://staging.afx-server.com",
+    "ApiKey": "your-api-key"
   }
 }
-```
-
-#### Health Checks
-Monitor application health at `GET /health` — returns `Healthy` / `Unhealthy` with component status.
-
-#### Caching Strategy
-| Resource | TTL | Invalidation |
-|----------|-----|--------------|
-| Dashboard stats | 10s | On review action |
-| Transaction list | 15s | On webhook received |
-| Exchange rates | 30s | Time-based expiry |
-
-### Database
-
-The app uses SQLite. The database is created automatically on first run. To reset:
-
-```bash
-rm src/PayGuardAI.Web/payguardai.db
-dotnet run
 ```
 
 ## Hackathon Track
 
-**Compliance and Risk Tooling** - Building tools that help fintech companies maintain regulatory compliance while processing cross-border payments efficiently.
+**Compliance and Risk Tooling** — Building tools that help fintech companies maintain regulatory compliance while processing cross-border payments efficiently.
 
 ## Contributing
 
@@ -514,13 +441,14 @@ This project was built for the Afriex Cross-Border Fintech Hackathon. Contributi
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+MIT License — see [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
 - [Afriex](https://afriex.com) for the hackathon opportunity and API documentation
-- [MudBlazor](https://mudblazor.com) for the excellent Blazor component library
-- The ASP.NET Core team for SignalR real-time capabilities
+- [MudBlazor](https://mudblazor.com) for the Blazor component library
+- [ML.NET](https://dotnet.microsoft.com/apps/machinelearning-ai/ml-dotnet) for the machine learning framework
+- The ASP.NET Core team for SignalR and the middleware pipeline
 
 ---
 
