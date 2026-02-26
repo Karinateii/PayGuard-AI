@@ -45,7 +45,7 @@
         </MudItem>
     </MudGrid>
     <!-- Action Buttons -->
-    <MudStack Row="true" Spacing="2" Class="mb-3">
+    <MudStack Row="true" Spacing="2" Class="mb-3" Style="flex-wrap: wrap;">
         <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
                    StartIcon="@Icons.Material.Filled.FilterAlt" OnClick="@LoadAuditLogs">
             Apply Filters
@@ -81,20 +81,20 @@
                 <MudTh>Notes</MudTh>
             </HeaderContent>
             <RowTemplate>
-                <MudTd>@context.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
-                <MudTd>
+                <MudTd DataLabel="Timestamp">@context.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
+                <MudTd DataLabel="Action">
                     <MudChip T="string" Size="Size.Small" Color="@GetActionColor(context.Action)">
                         @context.Action
                     </MudChip>
                 </MudTd>
-                <MudTd>@context.EntityType</MudTd>
-                <MudTd>
+                <MudTd DataLabel="Entity">@context.EntityType</MudTd>
+                <MudTd DataLabel="Entity ID">
                     <MudText Typo="Typo.body2" Style="font-family: monospace;">
                         @(context.EntityId.Length > 12 ? context.EntityId[..12] + "..." : context.EntityId)
                     </MudText>
                 </MudTd>
-                <MudTd>@context.PerformedBy</MudTd>
-                <MudTd>
+                <MudTd DataLabel="Performed By">@context.PerformedBy</MudTd>
+                <MudTd DataLabel="Notes">
                     @if (!string.IsNullOrEmpty(context.Notes))
                     {
                         <MudTooltip Text="@context.Notes">

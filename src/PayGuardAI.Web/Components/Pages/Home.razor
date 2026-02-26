@@ -158,21 +158,21 @@ else
                     <MudTh>Action</MudTh>
                 </HeaderContent>
                 <RowTemplate>
-                    <MudTd>@context.ExternalId[..8]...</MudTd>
-                    <MudTd>@context.Amount.ToString("N2") @context.SourceCurrency</MudTd>
-                    <MudTd>@context.SourceCountry → @context.DestinationCountry</MudTd>
-                    <MudTd>
+                    <MudTd DataLabel="ID">@(context.ExternalId.Length > 8 ? context.ExternalId[..8] + "..." : context.ExternalId)</MudTd>
+                    <MudTd DataLabel="Amount">@context.Amount.ToString("N2") @context.SourceCurrency</MudTd>
+                    <MudTd DataLabel="Corridor">@context.SourceCountry → @context.DestinationCountry</MudTd>
+                    <MudTd DataLabel="Risk Score">
                         <MudChip T="string" Size="Size.Small" Color="@GetRiskColor(context.RiskAnalysis?.RiskLevel)">
                             @(context.RiskAnalysis?.RiskScore ?? 0)
                         </MudChip>
                     </MudTd>
-                    <MudTd>
+                    <MudTd DataLabel="Status">
                         <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.RiskAnalysis?.ReviewStatus)">
                             @(context.RiskAnalysis?.ReviewStatus.ToString() ?? "N/A")
                         </MudChip>
                     </MudTd>
-                    <MudTd>@context.ReceivedAt.ToString("HH:mm:ss")</MudTd>
-                    <MudTd>
+                    <MudTd DataLabel="Time">@context.ReceivedAt.ToString("HH:mm:ss")</MudTd>
+                    <MudTd DataLabel="">
                         <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
                                        Size="Size.Small" Color="Color.Primary"
                                        Href="@($"/transactions/{context.Id}")" />

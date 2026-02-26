@@ -165,6 +165,10 @@ public class AuthController : ControllerBase
             HttpContext.Session.SetString("AuthenticatedEmail", email);
         }
 
+        // Record last login time
+        teamMember.LastLoginAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
         _logger.LogInformation("[AUTH] Magic link login successful for {Email} → tenant {Tenant}",
             email, teamMember.TenantId);
 

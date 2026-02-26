@@ -301,6 +301,9 @@
     private HubConnection? _hubConnection;
     private Dictionary<Guid, DotNetObjectReference<SwipeHandler>> _swipeRefs = new();
 
+    [CascadingParameter(Name = "OnReviewCompleted")]
+    private Func<Task>? OnReviewCompleted { get; set; }
+
     // Pagination - smaller page size since review cards are larger than table rows
     private int _currentPage = 1;
     private int _pageSize = 5;
@@ -480,6 +483,7 @@
             Snackbar.Add($"Transaction approved", Severity.Success);
             _reviews.Remove(_selectedReview);
             _reviewNotes = "";
+            if (OnReviewCompleted != null) await OnReviewCompleted();
         }
         catch (Exception ex)
         {
@@ -503,6 +507,7 @@
             Snackbar.Add($"Transaction rejected", Severity.Warning);
             _reviews.Remove(_selectedReview);
             _reviewNotes = "";
+            if (OnReviewCompleted != null) await OnReviewCompleted();
         }
         catch (Exception ex)
         {

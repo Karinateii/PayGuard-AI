@@ -305,6 +305,52 @@ h1:focus {
     opacity: 1;
 }
 
+/* ─── Mobile Table Responsive Layout ───────────────────────────── */
+@media (max-width: 599.98px) {
+    /* Clear visual separation between stacked table rows */
+    .mud-table-body .mud-table-row {
+        border-bottom: 2px solid var(--mud-palette-lines-default) !important;
+        padding-bottom: 8px !important;
+        margin-bottom: 4px;
+    }
+
+    /* Compact cell padding in responsive mode */
+    .mud-table-body .mud-table-cell {
+        padding: 4px 16px !important;
+        font-size: 0.85rem;
+        min-height: unset !important;
+    }
+
+    /* Data label styling for stacked tables */
+    .mud-table-cell[data-label]::before {
+        font-weight: 600 !important;
+        font-size: 0.75rem !important;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        opacity: 0.7;
+    }
+
+    /* Table pager - wrap on small screens to fix positioning */
+    .mud-table-pagination-toolbar {
+        flex-wrap: wrap !important;
+        justify-content: center !important;
+        gap: 4px;
+        padding: 8px 4px !important;
+    }
+
+    .mud-table-pagination-toolbar .mud-table-pagination-caption {
+        font-size: 0.75rem;
+    }
+
+    .mud-table-pagination-toolbar .mud-table-pagination-select {
+        margin: 0 8px !important;
+    }
+
+    .mud-table-pagination-toolbar .mud-table-pagination-actions {
+        margin-left: 0 !important;
+    }
+}
+
 /* ─── Dark Mode Adjustments for Mobile ─────────────────────────── */
 .mud-theme-dark .mobile-bottom-nav {
     border-top-color: rgba(255, 255, 255, 0.08);

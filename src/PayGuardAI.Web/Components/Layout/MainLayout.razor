@@ -98,7 +98,9 @@
 
             <MudMainContent Class="pt-16 px-4">
                 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-4">
-                    @Body
+                    <CascadingValue Value="@((Func<Task>)ReloadPendingReviewCount)" Name="OnReviewCompleted">
+                        @Body
+                    </CascadingValue>
                 </MudContainer>
             </MudMainContent>
 
@@ -253,6 +255,12 @@
         {
             _pendingReviewCount = 0;
         }
+    }
+
+    private async Task ReloadPendingReviewCount()
+    {
+        await LoadPendingReviewCount();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task SetupSignalRConnection()

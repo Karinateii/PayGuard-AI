@@ -92,6 +92,21 @@ public class DemoAuthenticationHandler : AuthenticationHandler<AuthenticationSch
                 await _db.SaveChangesAsync();
                 Logger.LogInformation("[AUTH] Auto-created SuperAdmin TeamMember for {User}", userName);
             }
+
+            // Record login time (once per session)
+            if (Context.Session.GetString("LoginRecorded") != "true")
+            {
+                var ownerMember = await _db.TeamMembers
+                    .IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(t => t.Email.ToLower() == userName.ToLower()
+                                        && t.TenantId == defaultTenantId);
+                if (ownerMember != null)
+                {
+                    ownerMember.LastLoginAt = DateTime.UtcNow;
+                    await _db.SaveChangesAsync();
+                }
+                Context.Session.SetString("LoginRecorded", "true");
+            }
         }
         else
         {
@@ -109,6 +124,14 @@ public class DemoAuthenticationHandler : AuthenticationHandler<AuthenticationSch
                 claims.Add(new Claim(ClaimTypes.Role, teamMember.Role));
                 Logger.LogInformation("[AUTH] Mapped {User} to tenant {Tenant} role {Role}",
                     userName, teamMember.TenantId, teamMember.Role);
+
+                // Record login time (once per session)
+                if (Context.Session.GetString("LoginRecorded") != "true")
+                {
+                    teamMember.LastLoginAt = DateTime.UtcNow;
+                    await _db.SaveChangesAsync();
+                    Context.Session.SetString("LoginRecorded", "true");
+                }
             }
             else
             {

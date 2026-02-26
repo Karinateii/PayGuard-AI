@@ -334,26 +334,26 @@ else
                     <MudTh>Received</MudTh>
                 </HeaderContent>
                 <RowTemplate>
-                    <MudTd>@(context.ExternalId.Length > 12 ? context.ExternalId[..12] + "..." : context.ExternalId)</MudTd>
-                    <MudTd>@context.Type</MudTd>
-                    <MudTd>@context.Amount.ToString("N2") @context.SourceCurrency</MudTd>
-                    <MudTd>@context.SourceCountry → @context.DestinationCountry</MudTd>
-                    <MudTd>
+                    <MudTd DataLabel="External ID">@(context.ExternalId.Length > 12 ? context.ExternalId[..12] + "..." : context.ExternalId)</MudTd>
+                    <MudTd DataLabel="Type">@context.Type</MudTd>
+                    <MudTd DataLabel="Amount">@context.Amount.ToString("N2") @context.SourceCurrency</MudTd>
+                    <MudTd DataLabel="Corridor">@context.SourceCountry → @context.DestinationCountry</MudTd>
+                    <MudTd DataLabel="Risk Score">
                         <MudChip T="string" Size="Size.Small" Color="@GetRiskColor(context.RiskAnalysis?.RiskLevel)" Style="@GetRiskStyle(context.RiskAnalysis?.RiskLevel)">
                             @(context.RiskAnalysis?.RiskScore ?? 0)
                         </MudChip>
                     </MudTd>
-                    <MudTd>
+                    <MudTd DataLabel="Risk Level">
                         <MudChip T="string" Size="Size.Small" Color="@GetRiskColor(context.RiskAnalysis?.RiskLevel)" Style="@GetRiskStyle(context.RiskAnalysis?.RiskLevel)">
                             @(context.RiskAnalysis?.RiskLevel.ToString() ?? "N/A")
                         </MudChip>
                     </MudTd>
-                    <MudTd>
+                    <MudTd DataLabel="Status">
                         <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.RiskAnalysis?.ReviewStatus)">
                             @(context.RiskAnalysis?.ReviewStatus.ToString() ?? "N/A")
                         </MudChip>
                     </MudTd>
-                    <MudTd>@context.ReceivedAt.ToString("MM/dd HH:mm")</MudTd>
+                    <MudTd DataLabel="Received">@context.ReceivedAt.ToString("MM/dd HH:mm")</MudTd>
                 </RowTemplate>
                 <PagerContent>
                     <MudTablePager PageSizeOptions="new int[]{10, 25, 50}" RowsPerPageString="Per page:" />
@@ -522,6 +522,10 @@ else
     private bool _showApproveDialog = false;
     private bool _showRejectDialog = false;
     private string _reviewNotes = "";
+
+    [CascadingParameter(Name = "OnReviewCompleted")]
+    private Func<Task>? OnReviewCompleted { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
         // Determine if current user is Manager/Admin/SuperAdmin — they shouldn't see Escalate
@@ -692,6 +696,7 @@ else
             _selectedTransaction = await TransactionService.GetByIdAsync(_selectedTransaction.Id);
             await LoadTransactions();
             _reviewNotes = "";
+            if (OnReviewCompleted != null) await OnReviewCompleted();
         }
         catch (Exception ex)
         {
@@ -715,6 +720,7 @@ else
             _selectedTransaction = await TransactionService.GetByIdAsync(_selectedTransaction.Id);
             await LoadTransactions();
             _reviewNotes = "";
+            if (OnReviewCompleted != null) await OnReviewCompleted();
         }
         catch (Exception ex)
         {
@@ -736,6 +742,7 @@ else
             Snackbar.Add("Transaction escalated for senior review", Severity.Info);
             _selectedTransaction = await TransactionService.GetByIdAsync(_selectedTransaction.Id);
             await LoadTransactions();
+            if (OnReviewCompleted != null) await OnReviewCompleted();
         }
         catch (Exception ex)
         {
