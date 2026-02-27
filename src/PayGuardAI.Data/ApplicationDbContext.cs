@@ -66,6 +66,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<GdprRequest> GdprRequests => Set<GdprRequest>();
     public DbSet<Watchlist> Watchlists => Set<Watchlist>();
     public DbSet<WatchlistEntry> WatchlistEntries => Set<WatchlistEntry>();
+    public DbSet<SystemLog> SystemLogs => Set<SystemLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

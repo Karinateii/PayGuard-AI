@@ -1211,5 +1211,70 @@ public class DatabaseMigrationService : IDatabaseMigrationService
         {
             _logger.LogDebug(ex, "Skipping Watchlist tables creation");
         }
+
+        // ── SystemLogs table ──────────────────────────────────────────
+        try
+        {
+            if (dbType == "PostgreSQL")
+            {
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS "SystemLogs" (
+                        "Id" uuid PRIMARY KEY,
+                        "Level" text NOT NULL DEFAULT '',
+                        "Message" text NOT NULL DEFAULT '',
+                        "Exception" text,
+                        "SourceContext" text,
+                        "CorrelationId" text,
+                        "TenantId" text,
+                        "UserId" text,
+                        "RequestPath" text,
+                        "MachineName" text,
+                        "Properties" text,
+                        "CreatedAt" timestamptz NOT NULL DEFAULT NOW()
+                    )
+                    """);
+            }
+            else
+            {
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS SystemLogs (
+                        Id TEXT PRIMARY KEY,
+                        Level TEXT NOT NULL DEFAULT '',
+                        Message TEXT NOT NULL DEFAULT '',
+                        Exception TEXT,
+                        SourceContext TEXT,
+                        CorrelationId TEXT,
+                        TenantId TEXT,
+                        UserId TEXT,
+                        RequestPath TEXT,
+                        MachineName TEXT,
+                        Properties TEXT,
+                        CreatedAt TEXT NOT NULL DEFAULT ''
+                    )
+                    """);
+            }
+
+            // Indexes for common searches
+            await _context.Database.ExecuteSqlRawAsync("""
+                CREATE INDEX IF NOT EXISTS IX_SystemLogs_CreatedAt
+                ON "SystemLogs" ("CreatedAt")
+                """);
+
+            await _context.Database.ExecuteSqlRawAsync("""
+                CREATE INDEX IF NOT EXISTS IX_SystemLogs_Level
+                ON "SystemLogs" ("Level")
+                """);
+
+            await _context.Database.ExecuteSqlRawAsync("""
+                CREATE INDEX IF NOT EXISTS IX_SystemLogs_CorrelationId
+                ON "SystemLogs" ("CorrelationId")
+                """);
+
+            _logger.LogDebug("SystemLogs table ensured");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipping SystemLogs table creation");
+        }
     }
 }

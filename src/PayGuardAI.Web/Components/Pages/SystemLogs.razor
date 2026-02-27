@@ -1,0 +1,368 @@
+@page "/admin/system-logs"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@attribute [Authorize(Policy = "RequireAdmin")]
+@inject PayGuardAI.Data.ApplicationDbContext DbContext
+
+<PageTitle>System Logs - PayGuard AI</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.Terminal" Class="mr-2" />
+    System Logs
+</MudText>
+
+<MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
+    Searchable structured log history. Warning-level and above logs are persisted for 30 days.
+    All logs include correlation IDs for full request tracing.
+</MudAlert>
+
+<MudPaper Class="pa-4 mb-4" Elevation="2">
+    <MudGrid Spacing="2" Class="mb-2">
+        <MudItem xs="12" sm="4" md="3">
+            <MudTextField T="string" @bind-Value="_search" Label="Search"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Variant="Variant.Outlined" Placeholder="message, exception, correlation ID..."
+                          Immediate="false" />
+        </MudItem>
+        <MudItem xs="6" sm="4" md="2">
+            <MudSelect T="string" @bind-Value="_levelFilter" Label="Level"
+                       Variant="Variant.Outlined">
+                <MudSelectItem T="string" Value="@((string)null!)">All Levels</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Warning")">⚠️ Warning</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Error")">🔴 Error</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Fatal")">💀 Fatal</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="6" sm="4" md="2">
+            <MudSelect T="string" @bind-Value="_timeRange" Label="Time Range"
+                       Variant="Variant.Outlined">
+                <MudSelectItem T="string" Value="@("1h")">Last Hour</MudSelectItem>
+                <MudSelectItem T="string" Value="@("6h")">Last 6 Hours</MudSelectItem>
+                <MudSelectItem T="string" Value="@("24h")">Last 24 Hours</MudSelectItem>
+                <MudSelectItem T="string" Value="@("7d")">Last 7 Days</MudSelectItem>
+                <MudSelectItem T="string" Value="@("30d")">Last 30 Days</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="6" sm="4" md="2">
+            <MudTextField T="string" @bind-Value="_tenantFilter" Label="Tenant ID"
+                          Variant="Variant.Outlined" Placeholder="Filter by tenant" />
+        </MudItem>
+        <MudItem xs="6" sm="4" md="3">
+            <MudTextField T="string" @bind-Value="_correlationFilter" Label="Correlation ID"
+                          Variant="Variant.Outlined" Placeholder="Trace a request" />
+        </MudItem>
+    </MudGrid>
+    <MudStack Row="true" Spacing="2">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Search" OnClick="LoadLogs">
+            Search
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Refresh" OnClick="ClearFilters">
+            Clear
+        </MudButton>
+        <MudSpacer />
+        <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Filled">
+            @_errorCount Errors
+        </MudChip>
+        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Filled">
+            @_warningCount Warnings
+        </MudChip>
+        <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">
+            @_totalCount Total
+        </MudChip>
+    </MudStack>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+@if (_logs.Count > 0)
+{
+    <MudTable Items="_logs" Dense="true" Hover="true" Striped="true" Bordered="true"
+              FixedHeader="true" Height="calc(100vh - 400px)" Class="mb-4"
+              RowClassFunc="@GetRowClass">
+        <HeaderContent>
+            <MudTh Style="width:150px;">Timestamp</MudTh>
+            <MudTh Style="width:80px;">Level</MudTh>
+            <MudTh>Message</MudTh>
+            <MudTh Style="width:120px;">Source</MudTh>
+            <MudTh Style="width:100px;">Correlation</MudTh>
+            <MudTh Style="width:100px;">Tenant</MudTh>
+            <MudTh Style="width:50px;">Details</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Timestamp">
+                <MudText Typo="Typo.caption">@context.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
+            </MudTd>
+            <MudTd DataLabel="Level">
+                @switch (context.Level)
+                {
+                    case "Fatal":
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Filled">💀 Fatal</MudChip>
+                        break;
+                    case "Error":
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Filled">Error</MudChip>
+                        break;
+                    case "Warning":
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Filled">Warn</MudChip>
+                        break;
+                }
+            </MudTd>
+            <MudTd DataLabel="Message">
+                <MudText Typo="Typo.body2" Style="max-width:500px;word-break:break-word;">
+                    @TruncateMessage(context.Message, 200)
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Source">
+                <MudText Typo="Typo.caption">@ShortenSource(context.SourceContext)</MudText>
+            </MudTd>
+            <MudTd DataLabel="Correlation">
+                @if (!string.IsNullOrWhiteSpace(context.CorrelationId))
+                {
+                    <MudTooltip Text="Click to filter by this correlation ID">
+                        <MudLink Typo="Typo.caption" Color="Color.Primary"
+                                 OnClick="@(() => FilterByCorrelation(context.CorrelationId))">
+                            @context.CorrelationId[..Math.Min(8, context.CorrelationId.Length)]…
+                        </MudLink>
+                    </MudTooltip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Tenant">
+                <MudText Typo="Typo.caption">@(context.TenantId ?? "—")</MudText>
+            </MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Info" Size="Size.Small"
+                               OnClick="@(() => ShowLogDetail(context))" />
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+else if (!_loading)
+{
+    <MudAlert Severity="Severity.Normal" Class="mt-4">
+        No log entries found for the selected filters.
+    </MudAlert>
+}
+
+@* ── Detail Dialog ─────────────────────────────────────────────── *@
+<MudDialog @bind-Visible="_showDetail" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.BugReport" />
+            <MudText Typo="Typo.h6">Log Detail</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        @if (_selectedLog != null)
+        {
+            <MudStack Spacing="2">
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Timestamp</MudText>
+                        <MudText>@_selectedLog.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss.fff UTC")</MudText>
+                    </MudItem>
+                    <MudItem xs="3">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Level</MudText>
+                        <MudText>@_selectedLog.Level</MudText>
+                    </MudItem>
+                    <MudItem xs="3">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Machine</MudText>
+                        <MudText>@(_selectedLog.MachineName ?? "—")</MudText>
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider />
+
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Message</MudText>
+                <MudPaper Class="pa-3" Elevation="0" Style="background:#f5f5f5;word-break:break-word;">
+                    <MudText Typo="Typo.body2">@_selectedLog.Message</MudText>
+                </MudPaper>
+
+                @if (!string.IsNullOrWhiteSpace(_selectedLog.Exception))
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Error">Exception</MudText>
+                    <MudPaper Class="pa-3" Elevation="0" Style="background:#fff3f3;overflow-x:auto;">
+                        <pre style="font-size:12px;margin:0;white-space:pre-wrap;">@_selectedLog.Exception</pre>
+                    </MudPaper>
+                }
+
+                <MudGrid>
+                    <MudItem xs="4">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Source</MudText>
+                        <MudText Typo="Typo.body2">@(_selectedLog.SourceContext ?? "—")</MudText>
+                    </MudItem>
+                    <MudItem xs="4">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Correlation ID</MudText>
+                        <MudText Typo="Typo.body2">@(_selectedLog.CorrelationId ?? "—")</MudText>
+                    </MudItem>
+                    <MudItem xs="4">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">User</MudText>
+                        <MudText Typo="Typo.body2">@(_selectedLog.UserId ?? "—")</MudText>
+                    </MudItem>
+                </MudGrid>
+
+                @if (!string.IsNullOrWhiteSpace(_selectedLog.Properties))
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Structured Properties</MudText>
+                    <MudPaper Class="pa-3" Elevation="0" Style="background:#f5f5f5;overflow-x:auto;">
+                        <pre style="font-size:12px;margin:0;white-space:pre-wrap;">@FormatJson(_selectedLog.Properties)</pre>
+                    </MudPaper>
+                }
+            </MudStack>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showDetail = false)">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<SystemLog> _logs = new();
+    private bool _loading;
+    private string? _search;
+    private string? _levelFilter;
+    private string _timeRange = "24h";
+    private string? _tenantFilter;
+    private string? _correlationFilter;
+
+    private int _errorCount;
+    private int _warningCount;
+    private int _totalCount;
+
+    private bool _showDetail;
+    private SystemLog? _selectedLog;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLogs();
+    }
+
+    private async Task LoadLogs()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            var cutoff = _timeRange switch
+            {
+                "1h"  => DateTime.UtcNow.AddHours(-1),
+                "6h"  => DateTime.UtcNow.AddHours(-6),
+                "24h" => DateTime.UtcNow.AddDays(-1),
+                "7d"  => DateTime.UtcNow.AddDays(-7),
+                "30d" => DateTime.UtcNow.AddDays(-30),
+                _     => DateTime.UtcNow.AddDays(-1)
+            };
+
+            var query = DbContext.SystemLogs
+                .IgnoreQueryFilters()
+                .Where(l => l.CreatedAt >= cutoff);
+
+            if (!string.IsNullOrWhiteSpace(_levelFilter))
+                query = query.Where(l => l.Level == _levelFilter);
+
+            if (!string.IsNullOrWhiteSpace(_search))
+                query = query.Where(l =>
+                    l.Message.Contains(_search) ||
+                    (l.Exception != null && l.Exception.Contains(_search)) ||
+                    (l.CorrelationId != null && l.CorrelationId.Contains(_search)) ||
+                    (l.SourceContext != null && l.SourceContext.Contains(_search)));
+
+            if (!string.IsNullOrWhiteSpace(_tenantFilter))
+                query = query.Where(l => l.TenantId == _tenantFilter);
+
+            if (!string.IsNullOrWhiteSpace(_correlationFilter))
+                query = query.Where(l => l.CorrelationId == _correlationFilter);
+
+            // Get counts for the chips
+            var allInRange = DbContext.SystemLogs
+                .IgnoreQueryFilters()
+                .Where(l => l.CreatedAt >= cutoff);
+
+            _errorCount = await allInRange.CountAsync(l => l.Level == "Error" || l.Level == "Fatal");
+            _warningCount = await allInRange.CountAsync(l => l.Level == "Warning");
+            _totalCount = await allInRange.CountAsync();
+
+            _logs = await query
+                .OrderByDescending(l => l.CreatedAt)
+                .Take(500)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            _logs = new List<SystemLog>();
+            Console.Error.WriteLine($"Error loading system logs: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ClearFilters()
+    {
+        _search = null;
+        _levelFilter = null;
+        _timeRange = "24h";
+        _tenantFilter = null;
+        _correlationFilter = null;
+        await LoadLogs();
+    }
+
+    private async Task FilterByCorrelation(string correlationId)
+    {
+        _correlationFilter = correlationId;
+        _timeRange = "7d"; // Expand range when tracing a request
+        await LoadLogs();
+    }
+
+    private void ShowLogDetail(SystemLog log)
+    {
+        _selectedLog = log;
+        _showDetail = true;
+    }
+
+    private static string GetRowClass(SystemLog log, int _)
+    {
+        return log.Level switch
+        {
+            "Fatal" => "mud-error-text",
+            "Error" => "mud-error-text",
+            _ => ""
+        };
+    }
+
+    private static string TruncateMessage(string message, int maxLength)
+    {
+        if (string.IsNullOrEmpty(message)) return "—";
+        return message.Length <= maxLength ? message : message[..maxLength] + "…";
+    }
+
+    private static string ShortenSource(string? source)
+    {
+        if (string.IsNullOrWhiteSpace(source)) return "—";
+        // Show only the class name, not the full namespace
+        var lastDot = source.LastIndexOf('.');
+        return lastDot >= 0 ? source[(lastDot + 1)..] : source;
+    }
+
+    private static string FormatJson(string json)
+    {
+        try
+        {
+            var doc = System.Text.Json.JsonDocument.Parse(json);
+            return System.Text.Json.JsonSerializer.Serialize(doc, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+        }
+        catch
+        {
+            return json;
+        }
+    }
+}

@@ -44,7 +44,8 @@ builder.Host.UseSerilog((context, services, config) => config
     .Enrich.WithEnvironmentName()
     .Enrich.WithThreadId()
     .Enrich.WithProperty("Application", "PayGuardAI")
-    .WriteTo.Console(new CompactJsonFormatter()));
+    .WriteTo.Console(new CompactJsonFormatter())
+    .WriteTo.DatabaseSink(services.GetRequiredService<IServiceScopeFactory>()));
 
 // Add MudBlazor services
 builder.Services.AddMudServices();
@@ -257,6 +258,9 @@ builder.Services.AddHostedService<MLRetrainingBackgroundService>();
 
 // Register scheduled report delivery — runs scheduled CustomReports and emails CSV results
 builder.Services.AddHostedService<ScheduledReportBackgroundService>();
+
+// Register log retention service — purges old logs, sends daily summary emails
+builder.Services.AddHostedService<LogRetentionBackgroundService>();
 
 // Register Rule Marketplace service — browse, import, and analyze rule templates
 builder.Services.AddScoped<IRuleMarketplaceService, RuleMarketplaceService>();
