@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Asp.Versioning;
 using PayGuardAI.Core.Services;
 using PayGuardAI.Data;
 
@@ -14,7 +15,9 @@ namespace PayGuardAI.Web.Controllers;
 /// Authentication controller for demo mode, OAuth, and magic link login/logout
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
+[Route("api/[controller]")] // Backward-compatible unversioned route
 public class AuthController : ControllerBase
 {
     private readonly ILogger<AuthController> _logger;

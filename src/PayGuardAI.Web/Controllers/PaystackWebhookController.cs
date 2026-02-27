@@ -1,19 +1,22 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 using PayGuardAI.Data.Services;
 
 namespace PayGuardAI.Web.Controllers;
 
 /// <summary>
 /// Receives Paystack webhook events.
-/// Endpoint: POST /api/webhooks/paystack
+/// Endpoint: POST /api/v1/webhooks/paystack
 /// Must be excluded from CSRF + auth — Paystack posts directly to this endpoint.
 ///
 /// Paystack verifies via HMAC SHA512 signature in the x-paystack-signature header.
 /// Only accepts webhooks from Paystack IPs: 52.31.139.75, 52.49.173.169, 52.214.14.220
 /// </summary>
 [ApiController]
-[Route("api/webhooks")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/webhooks")]
+[Route("api/webhooks")] // Backward-compatible unversioned route
 [AllowAnonymous]
 public class PaystackWebhookController : ControllerBase
 {

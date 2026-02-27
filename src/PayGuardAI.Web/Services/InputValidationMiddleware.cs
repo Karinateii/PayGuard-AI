@@ -35,7 +35,11 @@ public class InputValidationMiddleware
         }
 
         // Skip auth endpoints (demo-login uses form POST, not JSON)
-        if (context.Request.Path.StartsWithSegments("/api/Auth"))
+        // Supports both /api/Auth and /api/v{n}/Auth versioned routes
+        if (context.Request.Path.StartsWithSegments("/api/Auth")
+            || (context.Request.Path.HasValue
+                && context.Request.Path.Value!.StartsWith("/api/v", StringComparison.OrdinalIgnoreCase)
+                && context.Request.Path.Value.Contains("/Auth", StringComparison.OrdinalIgnoreCase)))
         {
             await _next(context);
             return;

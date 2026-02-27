@@ -1,14 +1,15 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 using PayGuardAI.Data.Services;
 
 namespace PayGuardAI.Web.Controllers;
 
 /// <summary>
 /// Receives Flutterwave billing webhook events (subscription charges, cancellations, failures).
-/// Endpoint: POST /api/webhooks/flutterwave-billing
+/// Endpoint: POST /api/v1/webhooks/flutterwave-billing
 ///
-/// IMPORTANT: This is separate from the transaction webhook at /api/webhooks/flutterwave
+/// IMPORTANT: This is separate from the transaction webhook at /api/v1/webhooks/flutterwave
 /// which handles payment provider transaction events (Afriex/Flutterwave/Wise).
 /// This controller handles BILLING events (subscription lifecycle).
 ///
@@ -16,7 +17,9 @@ namespace PayGuardAI.Web.Controllers;
 /// Docs: https://developer.flutterwave.com/docs/integration-guides/webhooks
 /// </summary>
 [ApiController]
-[Route("api/webhooks")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/webhooks")]
+[Route("api/webhooks")] // Backward-compatible unversioned route
 [AllowAnonymous]
 public class FlutterwaveBillingWebhookController : ControllerBase
 {

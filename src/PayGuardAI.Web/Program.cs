@@ -19,6 +19,8 @@ using Serilog.Events;
 using Serilog.Formatting.Compact;
 using System.Threading.RateLimiting;
 using Microsoft.OpenApi.Models;
+using Asp.Versioning;
+using Asp.Versioning.ApiExplorer;
 
 // Bootstrap logger captures fatal startup errors before DI is ready
 Log.Logger = new LoggerConfiguration()
@@ -262,6 +264,18 @@ builder.Services.AddScoped<IFraudSavingsService, FraudSavingsService>();
 // Add controllers for API endpoints (webhooks)
 builder.Services.AddControllers();
 
+// Add API versioning — URL segment strategy: /api/v1/webhooks, /api/v2/webhooks
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true;
+}).AddApiExplorer(options =>
+{
+    options.GroupNameFormat = "'v'VVV";
+    options.SubstituteApiVersionInUrl = true;
+});
+
 // Add Swagger/OpenAPI documentation
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -269,7 +283,7 @@ builder.Services.AddSwaggerGen(options =>
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "PayGuard AI API",
-        Version = "v1",
+        Version = "1.0",
         Description = "AI-powered transaction risk monitoring, compliance automation, and fraud detection for cross-border payments.\n\n" +
                     "## Authentication\n" +
                     "Most webhook endpoints are unauthenticated (they verify via HMAC signatures instead). " +

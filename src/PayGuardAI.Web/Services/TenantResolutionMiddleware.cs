@@ -53,8 +53,8 @@ public class TenantResolutionMiddleware
         //    API endpoints MUST supply tenant via auth claim or X-Tenant-Id header
         //    Exception: webhook endpoints and auth endpoints don't require tenant context
         else if (context.Request.Path.StartsWithSegments("/api")
-                 && !context.Request.Path.StartsWithSegments("/api/webhooks")
-                 && !context.Request.Path.StartsWithSegments("/api/Auth"))
+                 && !IsWebhookPath(context.Request.Path)
+                 && !IsAuthPath(context.Request.Path))
         {
             // SECURITY: reject API calls with no identifiable tenant
             context.Response.StatusCode = 400;
@@ -83,4 +83,20 @@ public class TenantResolutionMiddleware
 
         await _next(context);
     }
+
+    /// <summary>
+    /// Matches webhook paths: /api/webhooks/... and /api/v{n}/webhooks/...
+    /// </summary>
+    private static bool IsWebhookPath(PathString path) =>
+        path.StartsWithSegments("/api/webhooks")
+        || (path.HasValue && path.Value!.StartsWith("/api/v", StringComparison.OrdinalIgnoreCase)
+            && path.Value.Contains("/webhooks", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Matches auth paths: /api/Auth/... and /api/v{n}/Auth/...
+    /// </summary>
+    private static bool IsAuthPath(PathString path) =>
+        path.StartsWithSegments("/api/Auth")
+        || (path.HasValue && path.Value!.StartsWith("/api/v", StringComparison.OrdinalIgnoreCase)
+            && path.Value.Contains("/Auth", StringComparison.OrdinalIgnoreCase));
 }

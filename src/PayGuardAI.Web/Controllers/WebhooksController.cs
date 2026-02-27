@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
+using Asp.Versioning;
 using PayGuardAI.Core.Services;
 using PayGuardAI.Data.Services;
 using PayGuardAI.Web.Hubs;
@@ -14,7 +15,9 @@ namespace PayGuardAI.Web.Controllers;
 /// Per-API-key rate limiting applied for programmatic access control.
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
+[Route("api/[controller]")] // Backward-compatible unversioned route
 [EnableRateLimiting("PerApiKey")]
 public class WebhooksController : ControllerBase
 {
