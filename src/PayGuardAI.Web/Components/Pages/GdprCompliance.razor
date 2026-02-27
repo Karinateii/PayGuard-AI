@@ -374,7 +374,8 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Search failed: {ex.Message}", Severity.Error);
+            Console.Error.WriteLine($"Search failed: {ex}");
+            Snackbar.Add("Search failed. Please try again.", Severity.Error);
         }
         finally
         {
@@ -418,7 +419,8 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+            Console.Error.WriteLine($"Export failed: {ex}");
+            Snackbar.Add("Export failed. Please try again.", Severity.Error);
         }
         finally
         {
@@ -450,7 +452,8 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"CSV export failed: {ex.Message}", Severity.Error);
+            Console.Error.WriteLine($"CSV export failed: {ex}");
+            Snackbar.Add("CSV export failed. Please try again.", Severity.Error);
         }
         finally
         {
@@ -501,7 +504,8 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Erasure failed: {ex.Message}", Severity.Error);
+            Console.Error.WriteLine($"Erasure failed: {ex}");
+            Snackbar.Add("Erasure failed. Please try again.", Severity.Error);
         }
         finally
         {
@@ -520,7 +524,8 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to load history: {ex.Message}", Severity.Error);
+            Console.Error.WriteLine($"Failed to load history: {ex}");
+            Snackbar.Add("Failed to load history. Please try again.", Severity.Error);
         }
         finally
         {
@@ -532,24 +537,7 @@
     private async Task DownloadFile(byte[] bytes, string fileName, string contentType)
     {
         var base64 = Convert.ToBase64String(bytes);
-        await JS.InvokeVoidAsync("eval", $@"
-            (function() {{
-                var byteCharacters = atob('{base64}');
-                var byteNumbers = new Array(byteCharacters.length);
-                for (var i = 0; i < byteCharacters.length; i++) {{
-                    byteNumbers[i] = byteCharacters.charCodeAt(i);
-                }}
-                var byteArray = new Uint8Array(byteNumbers);
-                var blob = new Blob([byteArray], {{ type: '{contentType}' }});
-                var link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = '{fileName}';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(link.href);
-            }})();
-        ");
+        await JS.InvokeVoidAsync("PayGuard.downloadFileFromBase64", base64, fileName, contentType);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────

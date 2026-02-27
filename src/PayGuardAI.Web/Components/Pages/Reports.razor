@@ -525,9 +525,8 @@
             var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
             var base64 = Convert.ToBase64String(bytes);
             var fileName = $"payguard-compliance-report-{from:yyyyMMdd}-{to.AddDays(-1):yyyyMMdd}.csv";
-            var script = "(function() { var link = document.createElement('a'); link.download = '"
-                + fileName + "'; link.href = 'data:text/csv;base64," + base64 + "'; link.click(); })()";
-            await JS.InvokeVoidAsync("eval", script);
+            var dataUri = $"data:text/csv;base64,{base64}";
+            await JS.InvokeVoidAsync("PayGuard.downloadFileFromDataUri", dataUri, fileName);
 
             Snackbar.Add($"Exported {analyses.Count} records to CSV", Severity.Success);
         }
@@ -664,9 +663,8 @@
     {
         var bytes = System.Text.Encoding.UTF8.GetBytes(csvContent);
         var base64 = Convert.ToBase64String(bytes);
-        var script = "(function() { var link = document.createElement('a'); link.download = '"
-            + fileName + "'; link.href = 'data:text/csv;base64," + base64 + "'; link.click(); })()";
-        await JS.InvokeVoidAsync("eval", script);
+        var dataUri = $"data:text/csv;base64,{base64}";
+        await JS.InvokeVoidAsync("PayGuard.downloadFileFromDataUri", dataUri, fileName);
     }
 
     private string CsvEscape(string value)

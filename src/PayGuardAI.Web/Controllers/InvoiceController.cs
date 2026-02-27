@@ -10,7 +10,7 @@ namespace PayGuardAI.Web.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/invoices")]
-[Authorize]
+[Authorize(Policy = "RequireManager")]
 public class InvoiceController : ControllerBase
 {
     private readonly InvoiceService _invoiceService;

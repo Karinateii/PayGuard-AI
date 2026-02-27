@@ -487,7 +487,8 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            Console.Error.WriteLine($"Error approving review: {ex}");
+            Snackbar.Add("An error occurred while approving. Please try again.", Severity.Error);
         }
         finally
         {
@@ -511,7 +512,8 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            Console.Error.WriteLine($"Error rejecting review: {ex}");
+            Snackbar.Add("An error occurred while rejecting. Please try again.", Severity.Error);
         }
         finally
         {

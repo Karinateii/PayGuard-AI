@@ -195,7 +195,11 @@ else
                 Snackbar.Add($"Role '{formData.Name}' created!", Severity.Success);
                 await LoadData();
             }
-            catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Failed to create role: {ex}");
+                Snackbar.Add("Failed to create role. Please try again.", Severity.Error);
+            }
         }
     }
 
@@ -224,7 +228,11 @@ else
                 Snackbar.Add($"Role '{formData.Name}' updated!", Severity.Success);
                 await LoadData();
             }
-            catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Failed to update role: {ex}");
+                Snackbar.Add("Failed to update role. Please try again.", Severity.Error);
+            }
         }
     }
 
@@ -245,7 +253,11 @@ else
                 Snackbar.Add($"Role '{role.Name}' deleted", Severity.Info);
                 await LoadData();
             }
-            catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Failed to delete role: {ex}");
+                Snackbar.Add("Failed to delete role. Please try again.", Severity.Error);
+            }
         }
     }
 

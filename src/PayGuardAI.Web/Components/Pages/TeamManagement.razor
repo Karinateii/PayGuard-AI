@@ -153,7 +153,8 @@ else
             }
             catch (Exception ex)
             {
-                Snackbar.Add(ex.Message, Severity.Error);
+                Console.Error.WriteLine($"Failed to add team member: {ex}");
+                Snackbar.Add("Failed to add team member. Please try again.", Severity.Error);
             }
         }
     }
@@ -166,7 +167,11 @@ else
             member.Role = newRole;
             Snackbar.Add($"Updated {member.DisplayName}'s role to {newRole}", Severity.Success);
         }
-        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to change role: {ex}");
+            Snackbar.Add("Failed to update role. Please try again.", Severity.Error);
+        }
     }
 
     private async Task RemoveMember(TeamMember member)
@@ -190,7 +195,11 @@ else
                 Snackbar.Add($"Removed {member.DisplayName}", Severity.Info);
                 await LoadMembers();
             }
-            catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Failed to remove team member: {ex}");
+                Snackbar.Add("Failed to remove team member. Please try again.", Severity.Error);
+            }
         }
     }
 

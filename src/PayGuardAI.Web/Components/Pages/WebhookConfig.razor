@@ -140,7 +140,11 @@ else
                 Snackbar.Add("Webhook endpoint added!", Severity.Success);
                 await LoadEndpoints();
             }
-            catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Failed to add webhook endpoint: {ex}");
+                Snackbar.Add("Failed to add webhook endpoint. Please try again.", Severity.Error);
+            }
         }
     }
 

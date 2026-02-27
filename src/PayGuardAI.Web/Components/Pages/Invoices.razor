@@ -270,7 +270,8 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to load invoices: {ex.Message}", Severity.Error);
+            Console.Error.WriteLine($"Failed to load invoices: {ex}");
+            Snackbar.Add("Failed to load invoices. Please try again.", Severity.Error);
         }
         finally
         {
@@ -298,7 +299,8 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to generate invoice: {ex.Message}", Severity.Error);
+            Console.Error.WriteLine($"Failed to generate invoice: {ex}");
+            Snackbar.Add("Failed to generate invoice. Please try again.", Severity.Error);
         }
         finally
         {
@@ -312,13 +314,13 @@ else
         {
             // Download via the API controller endpoint
             var url = $"/api/invoices/{invoice.Id}/pdf";
-            var script = $"(function() {{ var a = document.createElement('a'); a.href = '{url}'; a.download = '{invoice.InvoiceNumber}.pdf'; document.body.appendChild(a); a.click(); document.body.removeChild(a); }})()";
-            await JS.InvokeVoidAsync("eval", script);
+            await JS.InvokeVoidAsync("PayGuard.downloadFromUrl", url, $"{invoice.InvoiceNumber}.pdf");
             Snackbar.Add("Downloading PDF...", Severity.Info);
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Download failed: {ex.Message}", Severity.Error);
+            Console.Error.WriteLine($"Download failed: {ex}");
+            Snackbar.Add("Download failed. Please try again.", Severity.Error);
         }
     }
 

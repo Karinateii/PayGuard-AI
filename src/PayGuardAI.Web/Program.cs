@@ -419,17 +419,20 @@ if (!app.Environment.IsDevelopment())
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 
-// Swagger UI — available in all environments for API documentation
-app.UseSwagger();
-app.UseSwaggerUI(options =>
+// Swagger UI — only in development (do not expose in production)
+if (app.Environment.IsDevelopment())
 {
-    options.SwaggerEndpoint("/swagger/v1/swagger.json", "PayGuard AI API v1");
-    options.RoutePrefix = "swagger";
-    options.DocumentTitle = "PayGuard AI - API Documentation";
-    options.DefaultModelsExpandDepth(1);
-    options.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.List);
-    options.EnableTryItOutByDefault();
-});
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "PayGuard AI API v1");
+        options.RoutePrefix = "swagger";
+        options.DocumentTitle = "PayGuard AI - API Documentation";
+        options.DefaultModelsExpandDepth(1);
+        options.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.List);
+        options.EnableTryItOutByDefault();
+    });
+}
 
 // Only redirect to HTTPS in development (Railway handles HTTPS termination at edge)
 if (app.Environment.IsDevelopment())

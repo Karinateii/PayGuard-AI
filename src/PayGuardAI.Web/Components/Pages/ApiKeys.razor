@@ -139,7 +139,8 @@ else
             }
             catch (Exception ex)
             {
-                Snackbar.Add(ex.Message, Severity.Error);
+                Console.Error.WriteLine($"Failed to generate API key: {ex}");
+                Snackbar.Add("Failed to generate API key. Please try again.", Severity.Error);
             }
         }
     }
@@ -158,7 +159,11 @@ else
                 Snackbar.Add("API key revoked.", Severity.Info);
                 await LoadKeys();
             }
-            catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Failed to revoke API key: {ex}");
+                Snackbar.Add("Failed to revoke API key. Please try again.", Severity.Error);
+            }
         }
     }
 

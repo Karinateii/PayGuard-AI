@@ -643,7 +643,8 @@ else
             }
             catch (Exception ex)
             {
-                Snackbar.Add($"Error loading transaction: {ex.Message}", Severity.Error);
+                Console.Error.WriteLine($"Error loading transaction: {ex}");
+                Snackbar.Add("Error loading transaction. Please try again.", Severity.Error);
                 NavigationManager.NavigateTo("/transactions");
             }
         }
@@ -804,7 +805,8 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            Console.Error.WriteLine($"Error approving transaction: {ex}");
+            Snackbar.Add("An error occurred while approving. Please try again.", Severity.Error);
         }
         finally
         {
@@ -828,7 +830,8 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            Console.Error.WriteLine($"Error rejecting transaction: {ex}");
+            Snackbar.Add("An error occurred while rejecting. Please try again.", Severity.Error);
         }
         finally
         {
@@ -850,7 +853,8 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            Console.Error.WriteLine($"Error escalating transaction: {ex}");
+            Snackbar.Add("An error occurred while escalating. Please try again.", Severity.Error);
         }
         finally
         {

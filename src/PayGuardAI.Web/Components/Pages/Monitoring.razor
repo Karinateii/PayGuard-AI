@@ -346,7 +346,8 @@ else if (_snapshot != null)
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to load monitoring data: {ex.Message}", Severity.Error);
+            Console.Error.WriteLine($"Failed to load monitoring data: {ex}");
+            Snackbar.Add("Failed to load monitoring data. Please try again.", Severity.Error);
         }
         finally
         {

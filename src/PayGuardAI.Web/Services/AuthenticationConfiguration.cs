@@ -66,8 +66,9 @@ public static class AuthenticationConfiguration
         {
             options.Cookie.Name = "PayGuardAuth";
             options.Cookie.HttpOnly = true;
-            // SameAsRequest works behind Railway's reverse proxy (which forwards HTTP internally)
-            options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+            // Always require Secure — Railway terminates TLS at edge and
+            // forwards X-Forwarded-Proto which UseForwardedHeaders honours.
+            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
             options.Cookie.SameSite = SameSiteMode.Lax;
             options.ExpireTimeSpan = TimeSpan.FromMinutes(settings.CookieExpirationMinutes);
             options.SlidingExpiration = settings.UseSlidingExpiration;

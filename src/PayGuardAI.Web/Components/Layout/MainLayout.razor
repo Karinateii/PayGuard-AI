@@ -174,7 +174,7 @@
             // Auto-close drawer on mobile (viewport < 960px)
             try
             {
-                var isMobile = await JS.InvokeAsync<bool>("eval", "window.innerWidth < 960");
+                var isMobile = await JS.InvokeAsync<bool>("PayGuard.isMobile", 960);
                 if (isMobile && _drawerOpen)
                 {
                     _drawerOpen = false;
@@ -192,7 +192,7 @@
         {
             try
             {
-                var isMobile = await JS.InvokeAsync<bool>("eval", "window.innerWidth < 960");
+                var isMobile = await JS.InvokeAsync<bool>("PayGuard.isMobile", 960);
                 if (isMobile && _drawerOpen)
                 {
                     _drawerOpen = false;
