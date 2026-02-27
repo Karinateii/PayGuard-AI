@@ -75,7 +75,7 @@ public class InvoicePdfService
                     left.Item().Text("From:").Bold().FontSize(9).FontColor(Colors.Grey.Darken1);
                     left.Item().Text("PayGuard AI Inc.");
                     left.Item().Text("Fraud Detection & Compliance");
-                    left.Item().Text("support@payguardai.com")
+                    left.Item().Text("support@payguardai.xyz")
                         .FontColor(Colors.Blue.Darken2);
                 });
 
