@@ -623,6 +623,9 @@ else
     {
         if (TransactionId.HasValue)
         {
+            // Close the quick-view drawer — we're showing the full detail page now
+            _drawerOpen = false;
+
             try
             {
                 // Use a separate DbContext via factory to avoid concurrency with
@@ -753,6 +756,7 @@ else
     {
         if (_selectedTransaction != null)
         {
+            _drawerOpen = false;
             NavigationManager.NavigateTo($"/transactions/{_selectedTransaction.Id}");
         }
     }
