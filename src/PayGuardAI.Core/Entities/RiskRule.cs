@@ -55,7 +55,10 @@ public class RiskRule
     /// <summary>
     /// Backward-compatible convenience property.
     /// A rule is "enabled" if its mode is Active or Shadow (it gets evaluated either way).
+    /// EF uses the _isEnabled backing field directly (bypasses getter/setter)
+    /// so materialization doesn't override Mode.
     /// </summary>
+    private bool _isEnabled = true;
     public bool IsEnabled
     {
         get => Mode != "Disabled";

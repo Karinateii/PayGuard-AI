@@ -151,7 +151,13 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(e => new { e.TenantId, e.RuleCode }).IsUnique();
             entity.HasIndex(e => e.Mode);
             entity.Property(e => e.Threshold).HasPrecision(18, 4);
-            entity.Ignore(e => e.IsEnabled);
+            // IsEnabled is computed from Mode but PostgreSQL has a legacy NOT NULL column.
+            // Use the backing field so EF reads/writes _isEnabled directly without
+            // calling the property setter (which would override Mode on materialization).
+            entity.Property(e => e.IsEnabled)
+                .HasField("_isEnabled")
+                .HasDefaultValue(true)
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
             entity.Ignore(e => e.IsShadow);
         });
 
