@@ -687,6 +687,7 @@ else
             var rule = new RiskRule
             {
                 Id = Guid.NewGuid(),
+                TenantId = CurrentUser.TenantId,
                 Name = suggestion.Name,
                 RuleCode = ruleCode,
                 Description = suggestion.Description,
@@ -757,6 +758,8 @@ else
         
         if (result is { Canceled: false, Data: RiskRule newRule })
         {
+            // Scope to current tenant (same pattern as compound rules)
+            newRule.TenantId = CurrentUser.TenantId;
             DbContext.RiskRules.Add(newRule);
             await DbContext.SaveChangesAsync();
             Snackbar.Add($"Custom rule '{newRule.Name}' created!", Severity.Success);
