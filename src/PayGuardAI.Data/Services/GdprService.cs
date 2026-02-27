@@ -35,6 +35,22 @@ public class GdprService : IGdprService
     {
         _logger.LogInformation("GDPR DSAR export requested for subject {SubjectId} by {RequestedBy}", subjectId, requestedBy);
 
+        var export = await BuildExportAsync(tenantId, subjectId, ct);
+
+        // Log once for the JSON export
+        await LogRequestAsync(tenantId, subjectId, "DSAR_EXPORT", requestedBy, export.TotalRecords, ct);
+
+        _logger.LogInformation("GDPR DSAR export completed: {TotalRecords} records for subject {SubjectId}", export.TotalRecords, subjectId);
+        return export;
+    }
+
+    /// <summary>
+    /// Builds the export payload without logging — shared by JSON and CSV paths
+    /// to avoid duplicate audit-trail entries.
+    /// </summary>
+    private async Task<GdprDataExport> BuildExportAsync(
+        string tenantId, string subjectId, CancellationToken ct)
+    {
         var export = new GdprDataExport
         {
             SubjectId = subjectId,
@@ -134,17 +150,15 @@ public class GdprService : IGdprService
             export.TotalRecords
         }, _jsonOpts);
 
-        // Log the request
-        await LogRequestAsync(tenantId, subjectId, "DSAR_EXPORT", requestedBy, export.TotalRecords, ct);
-
-        _logger.LogInformation("GDPR DSAR export completed: {TotalRecords} records for subject {SubjectId}", export.TotalRecords, subjectId);
         return export;
     }
 
     public async Task<byte[]> ExportSubjectDataCsvAsync(
         string tenantId, string subjectId, string requestedBy, CancellationToken ct = default)
     {
-        var export = await ExportSubjectDataAsync(tenantId, subjectId, requestedBy, ct);
+        _logger.LogInformation("GDPR DSAR CSV export requested for subject {SubjectId} by {RequestedBy}", subjectId, requestedBy);
+
+        var export = await BuildExportAsync(tenantId, subjectId, ct);
 
         var sb = new StringBuilder();
 
