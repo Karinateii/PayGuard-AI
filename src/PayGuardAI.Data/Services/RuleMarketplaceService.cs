@@ -19,13 +19,16 @@ public class RuleMarketplaceService : IRuleMarketplaceService
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<RuleMarketplaceService> _logger;
+    private readonly IRuleVersioningService _versioning;
 
     public RuleMarketplaceService(
         ApplicationDbContext context,
-        ILogger<RuleMarketplaceService> logger)
+        ILogger<RuleMarketplaceService> logger,
+        IRuleVersioningService versioning)
     {
         _context = context;
         _logger = logger;
+        _versioning = versioning;
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -214,6 +217,13 @@ public class RuleMarketplaceService : IRuleMarketplaceService
 
             if (existingRule != null)
             {
+                // Snapshot current state BEFORE overwriting so the user can rollback
+                await _versioning.SnapshotRuleAsync(
+                    existingRule,
+                    importedBy,
+                    $"Auto-snapshot before marketplace import of '{template.Name}'",
+                    cancellationToken);
+
                 // Update existing rule with template's recommended parameters
                 existingRule.Threshold = template.Threshold;
                 existingRule.ScoreWeight = template.ScoreWeight;

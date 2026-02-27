@@ -28,7 +28,8 @@ public class RuleMarketplaceServiceTests : IDisposable
         _db.Database.EnsureCreated();
 
         var logger = Mock.Of<ILogger<RuleMarketplaceService>>();
-        _service = new RuleMarketplaceService(_db, logger);
+        var versioning = Mock.Of<IRuleVersioningService>();
+        _service = new RuleMarketplaceService(_db, logger, versioning);
     }
 
     public void Dispose()
@@ -364,7 +365,8 @@ public class RuleMarketplaceServiceTests : IDisposable
         db.Database.EnsureCreated();
 
         var logger = Mock.Of<ILogger<RuleMarketplaceService>>();
-        var service = new RuleMarketplaceService(db, logger);
+        var versioning = Mock.Of<IRuleVersioningService>();
+        var service = new RuleMarketplaceService(db, logger, versioning);
 
         // The global rules (TenantId == "") are visible, so analytics will include them
         var analytics = await service.GetRuleAnalyticsAsync("empty-tenant");
