@@ -568,13 +568,14 @@ else
     protected override async Task OnInitializedAsync()
     {
         await LoadRules();
-        _ = LoadSuggestions(); // fire-and-forget so it doesn't block rules
+        // Load suggestions in background but stay on Blazor sync context
+        _ = InvokeAsync(LoadSuggestions);
     }
 
     private async Task LoadSuggestions()
     {
         _loadingSuggestions = true;
-        StateHasChanged();
+        await InvokeAsync(StateHasChanged);
         try
         {
             var tenantId = TenantContext.TenantId ?? "";
@@ -591,7 +592,7 @@ else
         finally
         {
             _loadingSuggestions = false;
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
         }
     }
 
@@ -676,36 +677,43 @@ else
 
     private async Task CreateRuleFromSuggestion(PayGuardAI.Core.Services.RuleSuggestion suggestion)
     {
-        var ruleCode = $"EXPR_{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}";
-
-        decimal threshold = 0;
-        decimal.TryParse(suggestion.ExpressionValue, out threshold);
-
-        var rule = new RiskRule
+        try
         {
-            Id = Guid.NewGuid(),
-            TenantId = TenantContext.TenantId ?? "",
-            Name = suggestion.Name,
-            RuleCode = ruleCode,
-            Description = suggestion.Description,
-            Category = suggestion.Category,
-            Threshold = threshold,
-            ScoreWeight = suggestion.SuggestedWeight,
-            ExpressionField = suggestion.ExpressionField,
-            ExpressionOperator = suggestion.ExpressionOperator,
-            ExpressionValue = suggestion.ExpressionValue,
-            Mode = "Shadow", // Start in shadow mode for safety
-            UpdatedAt = DateTime.UtcNow,
-            UpdatedBy = CurrentUser.UserName
-        };
+            var ruleCode = $"EXPR_{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}";
 
-        DbContext.RiskRules.Add(rule);
-        await DbContext.SaveChangesAsync();
-        Snackbar.Add($"Rule '{rule.Name}' created in Shadow mode — test it before activating!", Severity.Success);
+            decimal threshold = 0;
+            decimal.TryParse(suggestion.ExpressionValue, out threshold);
 
-        // Remove from suggestions list
-        _suggestions.RemoveAll(s => s.SuggestionId == suggestion.SuggestionId);
-        await LoadRules();
+            var rule = new RiskRule
+            {
+                Id = Guid.NewGuid(),
+                TenantId = TenantContext.TenantId ?? "",
+                Name = suggestion.Name,
+                RuleCode = ruleCode,
+                Description = suggestion.Description,
+                Category = suggestion.Category,
+                Threshold = threshold,
+                ScoreWeight = suggestion.SuggestedWeight,
+                ExpressionField = suggestion.ExpressionField,
+                ExpressionOperator = suggestion.ExpressionOperator,
+                ExpressionValue = suggestion.ExpressionValue,
+                Mode = "Shadow", // Start in shadow mode for safety
+                UpdatedAt = DateTime.UtcNow,
+                UpdatedBy = CurrentUser.UserName
+            };
+
+            DbContext.RiskRules.Add(rule);
+            await DbContext.SaveChangesAsync();
+            Snackbar.Add($"Rule '{rule.Name}' created in Shadow mode — test it before activating!", Severity.Success);
+
+            // Remove from suggestions list
+            _suggestions.RemoveAll(s => s.SuggestionId == suggestion.SuggestionId);
+            await LoadRules();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to create rule: {ex.Message}", Severity.Error);
+        }
     }
 
     private void DismissSuggestion(PayGuardAI.Core.Services.RuleSuggestion suggestion)
