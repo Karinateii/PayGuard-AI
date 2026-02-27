@@ -1,7 +1,8 @@
 @page "/reports"
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
-@inject PayGuardAI.Data.ApplicationDbContext DbContext
+@inject IDbContextFactory<PayGuardAI.Data.ApplicationDbContext> DbFactory
+@inject PayGuardAI.Core.Services.ITenantContext TenantContext
 @inject IReviewService ReviewService
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
@@ -373,7 +374,10 @@
         var from = _fromDate ?? DateTime.UtcNow.Date.AddDays(-30);
         var to = (_toDate ?? DateTime.UtcNow.Date).AddDays(1); // Include full day
 
-        var analyses = await DbContext.RiskAnalyses
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.SetTenantId(TenantContext.TenantId);
+
+        var analyses = await db.RiskAnalyses
             .Include(r => r.Transaction)
             .Include(r => r.RiskFactors)
             .Where(r => r.AnalyzedAt >= from && r.AnalyzedAt < to)
@@ -486,7 +490,10 @@
             var from = _fromDate ?? DateTime.UtcNow.Date.AddDays(-30);
             var to = (_toDate ?? DateTime.UtcNow.Date).AddDays(1);
 
-            var analyses = await DbContext.RiskAnalyses
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenantId(TenantContext.TenantId);
+
+            var analyses = await db.RiskAnalyses
                 .Include(r => r.Transaction)
                 .Include(r => r.RiskFactors)
                 .Where(r => r.AnalyzedAt >= from && r.AnalyzedAt < to)
@@ -543,7 +550,10 @@
             var from = _fromDate ?? DateTime.UtcNow.Date.AddDays(-30);
             var to = (_toDate ?? DateTime.UtcNow.Date).AddDays(1);
 
-            var logs = await DbContext.AuditLogs
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenantId(TenantContext.TenantId);
+
+            var logs = await db.AuditLogs
                 .Where(a => a.CreatedAt >= from && a.CreatedAt < to)
                 .OrderByDescending(a => a.CreatedAt)
                 .ToListAsync();
@@ -578,7 +588,10 @@
         _exportingAccess = true;
         try
         {
-            var members = await DbContext.TeamMembers
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenantId(TenantContext.TenantId);
+
+            var members = await db.TeamMembers
                 .OrderBy(m => m.Email)
                 .ToListAsync();
 
@@ -615,7 +628,10 @@
             var from = _fromDate ?? DateTime.UtcNow.Date.AddDays(-30);
             var to = (_toDate ?? DateTime.UtcNow.Date).AddDays(1);
 
-            var versions = await DbContext.RuleVersions
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenantId(TenantContext.TenantId);
+
+            var versions = await db.RuleVersions
                 .Where(v => v.CreatedAt >= from && v.CreatedAt < to)
                 .OrderByDescending(v => v.CreatedAt)
                 .ToListAsync();

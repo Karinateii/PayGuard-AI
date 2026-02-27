@@ -2,7 +2,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
 @attribute [Authorize(Policy = "RequireSuperAdmin")]
-@inject PayGuardAI.Data.ApplicationDbContext DbContext
+@inject IDbContextFactory<PayGuardAI.Data.ApplicationDbContext> DbFactory
 
 <PageTitle>System Logs - PayGuard AI</PageTitle>
 
@@ -244,8 +244,9 @@ else if (!_loading)
 
     protected override async Task OnInitializedAsync()
     {
-        // Load distinct tenant IDs for the dropdown
-        _tenantOptions = await DbContext.SystemLogs
+        // Load distinct tenant IDs for the dropdown (own context to avoid concurrency)
+        await using var dbInit = await DbFactory.CreateDbContextAsync();
+        _tenantOptions = await dbInit.SystemLogs
             .IgnoreQueryFilters()
             .Where(l => l.TenantId != null && l.TenantId != "" && l.TenantId != "unknown")
             .Select(l => l.TenantId!)
@@ -263,6 +264,8 @@ else if (!_loading)
 
         try
         {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
             var cutoff = _timeRange switch
             {
                 "1h"  => DateTime.UtcNow.AddHours(-1),
@@ -273,7 +276,7 @@ else if (!_loading)
                 _     => DateTime.UtcNow.AddDays(-1)
             };
 
-            var query = DbContext.SystemLogs
+            var query = db.SystemLogs
                 .IgnoreQueryFilters()
                 .Where(l => l.CreatedAt >= cutoff);
 
@@ -294,7 +297,7 @@ else if (!_loading)
                 query = query.Where(l => l.CorrelationId == _correlationFilter);
 
             // Get counts for the chips
-            var allInRange = DbContext.SystemLogs
+            var allInRange = db.SystemLogs
                 .IgnoreQueryFilters()
                 .Where(l => l.CreatedAt >= cutoff);
 

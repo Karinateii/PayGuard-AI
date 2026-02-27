@@ -4,7 +4,7 @@
 @using PayGuardAI.Core.Entities
 @using PayGuardAI.Core.Services
 @attribute [Authorize(Policy = "RequireManager")]
-@inject PayGuardAI.Data.ApplicationDbContext DbContext
+@inject IDbContextFactory<PayGuardAI.Data.ApplicationDbContext> DbFactory
 @inject ITenantContext TenantContext
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -199,9 +199,10 @@ else
         _loading = true;
         try
         {
-            var tenantId = TenantContext.TenantId;
-            _preferences = await DbContext.NotificationPreferences
-                .Where(p => p.TenantId == tenantId)
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenantId(TenantContext.TenantId);
+            _preferences = await db.NotificationPreferences
+                .Where(p => p.TenantId == TenantContext.TenantId)
                 .OrderBy(p => p.DisplayName)
                 .ToListAsync();
         }
@@ -226,8 +227,11 @@ else
         {
             pref.TenantId = TenantContext.TenantId;
 
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenantId(TenantContext.TenantId);
+
             // Check for duplicate
-            var exists = await DbContext.NotificationPreferences
+            var exists = await db.NotificationPreferences
                 .AnyAsync(p => p.TenantId == pref.TenantId && p.Email.ToLower() == pref.Email.ToLower());
             if (exists)
             {
@@ -235,8 +239,8 @@ else
                 return;
             }
 
-            DbContext.NotificationPreferences.Add(pref);
-            await DbContext.SaveChangesAsync();
+            db.NotificationPreferences.Add(pref);
+            await db.SaveChangesAsync();
             Snackbar.Add($"Added {pref.DisplayName}", Severity.Success);
             await LoadPreferences();
         }
@@ -244,6 +248,9 @@ else
 
     private async Task TogglePref(NotificationPreference pref, string property, bool value)
     {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.Attach(pref);
+
         switch (property)
         {
             case nameof(NotificationPreference.RiskAlertsEnabled):
@@ -258,15 +265,17 @@ else
                 pref.SystemAlertsEnabled = value; break;
         }
         pref.UpdatedAt = DateTime.UtcNow;
-        await DbContext.SaveChangesAsync();
+        await db.SaveChangesAsync();
         Snackbar.Add("Preference updated", Severity.Success);
     }
 
     private async Task UpdateMinScore(NotificationPreference pref, int value)
     {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.Attach(pref);
         pref.MinimumRiskScoreForAlert = Math.Clamp(value, 0, 100);
         pref.UpdatedAt = DateTime.UtcNow;
-        await DbContext.SaveChangesAsync();
+        await db.SaveChangesAsync();
         Snackbar.Add("Minimum risk score updated", Severity.Success);
     }
 
@@ -279,8 +288,9 @@ else
 
         if (confirm == true)
         {
-            DbContext.NotificationPreferences.Remove(pref);
-            await DbContext.SaveChangesAsync();
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.Remove(pref);
+            await db.SaveChangesAsync();
             Snackbar.Add($"Removed {pref.DisplayName}", Severity.Success);
             await LoadPreferences();
         }

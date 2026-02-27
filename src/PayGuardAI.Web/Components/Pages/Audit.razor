@@ -1,7 +1,8 @@
 @page "/audit"
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "RequireManager")]
-@inject PayGuardAI.Data.ApplicationDbContext DbContext
+@inject IDbContextFactory<PayGuardAI.Data.ApplicationDbContext> DbFactory
+@inject PayGuardAI.Core.Services.ITenantContext TenantContext
 @using Microsoft.EntityFrameworkCore
 
 <PageTitle>Audit Log - PayGuard AI</PageTitle>
@@ -158,7 +159,9 @@
         _loading = true;
         try
         {
-            _auditLogs = await DbContext.AuditLogs
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenantId(TenantContext.TenantId);
+            _auditLogs = await db.AuditLogs
                 .OrderByDescending(l => l.CreatedAt)
                 .Take(500)
                 .ToListAsync();

@@ -1,7 +1,7 @@
 @page "/rules"
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "RequireManager")]
-@inject PayGuardAI.Data.ApplicationDbContext DbContext
+@inject IDbContextFactory<PayGuardAI.Data.ApplicationDbContext> DbFactory
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
@@ -601,7 +601,10 @@ else
         _loading = true;
         try
         {
-            var allRules = await DbContext.RiskRules
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenantId(TenantContext.TenantId);
+
+            var allRules = await db.RiskRules
                 .OrderBy(r => r.Category).ThenBy(r => r.Name)
                 .ToListAsync();
 
@@ -618,7 +621,7 @@ else
             _expressionRules = _rules.Where(r => r.IsExpression).ToList();
 
             // Load compound rules
-            _compoundRules = await DbContext.RuleGroups
+            _compoundRules = await db.RuleGroups
                 .Include(g => g.Conditions)
                 .OrderBy(g => g.Name)
                 .ToListAsync();
@@ -632,10 +635,13 @@ else
     private async Task ChangeRuleMode(RiskRule rule, string mode)
     {
         await VersioningService.SnapshotRuleAsync(rule, CurrentUser.UserName, $"Mode: {rule.Mode} → {mode}");
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.Attach(rule);
         rule.Mode = mode;
         rule.UpdatedAt = DateTime.UtcNow;
         rule.UpdatedBy = CurrentUser.UserName;
-        await DbContext.SaveChangesAsync();
+        await db.SaveChangesAsync();
 
         var label = mode switch
         {
@@ -656,20 +662,26 @@ else
     private async Task UpdateThreshold(RiskRule rule, decimal value)
     {
         await VersioningService.SnapshotRuleAsync(rule, CurrentUser.UserName, $"Threshold: {rule.Threshold} → {value}");
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.Attach(rule);
         rule.Threshold = value;
         rule.UpdatedAt = DateTime.UtcNow;
         rule.UpdatedBy = CurrentUser.UserName;
-        await DbContext.SaveChangesAsync();
+        await db.SaveChangesAsync();
         Snackbar.Add($"Threshold updated for '{rule.Name}'", Severity.Info);
     }
 
     private async Task UpdateWeight(RiskRule rule, int value)
     {
         await VersioningService.SnapshotRuleAsync(rule, CurrentUser.UserName, $"Weight: {rule.ScoreWeight} → {value}");
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.Attach(rule);
         rule.ScoreWeight = value;
         rule.UpdatedAt = DateTime.UtcNow;
         rule.UpdatedBy = CurrentUser.UserName;
-        await DbContext.SaveChangesAsync();
+        await db.SaveChangesAsync();
         Snackbar.Add($"Weight updated for '{rule.Name}'", Severity.Info);
     }
 
@@ -705,8 +717,9 @@ else
             // Set to shadow after construction (IsEnabled setter sets Mode=Active)
             rule.Mode = "Shadow";
 
-            DbContext.RiskRules.Add(rule);
-            await DbContext.SaveChangesAsync();
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.RiskRules.Add(rule);
+            await db.SaveChangesAsync();
             Snackbar.Add($"Rule '{rule.Name}' created in Shadow mode — test it before activating!", Severity.Success);
 
             // Remove from suggestions list
@@ -760,8 +773,10 @@ else
         {
             // Scope to current tenant (same pattern as compound rules)
             newRule.TenantId = CurrentUser.TenantId;
-            DbContext.RiskRules.Add(newRule);
-            await DbContext.SaveChangesAsync();
+
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.RiskRules.Add(newRule);
+            await db.SaveChangesAsync();
             Snackbar.Add($"Custom rule '{newRule.Name}' created!", Severity.Success);
             await LoadRules();
         }
@@ -783,8 +798,9 @@ else
         
         if (confirmed == true)
         {
-            DbContext.RiskRules.Remove(rule);
-            await DbContext.SaveChangesAsync();
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.Remove(rule);
+            await db.SaveChangesAsync();
             Snackbar.Add($"Rule '{rule.Name}' deleted", Severity.Warning);
             await LoadRules();
         }
@@ -808,8 +824,9 @@ else
                 condition.RuleGroupId = newGroup.Id;
             }
 
-            DbContext.RuleGroups.Add(newGroup);
-            await DbContext.SaveChangesAsync();
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.RuleGroups.Add(newGroup);
+            await db.SaveChangesAsync();
             Snackbar.Add($"Compound rule '{newGroup.Name}' created with {newGroup.Conditions.Count} conditions!", Severity.Success);
             await LoadRules();
         }
@@ -818,9 +835,12 @@ else
     private async Task ChangeCompoundRuleMode(RuleGroup group, string mode)
     {
         await VersioningService.SnapshotCompoundRuleAsync(group, CurrentUser.UserName, $"Mode: {group.Mode} → {mode}");
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.Attach(group);
         group.Mode = mode;
         group.UpdatedAt = DateTime.UtcNow;
-        await DbContext.SaveChangesAsync();
+        await db.SaveChangesAsync();
 
         var label = mode switch
         {
@@ -841,9 +861,12 @@ else
     private async Task UpdateCompoundWeight(RuleGroup group, int value)
     {
         await VersioningService.SnapshotCompoundRuleAsync(group, CurrentUser.UserName, $"RiskPoints: {group.RiskPoints} → {value}");
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.Attach(group);
         group.RiskPoints = value;
         group.UpdatedAt = DateTime.UtcNow;
-        await DbContext.SaveChangesAsync();
+        await db.SaveChangesAsync();
         Snackbar.Add($"Risk points updated for '{group.Name}'", Severity.Info);
     }
 
@@ -856,8 +879,9 @@ else
         
         if (confirmed == true)
         {
-            DbContext.RuleGroups.Remove(group);
-            await DbContext.SaveChangesAsync();
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.Remove(group);
+            await db.SaveChangesAsync();
             Snackbar.Add($"Compound rule '{group.Name}' deleted", Severity.Warning);
             await LoadRules();
         }
