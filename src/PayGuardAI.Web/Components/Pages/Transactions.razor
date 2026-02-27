@@ -1,11 +1,13 @@
 @page "/transactions"
 @page "/transactions/{TransactionId:guid}"
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
 @attribute [Authorize]
 @inject ITransactionService TransactionService
 @inject IReviewService ReviewService
 @inject ISnackbar Snackbar
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
+@inject IDbContextFactory<PayGuardAI.Data.ApplicationDbContext> DbFactory
 
 <PageTitle>Transactions - PayGuard AI</PageTitle>
 
@@ -587,6 +589,7 @@ else
     [SupplyParameterFromQuery]
     public string? ReturnTo { get; set; }
 
+    private readonly SemaphoreSlim _dbLock = new(1, 1);
     private bool _loading = true;
     private bool _processing = false;
     private bool _drawerOpen = false;
@@ -622,7 +625,13 @@ else
         {
             try
             {
-                _selectedTransaction = await TransactionService.GetByIdAsync(TransactionId.Value);
+                // Use a separate DbContext via factory to avoid concurrency with
+                // OnInitializedAsync's LoadTransactions which shares the scoped context.
+                await using var db = await DbFactory.CreateDbContextAsync();
+                _selectedTransaction = await db.Transactions
+                    .Include(t => t.RiskAnalysis)
+                        .ThenInclude(r => r!.RiskFactors)
+                    .FirstOrDefaultAsync(t => t.Id == TransactionId.Value);
                 if (_selectedTransaction == null)
                 {
                     Snackbar.Add("Transaction not found", Severity.Warning);
