@@ -687,20 +687,22 @@ else
             var rule = new RiskRule
             {
                 Id = Guid.NewGuid(),
-                TenantId = TenantContext.TenantId ?? "",
                 Name = suggestion.Name,
                 RuleCode = ruleCode,
                 Description = suggestion.Description,
                 Category = suggestion.Category,
                 Threshold = threshold,
                 ScoreWeight = suggestion.SuggestedWeight,
+                IsEnabled = true,
                 ExpressionField = suggestion.ExpressionField,
                 ExpressionOperator = suggestion.ExpressionOperator,
                 ExpressionValue = suggestion.ExpressionValue,
-                Mode = "Shadow", // Start in shadow mode for safety
                 UpdatedAt = DateTime.UtcNow,
                 UpdatedBy = CurrentUser.UserName
             };
+
+            // Set to shadow after construction (IsEnabled setter sets Mode=Active)
+            rule.Mode = "Shadow";
 
             DbContext.RiskRules.Add(rule);
             await DbContext.SaveChangesAsync();
@@ -712,7 +714,8 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Failed to create rule: {ex.Message}", Severity.Error);
+            var innerMsg = ex.InnerException?.Message ?? ex.Message;
+            Snackbar.Add($"Failed to create rule: {innerMsg}", Severity.Error);
         }
     }
 
