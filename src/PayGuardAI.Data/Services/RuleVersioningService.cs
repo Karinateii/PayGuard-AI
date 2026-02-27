@@ -63,9 +63,12 @@ public class RuleVersioningService : IRuleVersioningService
             ExpressionValue = rule.ExpressionValue
         };
 
+        // Use rule.TenantId (not _tenantContext.TenantId) to guarantee the version
+        // matches the rule's actual tenant — avoids mismatches when the ambient
+        // tenant context hasn't been set yet (e.g., marketplace import during SSR).
         var version = new RuleVersion
         {
-            TenantId = _tenantContext.TenantId,
+            TenantId = rule.TenantId,
             EntityType = "RiskRule",
             EntityId = rule.Id,
             VersionNumber = nextVersion,
@@ -79,8 +82,8 @@ public class RuleVersioningService : IRuleVersioningService
         _context.RuleVersions.Add(version);
         await _context.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Snapshot v{Version} for RiskRule '{RuleName}' ({RuleId}) by {User}",
-            nextVersion, rule.Name, rule.Id, changedBy);
+        _logger.LogInformation("Snapshot v{Version} for RiskRule '{RuleName}' ({RuleId}) tenant={TenantId} by {User}",
+            nextVersion, rule.Name, rule.Id, rule.TenantId, changedBy);
 
         return version;
     }
@@ -106,9 +109,10 @@ public class RuleVersioningService : IRuleVersioningService
             }).ToList()
         };
 
+        // Use group.TenantId (not _tenantContext.TenantId) — same rationale as SnapshotRuleAsync
         var version = new RuleVersion
         {
-            TenantId = _tenantContext.TenantId,
+            TenantId = group.TenantId,
             EntityType = "RuleGroup",
             EntityId = group.Id,
             VersionNumber = nextVersion,
@@ -122,8 +126,8 @@ public class RuleVersioningService : IRuleVersioningService
         _context.RuleVersions.Add(version);
         await _context.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Snapshot v{Version} for RuleGroup '{GroupName}' ({GroupId}) by {User}",
-            nextVersion, group.Name, group.Id, changedBy);
+        _logger.LogInformation("Snapshot v{Version} for RuleGroup '{GroupName}' ({GroupId}) tenant={TenantId} by {User}",
+            nextVersion, group.Name, group.Id, group.TenantId, changedBy);
 
         return version;
     }
@@ -184,9 +188,9 @@ public class RuleVersioningService : IRuleVersioningService
         rule.Threshold = snapshot.Threshold;
         rule.ScoreWeight = snapshot.ScoreWeight;
         rule.Mode = snapshot.Mode;
-        rule.ExpressionField = snapshot.ExpressionField;
-        rule.ExpressionOperator = snapshot.ExpressionOperator;
-        rule.ExpressionValue = snapshot.ExpressionValue;
+        rule.ExpressionField = snapshot.ExpressionField ?? string.Empty;
+        rule.ExpressionOperator = snapshot.ExpressionOperator ?? string.Empty;
+        rule.ExpressionValue = snapshot.ExpressionValue ?? string.Empty;
         rule.UpdatedAt = DateTime.UtcNow;
         rule.UpdatedBy = rolledBackBy;
 
