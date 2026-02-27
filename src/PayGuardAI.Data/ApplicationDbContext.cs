@@ -154,9 +154,10 @@ public class ApplicationDbContext : DbContext
             // IsEnabled is computed from Mode but PostgreSQL has a legacy NOT NULL column.
             // Use the backing field so EF reads/writes _isEnabled directly without
             // calling the property setter (which would override Mode on materialization).
+            // NOTE: Do NOT use HasDefaultValue — it tells EF to skip the column on INSERT
+            // when the value matches the default, and PostgreSQL has no column DEFAULT.
             entity.Property(e => e.IsEnabled)
                 .HasField("_isEnabled")
-                .HasDefaultValue(true)
                 .UsePropertyAccessMode(PropertyAccessMode.Field);
             entity.Ignore(e => e.IsShadow);
         });
