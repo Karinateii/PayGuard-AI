@@ -67,6 +67,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Watchlist> Watchlists => Set<Watchlist>();
     public DbSet<WatchlistEntry> WatchlistEntries => Set<WatchlistEntry>();
     public DbSet<SystemLog> SystemLogs => Set<SystemLog>();
+    public DbSet<Invoice> Invoices => Set<Invoice>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -94,6 +95,7 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<RuleVersion>().HasQueryFilter(e => e.TenantId == TenantId);
         modelBuilder.Entity<GdprRequest>().HasQueryFilter(e => e.TenantId == TenantId);
         modelBuilder.Entity<Watchlist>().HasQueryFilter(e => e.TenantId == TenantId);
+        modelBuilder.Entity<Invoice>().HasQueryFilter(e => e.TenantId == TenantId);
 
         // Entity configuration
 

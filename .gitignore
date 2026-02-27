@@ -93,3 +93,4 @@ node_modules/
 # Local deployment guides (keep private until ready to publish)
 DOCKER-HEROKU-GUIDE.md
 documentation/
+src/PayGuardAI.Web/keys/

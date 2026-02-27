@@ -1276,5 +1276,96 @@ public class DatabaseMigrationService : IDatabaseMigrationService
         {
             _logger.LogDebug(ex, "Skipping SystemLogs table creation");
         }
+
+        // ── Invoices table ────────────────────────────────────────────
+        try
+        {
+            if (dbType == "PostgreSQL")
+            {
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS "Invoices" (
+                        "Id" uuid PRIMARY KEY,
+                        "TenantId" text NOT NULL DEFAULT '',
+                        "InvoiceNumber" text NOT NULL DEFAULT '',
+                        "Plan" integer NOT NULL DEFAULT 0,
+                        "Status" text NOT NULL DEFAULT 'issued',
+                        "AmountCents" integer NOT NULL DEFAULT 0,
+                        "Currency" text NOT NULL DEFAULT 'USD',
+                        "TaxCents" integer NOT NULL DEFAULT 0,
+                        "TotalCents" integer NOT NULL DEFAULT 0,
+                        "PeriodStart" timestamptz NOT NULL,
+                        "PeriodEnd" timestamptz NOT NULL,
+                        "IssuedAt" timestamptz NOT NULL DEFAULT NOW(),
+                        "PaidAt" timestamptz,
+                        "DueDate" timestamptz NOT NULL,
+                        "ProviderReference" text,
+                        "Provider" text,
+                        "TransactionsProcessed" integer NOT NULL DEFAULT 0,
+                        "IncludedTransactions" integer NOT NULL DEFAULT 0,
+                        "BillToName" text NOT NULL DEFAULT '',
+                        "BillToEmail" text NOT NULL DEFAULT '',
+                        "BillToAddress" text,
+                        "TaxId" text,
+                        "Notes" text,
+                        "CreatedAt" timestamptz NOT NULL DEFAULT NOW(),
+                        "UpdatedAt" timestamptz NOT NULL DEFAULT NOW()
+                    )
+                    """);
+            }
+            else
+            {
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS Invoices (
+                        Id TEXT PRIMARY KEY,
+                        TenantId TEXT NOT NULL DEFAULT '',
+                        InvoiceNumber TEXT NOT NULL DEFAULT '',
+                        Plan INTEGER NOT NULL DEFAULT 0,
+                        Status TEXT NOT NULL DEFAULT 'issued',
+                        AmountCents INTEGER NOT NULL DEFAULT 0,
+                        Currency TEXT NOT NULL DEFAULT 'USD',
+                        TaxCents INTEGER NOT NULL DEFAULT 0,
+                        TotalCents INTEGER NOT NULL DEFAULT 0,
+                        PeriodStart TEXT NOT NULL,
+                        PeriodEnd TEXT NOT NULL,
+                        IssuedAt TEXT NOT NULL DEFAULT '',
+                        PaidAt TEXT,
+                        DueDate TEXT NOT NULL DEFAULT '',
+                        ProviderReference TEXT,
+                        Provider TEXT,
+                        TransactionsProcessed INTEGER NOT NULL DEFAULT 0,
+                        IncludedTransactions INTEGER NOT NULL DEFAULT 0,
+                        BillToName TEXT NOT NULL DEFAULT '',
+                        BillToEmail TEXT NOT NULL DEFAULT '',
+                        BillToAddress TEXT,
+                        TaxId TEXT,
+                        Notes TEXT,
+                        CreatedAt TEXT NOT NULL DEFAULT '',
+                        UpdatedAt TEXT NOT NULL DEFAULT ''
+                    )
+                    """);
+            }
+
+            // Indexes for tenant scoping and invoice lookup
+            await _context.Database.ExecuteSqlRawAsync("""
+                CREATE INDEX IF NOT EXISTS IX_Invoices_TenantId
+                ON "Invoices" ("TenantId")
+                """);
+
+            await _context.Database.ExecuteSqlRawAsync("""
+                CREATE UNIQUE INDEX IF NOT EXISTS IX_Invoices_InvoiceNumber
+                ON "Invoices" ("InvoiceNumber")
+                """);
+
+            await _context.Database.ExecuteSqlRawAsync("""
+                CREATE INDEX IF NOT EXISTS IX_Invoices_Status
+                ON "Invoices" ("Status")
+                """);
+
+            _logger.LogDebug("Invoices table ensured");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipping Invoices table creation");
+        }
     }
 }

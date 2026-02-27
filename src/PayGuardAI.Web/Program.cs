@@ -294,6 +294,10 @@ builder.Services.AddScoped<IRelationshipAnalysisService, RelationshipAnalysisSer
 // Register Rule Suggestion service — AI-powered pattern analysis for rule recommendations
 builder.Services.AddScoped<IRuleSuggestionService, RuleSuggestionService>();
 
+// Register Invoice services — PDF generation and invoice lifecycle management
+builder.Services.AddScoped<InvoiceService>();
+builder.Services.AddSingleton<InvoicePdfService>();
+
 // Add controllers for API endpoints (webhooks)
 builder.Services.AddControllers();
 

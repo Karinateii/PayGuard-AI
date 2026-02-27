@@ -1,0 +1,349 @@
+@page "/billing/invoices"
+@using Microsoft.AspNetCore.Authorization
+@using PayGuardAI.Core.Entities
+@using PayGuardAI.Core.Services
+@using PayGuardAI.Data.Services
+@attribute [Authorize(Policy = "RequireManager")]
+@inject InvoiceService InvoiceService
+@inject BillingServiceFactory BillingFactory
+@inject ITenantContext TenantContext
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject IConfiguration Config
+
+<PageTitle>Invoices — PayGuard AI</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4" Style="flex-wrap: wrap; gap: 12px;">
+    <MudText Typo="Typo.h4" Style="font-weight:700">
+        <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2" />
+        Invoices
+    </MudText>
+    <MudStack Row="true" Spacing="2">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.ArrowBack"
+                   Href="/billing" Size="Size.Small">
+            Back to Billing
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="GenerateInvoice" Disabled="@_generating"
+                   Size="Size.Small">
+            @if (_generating) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" /> }
+            Generate Invoice
+        </MudButton>
+    </MudStack>
+</MudStack>
+
+<MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-6">
+    View and download PDF invoices for your subscription periods. Invoices include plan details, usage, and payment information.
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_invoices.Count == 0)
+{
+    <MudPaper Class="pa-8 d-flex flex-column align-center justify-center" Elevation="2" Style="min-height: 300px;">
+        <MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Size="Size.Large" Color="Color.Secondary" Class="mb-4" />
+        <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mb-2">No Invoices Yet</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+            Generate your first invoice from your current subscription.
+        </MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="GenerateInvoice" Disabled="@_generating">
+            Generate Invoice
+        </MudButton>
+    </MudPaper>
+}
+else
+{
+    @* ── Summary Cards ──────────────────────────────────────── *@
+    <MudGrid Spacing="3" Class="mb-4">
+        <MudItem xs="6" sm="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.overline" Color="Color.Secondary">TOTAL INVOICES</MudText>
+                <MudText Typo="Typo.h4" Style="font-weight:700">@_invoices.Count</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.overline" Color="Color.Secondary">PAID</MudText>
+                <MudText Typo="Typo.h4" Style="font-weight:700" Color="Color.Success">
+                    @_invoices.Count(i => i.Status == "paid")
+                </MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.overline" Color="Color.Secondary">TOTAL BILLED</MudText>
+                <MudText Typo="Typo.h4" Style="font-weight:700">
+                    $@_invoices.Sum(i => i.Total).ToString("N2")
+                </MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.overline" Color="Color.Secondary">OUTSTANDING</MudText>
+                <MudText Typo="Typo.h4" Style="font-weight:700" Color="@(_outstanding > 0 ? Color.Warning : Color.Default)">
+                    $@_outstanding.ToString("N2")
+                </MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @* ── Invoice Table ──────────────────────────────────────── *@
+    <MudTable Items="_invoices" Hover="true" Dense="true" Elevation="2" Breakpoint="Breakpoint.Sm">
+        <HeaderContent>
+            <MudTh>Invoice #</MudTh>
+            <MudTh>Date</MudTh>
+            <MudTh>Plan</MudTh>
+            <MudTh>Period</MudTh>
+            <MudTh>Amount</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh Style="width:120px;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Invoice #">
+                <MudText Typo="Typo.body2" Style="font-family:monospace;font-weight:600;">
+                    @context.InvoiceNumber
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Date">
+                @context.IssuedAt.ToString("MMM dd, yyyy")
+            </MudTd>
+            <MudTd DataLabel="Plan">
+                <MudChip T="string" Size="Size.Small" Color="@GetPlanColor(context.Plan)" Variant="Variant.Filled">
+                    @context.Plan
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Period">
+                <MudText Typo="Typo.caption">
+                    @context.PeriodStart.ToString("MMM dd") — @context.PeriodEnd.ToString("MMM dd, yyyy")
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Amount">
+                <MudText Typo="Typo.body2" Style="font-weight:600;">
+                    $@context.Total.ToString("N2") @context.Currency
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)" Variant="Variant.Filled">
+                    @context.Status.ToUpperInvariant()
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Actions">
+                <MudStack Row="true" Spacing="1">
+                    <MudTooltip Text="Download PDF">
+                        <MudIconButton Icon="@Icons.Material.Filled.PictureAsPdf"
+                                       Color="Color.Error" Size="Size.Small"
+                                       OnClick="@(async () => await DownloadPdf(context))" />
+                    </MudTooltip>
+                    <MudTooltip Text="View details">
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                       Color="Color.Primary" Size="Size.Small"
+                                       OnClick="@(() => ShowDetail(context))" />
+                    </MudTooltip>
+                </MudStack>
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }" />
+        </PagerContent>
+    </MudTable>
+}
+
+@* ── Detail Dialog ──────────────────────────────────────── *@
+<MudDialog @bind-Visible="_showDetail" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Receipt" />
+            <MudText Typo="Typo.h6">Invoice @_selectedInvoice?.InvoiceNumber</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        @if (_selectedInvoice != null)
+        {
+            <MudStack Spacing="2">
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Bill To</MudText>
+                        <MudText>@_selectedInvoice.BillToName</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">@_selectedInvoice.BillToEmail</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText>
+                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(_selectedInvoice.Status)">
+                            @_selectedInvoice.Status.ToUpperInvariant()
+                        </MudChip>
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider />
+
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Plan</MudText>
+                        <MudText>@_selectedInvoice.Plan — $@_selectedInvoice.Amount.ToString("N2")/mo</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Billing Period</MudText>
+                        <MudText>@_selectedInvoice.PeriodStart.ToString("MMM dd") — @_selectedInvoice.PeriodEnd.ToString("MMM dd, yyyy")</MudText>
+                    </MudItem>
+                </MudGrid>
+
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Transactions</MudText>
+                        <MudText>@_selectedInvoice.TransactionsProcessed.ToString("N0") / @_selectedInvoice.IncludedTransactions.ToString("N0")</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Provider</MudText>
+                        <MudText>@(_selectedInvoice.Provider ?? "—")</MudText>
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider />
+
+                <MudGrid>
+                    <MudItem xs="4">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Subtotal</MudText>
+                        <MudText>$@_selectedInvoice.Amount.ToString("N2")</MudText>
+                    </MudItem>
+                    <MudItem xs="4">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Tax</MudText>
+                        <MudText>$@_selectedInvoice.Tax.ToString("N2")</MudText>
+                    </MudItem>
+                    <MudItem xs="4">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Total</MudText>
+                        <MudText Typo="Typo.h6" Style="font-weight:700">$@_selectedInvoice.Total.ToString("N2")</MudText>
+                    </MudItem>
+                </MudGrid>
+
+                @if (_selectedInvoice.PaidAt.HasValue)
+                {
+                    <MudAlert Severity="Severity.Success" Dense="true">
+                        Paid on @_selectedInvoice.PaidAt.Value.ToString("MMM dd, yyyy")
+                        @if (!string.IsNullOrWhiteSpace(_selectedInvoice.ProviderReference))
+                        {
+                            <text> — Ref: @_selectedInvoice.ProviderReference</text>
+                        }
+                    </MudAlert>
+                }
+            </MudStack>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(async () => { if (_selectedInvoice != null) await DownloadPdf(_selectedInvoice); })"
+                   Color="Color.Error" Variant="Variant.Outlined"
+                   StartIcon="@Icons.Material.Filled.PictureAsPdf">
+            Download PDF
+        </MudButton>
+        <MudButton OnClick="@(() => _showDetail = false)">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<Invoice> _invoices = new();
+    private bool _loading = true;
+    private bool _generating;
+    private bool _showDetail;
+    private Invoice? _selectedInvoice;
+    private decimal _outstanding;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInvoices();
+    }
+
+    private async Task LoadInvoices()
+    {
+        _loading = true;
+        try
+        {
+            _invoices = await InvoiceService.GetInvoicesAsync();
+            _outstanding = _invoices
+                .Where(i => i.Status is "issued" or "overdue")
+                .Sum(i => i.Total);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load invoices: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task GenerateInvoice()
+    {
+        _generating = true;
+        try
+        {
+            var billingService = BillingFactory.GetDefault();
+            var subscription = await billingService.GetSubscriptionAsync(TenantContext.TenantId);
+
+            if (subscription == null)
+            {
+                Snackbar.Add("No active subscription found. Subscribe to a plan first.", Severity.Warning);
+                return;
+            }
+
+            var invoice = await InvoiceService.GenerateFromSubscriptionAsync(subscription);
+            Snackbar.Add($"Invoice {invoice.InvoiceNumber} generated!", Severity.Success);
+            await LoadInvoices();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to generate invoice: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _generating = false;
+        }
+    }
+
+    private async Task DownloadPdf(Invoice invoice)
+    {
+        try
+        {
+            // Download via the API controller endpoint
+            var url = $"/api/invoices/{invoice.Id}/pdf";
+            var script = $"(function() {{ var a = document.createElement('a'); a.href = '{url}'; a.download = '{invoice.InvoiceNumber}.pdf'; document.body.appendChild(a); a.click(); document.body.removeChild(a); }})()";
+            await JS.InvokeVoidAsync("eval", script);
+            Snackbar.Add("Downloading PDF...", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Download failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void ShowDetail(Invoice invoice)
+    {
+        _selectedInvoice = invoice;
+        _showDetail = true;
+    }
+
+    private static Color GetStatusColor(string status) => status switch
+    {
+        "paid" => Color.Success,
+        "issued" => Color.Info,
+        "draft" => Color.Default,
+        "overdue" => Color.Error,
+        "void" => Color.Dark,
+        _ => Color.Default
+    };
+
+    private static Color GetPlanColor(BillingPlan plan) => plan switch
+    {
+        BillingPlan.Enterprise => Color.Dark,
+        BillingPlan.Pro => Color.Primary,
+        BillingPlan.Starter => Color.Info,
+        BillingPlan.Trial => Color.Default,
+        _ => Color.Default
+    };
+}
