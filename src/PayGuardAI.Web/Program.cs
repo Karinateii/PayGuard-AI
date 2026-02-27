@@ -273,6 +273,9 @@ builder.Services.AddScoped<IWatchlistService, WatchlistService>();
 // Register Relationship Analysis service — fan-out / fan-in / mule detection
 builder.Services.AddScoped<IRelationshipAnalysisService, RelationshipAnalysisService>();
 
+// Register Rule Suggestion service — AI-powered pattern analysis for rule recommendations
+builder.Services.AddScoped<IRuleSuggestionService, RuleSuggestionService>();
+
 // Add controllers for API endpoints (webhooks)
 builder.Services.AddControllers();
 

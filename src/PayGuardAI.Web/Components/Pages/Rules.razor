@@ -6,6 +6,8 @@
 @inject IDialogService DialogService
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
 @inject PayGuardAI.Core.Services.IRuleVersioningService VersioningService
+@inject PayGuardAI.Core.Services.IRuleSuggestionService SuggestionService
+@inject PayGuardAI.Core.Services.ITenantContext TenantContext
 @using Microsoft.EntityFrameworkCore
 
 <PageTitle>Risk Rules - PayGuard AI</PageTitle>
@@ -42,6 +44,107 @@
 }
 else
 {
+    @* ── AI-Powered Rule Suggestions ──────────────────────────────── *@
+    @if (_suggestions.Count > 0)
+    {
+        <MudPaper Class="pa-4 mb-5" Elevation="2" Style="border-left: 4px solid var(--mud-palette-info);">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudText Typo="Typo.h6">
+                        💡 Smart Rule Suggestions
+                    </MudText>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Filled">
+                        @_suggestions.Count new
+                    </MudChip>
+                </MudStack>
+                <MudStack Row="true" Spacing="1">
+                    <MudTooltip Text="Refresh suggestions based on latest data">
+                        <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
+                                       OnClick="@LoadSuggestions" Disabled="@_loadingSuggestions" />
+                    </MudTooltip>
+                    <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Default"
+                               OnClick="@(() => _suggestionsCollapsed = !_suggestionsCollapsed)">
+                        @(_suggestionsCollapsed ? "Show" : "Hide")
+                    </MudButton>
+                </MudStack>
+            </MudStack>
+
+            @if (_loadingSuggestions)
+            {
+                <MudProgressLinear Color="Color.Info" Indeterminate="true" Class="mb-2" />
+            }
+
+            @if (!_suggestionsCollapsed)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                    Based on analysis of flagged transactions from the last 30 days. Click <strong>"Create Rule"</strong> to adopt a suggestion.
+                </MudText>
+
+                <MudGrid>
+                    @foreach (var suggestion in _suggestions)
+                    {
+                        <MudItem xs="12" md="6" lg="4">
+                            <MudCard Elevation="1" Style="border-top: 3px solid var(--mud-palette-info); height: 100%;">
+                                <MudCardContent>
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-2">
+                                        <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">
+                                            @GetPatternIcon(suggestion.Pattern) @suggestion.Name
+                                        </MudText>
+                                        <MudTooltip Text="@($"Confidence: {suggestion.Confidence}%")">
+                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                                                     Color="@GetConfidenceColor(suggestion.Confidence)">
+                                                @suggestion.Confidence%
+                                            </MudChip>
+                                        </MudTooltip>
+                                    </MudStack>
+
+                                    <MudText Typo="Typo.body2" Class="mb-2">@suggestion.Description</MudText>
+
+                                    <MudPaper Class="pa-2 mb-2" Elevation="0" Style="background-color: var(--mud-palette-background-grey);">
+                                        <MudText Typo="Typo.body2">
+                                            <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Size="Size.Small" Class="mr-1" />
+                                            When <strong>@GetFieldDisplayName(suggestion.ExpressionField)</strong>
+                                            @GetOperatorDisplay(suggestion.ExpressionOperator)
+                                            <strong>@suggestion.ExpressionValue</strong>
+                                            → +@suggestion.SuggestedWeight pts
+                                        </MudText>
+                                    </MudPaper>
+
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        <MudIcon Icon="@Icons.Material.Filled.Analytics" Size="Size.Small" Class="mr-1" />
+                                        @suggestion.Evidence
+                                    </MudText>
+                                </MudCardContent>
+                                <MudCardActions>
+                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                               StartIcon="@Icons.Material.Filled.Add"
+                                               OnClick="@(() => CreateRuleFromSuggestion(suggestion))">
+                                        Create Rule
+                                    </MudButton>
+                                    <MudSpacer />
+                                    <MudTooltip Text="Dismiss this suggestion">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                                                       Color="Color.Default"
+                                                       OnClick="@(() => DismissSuggestion(suggestion))" />
+                                    </MudTooltip>
+                                </MudCardActions>
+                            </MudCard>
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+        </MudPaper>
+    }
+    else if (!_loadingSuggestions && _suggestionsLoaded)
+    {
+        <MudAlert Severity="Severity.Success" Dense="true" Class="mb-4">
+            <MudText Typo="Typo.body2">
+                ✅ No new rule suggestions — your current rules cover the observed patterns well.
+                <MudLink OnClick="@LoadSuggestions" Typo="Typo.body2">Re-analyze</MudLink>
+            </MudText>
+        </MudAlert>
+    }
+
     @* ── System Rules (built-in) ──────────────────────────────────── *@
     <MudText Typo="Typo.h6" Class="mb-2">
         <MudIcon Icon="@Icons.Material.Filled.Shield" Size="Size.Small" Class="mr-1" />
@@ -455,9 +558,41 @@ else
     private List<RiskRule> _expressionRules = new();
     private List<RuleGroup> _compoundRules = new();
 
+    // ── Suggestion state ──
+    private List<PayGuardAI.Core.Services.RuleSuggestion> _suggestions = new();
+    private HashSet<string> _dismissedSuggestionIds = new();
+    private bool _loadingSuggestions;
+    private bool _suggestionsLoaded;
+    private bool _suggestionsCollapsed;
+
     protected override async Task OnInitializedAsync()
     {
         await LoadRules();
+        _ = LoadSuggestions(); // fire-and-forget so it doesn't block rules
+    }
+
+    private async Task LoadSuggestions()
+    {
+        _loadingSuggestions = true;
+        StateHasChanged();
+        try
+        {
+            var tenantId = TenantContext.TenantId ?? "";
+            var allSuggestions = await SuggestionService.GenerateSuggestionsAsync(tenantId);
+            _suggestions = allSuggestions
+                .Where(s => !_dismissedSuggestionIds.Contains(s.SuggestionId))
+                .ToList();
+            _suggestionsLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Could not load suggestions: {ex.Message}", Severity.Warning);
+        }
+        finally
+        {
+            _loadingSuggestions = false;
+            StateHasChanged();
+        }
     }
 
     private async Task LoadRules()
@@ -536,6 +671,71 @@ else
         await DbContext.SaveChangesAsync();
         Snackbar.Add($"Weight updated for '{rule.Name}'", Severity.Info);
     }
+
+    // ── Suggestion Actions ──────────────────────────────────────────
+
+    private async Task CreateRuleFromSuggestion(PayGuardAI.Core.Services.RuleSuggestion suggestion)
+    {
+        var ruleCode = $"EXPR_{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}";
+
+        decimal threshold = 0;
+        decimal.TryParse(suggestion.ExpressionValue, out threshold);
+
+        var rule = new RiskRule
+        {
+            Id = Guid.NewGuid(),
+            TenantId = TenantContext.TenantId ?? "",
+            Name = suggestion.Name,
+            RuleCode = ruleCode,
+            Description = suggestion.Description,
+            Category = suggestion.Category,
+            Threshold = threshold,
+            ScoreWeight = suggestion.SuggestedWeight,
+            ExpressionField = suggestion.ExpressionField,
+            ExpressionOperator = suggestion.ExpressionOperator,
+            ExpressionValue = suggestion.ExpressionValue,
+            Mode = "Shadow", // Start in shadow mode for safety
+            UpdatedAt = DateTime.UtcNow,
+            UpdatedBy = CurrentUser.UserName
+        };
+
+        DbContext.RiskRules.Add(rule);
+        await DbContext.SaveChangesAsync();
+        Snackbar.Add($"Rule '{rule.Name}' created in Shadow mode — test it before activating!", Severity.Success);
+
+        // Remove from suggestions list
+        _suggestions.RemoveAll(s => s.SuggestionId == suggestion.SuggestionId);
+        await LoadRules();
+    }
+
+    private void DismissSuggestion(PayGuardAI.Core.Services.RuleSuggestion suggestion)
+    {
+        _dismissedSuggestionIds.Add(suggestion.SuggestionId);
+        _suggestions.RemoveAll(s => s.SuggestionId == suggestion.SuggestionId);
+        Snackbar.Add("Suggestion dismissed", Severity.Info);
+    }
+
+    // ── Suggestion Helpers ──────────────────────────────────────────
+
+    private static string GetPatternIcon(PayGuardAI.Core.Services.SuggestionPattern pattern) => pattern switch
+    {
+        PayGuardAI.Core.Services.SuggestionPattern.AmountCluster => "💰",
+        PayGuardAI.Core.Services.SuggestionPattern.CorridorHotspot => "🌍",
+        PayGuardAI.Core.Services.SuggestionPattern.TimeAnomaly => "🕐",
+        PayGuardAI.Core.Services.SuggestionPattern.RoundAmountSpike => "🔢",
+        PayGuardAI.Core.Services.SuggestionPattern.VelocityBurst => "⚡",
+        PayGuardAI.Core.Services.SuggestionPattern.CurrencyPairRisk => "💱",
+        PayGuardAI.Core.Services.SuggestionPattern.NewCustomerRisk => "🆕",
+        PayGuardAI.Core.Services.SuggestionPattern.RepeatOffender => "🔁",
+        _ => "💡"
+    };
+
+    private static Color GetConfidenceColor(int confidence) => confidence switch
+    {
+        >= 75 => Color.Success,
+        >= 50 => Color.Warning,
+        _ => Color.Default
+    };
     
     private async Task OpenAddRuleDialog()
     {
