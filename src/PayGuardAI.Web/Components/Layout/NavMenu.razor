@@ -79,19 +79,19 @@
             <MudNavLink Href="/admin/gdpr" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Shield">
                 GDPR Compliance
             </MudNavLink>
-            <MudNavLink Href="/admin/system-logs" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Terminal">
-                System Logs
-            </MudNavLink>
         </Authorized>
     </AuthorizeView>
 
-    @* ── Platform Owner only ──────────────────────────────────────── *@
+    @* ── Platform Owner only ──────────────────────────────────────────────── *@
     <AuthorizeView Roles="SuperAdmin">
         <Authorized>
             <MudDivider Class="my-2" />
             <MudText Typo="Typo.overline" Class="ml-4 mt-1" Color="Color.Secondary">Platform</MudText>
             <MudNavLink Href="/super-admin/tenants" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Business">
                 Tenant Management
+            </MudNavLink>
+            <MudNavLink Href="/super-admin/system-logs" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Terminal">
+                System Logs
             </MudNavLink>
         </Authorized>
     </AuthorizeView>

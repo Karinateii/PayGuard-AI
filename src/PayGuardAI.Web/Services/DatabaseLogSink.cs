@@ -33,12 +33,29 @@ public class DatabaseLogSink : ILogEventSink, IDisposable
             TimeSpan.FromSeconds(flushIntervalSeconds));
     }
 
+    // Sources that produce noisy infra warnings — skip persisting them to DB
+    private static readonly HashSet<string> _suppressedSources = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Microsoft.AspNetCore.Session.SessionMiddleware",
+        "Microsoft.AspNetCore.DataProtection.XmlEncryption.XmlKeyManager",
+        "Microsoft.AspNetCore.DataProtection.Repositories.FileSystemXmlRepository",
+        "Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager",
+        "Microsoft.EntityFrameworkCore.Model.Validation",
+        "Microsoft.AspNetCore.Hosting.Diagnostics",
+        "Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServer",
+    };
+
     public void Emit(LogEvent logEvent)
     {
         if (_disposed) return;
 
         // Only persist Warning and above to keep DB lean
         if (logEvent.Level < LogEventLevel.Warning) return;
+
+        // Skip noisy infrastructure sources
+        var source = GetProperty(logEvent, "SourceContext");
+        if (source != null && _suppressedSources.Any(s => source.Contains(s, StringComparison.OrdinalIgnoreCase)))
+            return;
 
         var entry = new SystemLog
         {

@@ -1,7 +1,7 @@
-@page "/admin/system-logs"
+@page "/super-admin/system-logs"
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
-@attribute [Authorize(Policy = "RequireAdmin")]
+@attribute [Authorize(Policy = "RequireSuperAdmin")]
 @inject PayGuardAI.Data.ApplicationDbContext DbContext
 
 <PageTitle>System Logs - PayGuard AI</PageTitle>
@@ -12,8 +12,8 @@
 </MudText>
 
 <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4">
-    Searchable structured log history. Warning-level and above logs are persisted for 30 days.
-    All logs include correlation IDs for full request tracing.
+    Platform-wide structured log history. Warning-level and above are persisted for 30 days.
+    Select a tenant to view its logs, or choose "All Tenants" for a global view.
 </MudAlert>
 
 <MudPaper Class="pa-4 mb-4" Elevation="2">
@@ -44,8 +44,14 @@
             </MudSelect>
         </MudItem>
         <MudItem xs="6" sm="4" md="2">
-            <MudTextField T="string" @bind-Value="_tenantFilter" Label="Tenant ID"
-                          Variant="Variant.Outlined" Placeholder="Filter by tenant" />
+            <MudSelect T="string" @bind-Value="_tenantFilter" Label="Tenant"
+                       Variant="Variant.Outlined">
+                <MudSelectItem T="string" Value="@((string)null!)">All Tenants</MudSelectItem>
+                @foreach (var t in _tenantOptions)
+                {
+                    <MudSelectItem T="string" Value="@t">@t</MudSelectItem>
+                }
+            </MudSelect>
         </MudItem>
         <MudItem xs="6" sm="4" md="3">
             <MudTextField T="string" @bind-Value="_correlationFilter" Label="Correlation ID"
@@ -234,9 +240,19 @@ else if (!_loading)
 
     private bool _showDetail;
     private SystemLog? _selectedLog;
+    private List<string> _tenantOptions = new();
 
     protected override async Task OnInitializedAsync()
     {
+        // Load distinct tenant IDs for the dropdown
+        _tenantOptions = await DbContext.SystemLogs
+            .IgnoreQueryFilters()
+            .Where(l => l.TenantId != null && l.TenantId != "" && l.TenantId != "unknown")
+            .Select(l => l.TenantId!)
+            .Distinct()
+            .OrderBy(t => t)
+            .ToListAsync();
+
         await LoadLogs();
     }
 

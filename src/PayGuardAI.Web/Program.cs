@@ -434,13 +434,20 @@ if (app.Environment.IsDevelopment())
 app.UseSerilogRequestLogging(options =>
 {
     options.MessageTemplate = "{RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000}ms";
-    options.GetLevel = (httpContext, elapsed, ex) => ex != null
-        ? LogEventLevel.Error
-        : httpContext.Response.StatusCode >= 500
-            ? LogEventLevel.Error
-            : elapsed > 2000
-                ? LogEventLevel.Warning
-                : LogEventLevel.Information;
+    options.GetLevel = (httpContext, elapsed, ex) =>
+    {
+        // Skip WebSocket upgrades (/_blazor, /hubs/) — they’re long-lived by design
+        var path = httpContext.Request.Path.Value ?? "";
+        if (httpContext.Response.StatusCode == 101
+            || path.StartsWith("/_blazor")
+            || path.StartsWith("/hubs/"))
+            return LogEventLevel.Debug; // effectively hidden
+
+        if (ex != null) return LogEventLevel.Error;
+        if (httpContext.Response.StatusCode >= 500) return LogEventLevel.Error;
+        if (elapsed > 2000) return LogEventLevel.Warning;
+        return LogEventLevel.Information;
+    };
     options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
     {
         diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value ?? "");
