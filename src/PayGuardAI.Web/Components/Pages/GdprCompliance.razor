@@ -1,0 +1,571 @@
+@page "/admin/gdpr"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin,SuperAdmin,Manager")]
+@inject PayGuardAI.Core.Services.IGdprService GdprService
+@inject PayGuardAI.Core.Services.ITenantContext TenantContext
+@inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+@inject IDialogService DialogService
+
+<PageTitle>GDPR Compliance — PayGuard AI</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">
+    <MudIcon Icon="@Icons.Material.Filled.Shield" Class="mr-2" />
+    GDPR Compliance Center
+</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+    Data Subject Access Requests (DSAR), Right to Erasure, and compliance audit trail.
+    All operations are logged and tenant-scoped per GDPR Articles 15, 17, and 20.
+</MudText>
+
+<MudGrid Spacing="4">
+    @* ── Left Column: Subject Search + Actions ─────────────────────── *@
+    <MudItem xs="12" md="7">
+        <MudPaper Class="pa-6" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.PersonSearch" Class="mr-1" />
+                Data Subject Lookup
+            </MudText>
+
+            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.End">
+                <MudTextField @bind-Value="_searchQuery" Label="Search by Customer / Sender ID"
+                              Variant="Variant.Outlined" Placeholder="e.g. usr_abc123 or partial ID"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Immediate="true" DebounceInterval="400"
+                              OnDebounceIntervalElapsed="SearchSubjects"
+                              Class="flex-grow-1" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Search"
+                           OnClick="SearchSubjects" Disabled="@_searching">
+                    Search
+                </MudButton>
+            </MudStack>
+
+            @if (_searching)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mt-2" />
+            }
+
+            @if (_searchResults.Any())
+            {
+                <MudText Typo="Typo.overline" Class="mt-4 mb-2">
+                    @_searchResults.Count matching subject(s)
+                </MudText>
+                <MudList T="string" Dense="true" Class="mb-2">
+                    @foreach (var subject in _searchResults)
+                    {
+                        <MudListItem T="string" Icon="@Icons.Material.Filled.Person"
+                                     OnClick="@(() => SelectSubject(subject))"
+                                     Style="@(subject == _selectedSubject ? "background-color: var(--mud-palette-primary-lighten); border-radius:8px;" : "")">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Style="width:100%">
+                                <MudText Typo="Typo.body1" Style="font-family: monospace;">@subject</MudText>
+                                @if (subject == _selectedSubject)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Primary">Selected</MudChip>
+                                }
+                            </MudStack>
+                        </MudListItem>
+                    }
+                </MudList>
+            }
+            else if (_searchPerformed && !_searching)
+            {
+                <MudAlert Severity="Severity.Info" Class="mt-4">
+                    No subjects found matching your query. Try a different search term.
+                </MudAlert>
+            }
+        </MudPaper>
+
+        @* ── Selected Subject Actions ─────────────────────────────── *@
+        @if (!string.IsNullOrEmpty(_selectedSubject))
+        {
+            <MudPaper Class="pa-6 mt-4" Elevation="2">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+                    <MudText Typo="Typo.h6">
+                        <MudIcon Icon="@Icons.Material.Filled.Person" Class="mr-1" />
+                        Subject: <code>@_selectedSubject</code>
+                    </MudText>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
+                        GDPR Art. 15/17/20
+                    </MudChip>
+                </MudStack>
+
+                <MudGrid Spacing="3">
+                    @* Export JSON (Data Portability) *@
+                    <MudItem xs="12" sm="4">
+                        <MudCard Elevation="1" Class="pa-4" Style="height: 100%;">
+                            <MudStack Spacing="2" Justify="Justify.SpaceBetween" Style="height: 100%;">
+                                <div>
+                                    <MudIcon Icon="@Icons.Material.Filled.Code" Color="Color.Primary" Size="Size.Large" />
+                                    <MudText Typo="Typo.subtitle1" Class="mt-2">Export JSON</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        Machine-readable data portability export (Art. 20)
+                                    </MudText>
+                                </div>
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                                           StartIcon="@Icons.Material.Filled.Download"
+                                           OnClick="ExportJson" Disabled="@_exporting">
+                                    @if (_exporting && _exportType == "json")
+                                    {
+                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                    }
+                                    Download JSON
+                                </MudButton>
+                            </MudStack>
+                        </MudCard>
+                    </MudItem>
+
+                    @* Export CSV *@
+                    <MudItem xs="12" sm="4">
+                        <MudCard Elevation="1" Class="pa-4" Style="height: 100%;">
+                            <MudStack Spacing="2" Justify="Justify.SpaceBetween" Style="height: 100%;">
+                                <div>
+                                    <MudIcon Icon="@Icons.Material.Filled.TableChart" Color="Color.Success" Size="Size.Large" />
+                                    <MudText Typo="Typo.subtitle1" Class="mt-2">Export CSV</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        Human-readable export for compliance review (Art. 15)
+                                    </MudText>
+                                </div>
+                                <MudButton Variant="Variant.Filled" Color="Color.Success" FullWidth="true"
+                                           StartIcon="@Icons.Material.Filled.Download"
+                                           OnClick="ExportCsv" Disabled="@_exporting">
+                                    @if (_exporting && _exportType == "csv")
+                                    {
+                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                    }
+                                    Download CSV
+                                </MudButton>
+                            </MudStack>
+                        </MudCard>
+                    </MudItem>
+
+                    @* Anonymize (Right to Erasure) *@
+                    <MudItem xs="12" sm="4">
+                        <MudCard Elevation="1" Class="pa-4" Style="height: 100%; border: 1px solid var(--mud-palette-error);">
+                            <MudStack Spacing="2" Justify="Justify.SpaceBetween" Style="height: 100%;">
+                                <div>
+                                    <MudIcon Icon="@Icons.Material.Filled.DeleteForever" Color="Color.Error" Size="Size.Large" />
+                                    <MudText Typo="Typo.subtitle1" Class="mt-2">Right to Erasure</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        Anonymize all PII — irreversible (Art. 17)
+                                    </MudText>
+                                </div>
+                                <MudButton Variant="Variant.Filled" Color="Color.Error" FullWidth="true"
+                                           StartIcon="@Icons.Material.Filled.DeleteForever"
+                                           OnClick="ConfirmErasure" Disabled="@_erasing">
+                                    @if (_erasing)
+                                    {
+                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                    }
+                                    Anonymize Data
+                                </MudButton>
+                            </MudStack>
+                        </MudCard>
+                    </MudItem>
+                </MudGrid>
+
+                @* Export/Erasure Result *@
+                @if (_lastExport != null)
+                {
+                    <MudAlert Severity="Severity.Success" Class="mt-4" Dense="true">
+                        <strong>DSAR Export completed:</strong> @_lastExport.TotalRecords records exported
+                        (@_lastExport.Transactions.Count transactions, @_lastExport.RiskAnalyses.Count analyses,
+                        @_lastExport.AuditEntries.Count audit entries).
+                    </MudAlert>
+                }
+
+                @if (_lastErasure != null)
+                {
+                    <MudAlert Severity="Severity.Warning" Class="mt-4" Dense="true">
+                        <strong>Erasure completed:</strong> @_lastErasure.TotalRecords records anonymized
+                        (@_lastErasure.TransactionsAnonymized txns, @_lastErasure.RiskAnalysesAnonymized analyses,
+                        @_lastErasure.AuditEntriesAnonymized audit entries,
+                        profile @(_lastErasure.CustomerProfileRemoved ? "removed" : "not found")).
+                    </MudAlert>
+                }
+            </MudPaper>
+        }
+    </MudItem>
+
+    @* ── Right Column: Info + Stats ────────────────────────────────── *@
+    <MudItem xs="12" md="5">
+        <MudPaper Class="pa-6" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-1" />
+                GDPR Quick Reference
+            </MudText>
+            <MudStack Spacing="2">
+                <MudAlert Severity="Severity.Info" Dense="true" NoIcon="true">
+                    <strong>Art. 15 — Right of Access</strong><br />
+                    Data subjects can request a copy of all personal data you hold about them.
+                    Use the <em>Export CSV</em> or <em>Export JSON</em> actions.
+                </MudAlert>
+                <MudAlert Severity="Severity.Info" Dense="true" NoIcon="true">
+                    <strong>Art. 17 — Right to Erasure</strong><br />
+                    Subjects can request deletion of their personal data. Use
+                    <em>Anonymize Data</em> — PII is irreversibly hashed while keeping
+                    transaction structure for AML compliance.
+                </MudAlert>
+                <MudAlert Severity="Severity.Info" Dense="true" NoIcon="true">
+                    <strong>Art. 20 — Data Portability</strong><br />
+                    Subjects can receive their data in a structured, machine-readable format.
+                    The <em>Export JSON</em> action provides a complete portable bundle.
+                </MudAlert>
+                <MudAlert Severity="Severity.Warning" Dense="true" NoIcon="true">
+                    <strong>30-Day Deadline</strong><br />
+                    GDPR requires you to respond to data-subject requests within
+                    <strong>30 calendar days</strong>. All requests are timestamped in the audit trail below.
+                </MudAlert>
+            </MudStack>
+        </MudPaper>
+
+        @* ── Data exported summary ─────────────────────────────── *@
+        <MudPaper Class="pa-6 mt-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.BarChart" Class="mr-1" />
+                Compliance Stats
+            </MudText>
+            @if (_requestHistory.Any())
+            {
+                <MudSimpleTable Dense="true" Bordered="true" Striped="true">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Total DSAR Requests</td>
+                            <td><strong>@_requestHistory.Count(r => r.RequestType.StartsWith("DSAR"))</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Total Erasure Requests</td>
+                            <td><strong>@_requestHistory.Count(r => r.RequestType == "ERASURE")</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Records Processed</td>
+                            <td><strong>@_requestHistory.Sum(r => r.RecordsAffected)</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Unique Subjects</td>
+                            <td><strong>@_requestHistory.Select(r => r.SubjectId).Distinct().Count()</strong></td>
+                        </tr>
+                    </tbody>
+                </MudSimpleTable>
+            }
+            else
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">No GDPR requests yet.</MudText>
+            }
+        </MudPaper>
+    </MudItem>
+
+    @* ── Request Audit Trail (full width) ──────────────────────────── *@
+    <MudItem xs="12">
+        <MudPaper Class="pa-6" Elevation="2">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+                <MudText Typo="Typo.h6">
+                    <MudIcon Icon="@Icons.Material.Filled.History" Class="mr-1" />
+                    GDPR Request Audit Trail
+                </MudText>
+                <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Refresh"
+                           OnClick="LoadHistory">
+                    Refresh
+                </MudButton>
+            </MudStack>
+
+            @if (_loadingHistory)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else if (_requestHistory.Any())
+            {
+                <MudTable Items="@_requestHistory" Dense="true" Bordered="true" Striped="true" Hover="true"
+                          RowsPerPage="10">
+                    <HeaderContent>
+                        <MudTh>Date</MudTh>
+                        <MudTh>Type</MudTh>
+                        <MudTh>Subject</MudTh>
+                        <MudTh>Requested By</MudTh>
+                        <MudTh>Records</MudTh>
+                        <MudTh>Status</MudTh>
+                        <MudTh>Notes</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.RequestedAt.ToString("yyyy-MM-dd HH:mm")</MudTd>
+                        <MudTd>
+                            <MudChip T="string" Size="Size.Small"
+                                     Color="@GetRequestTypeColor(context.RequestType)"
+                                     Variant="Variant.Filled">
+                                @GetRequestTypeLabel(context.RequestType)
+                            </MudChip>
+                        </MudTd>
+                        <MudTd Style="font-family: monospace; font-size: 0.85rem;">@context.SubjectId</MudTd>
+                        <MudTd>@context.RequestedBy</MudTd>
+                        <MudTd>@context.RecordsAffected</MudTd>
+                        <MudTd>
+                            <MudChip T="string" Size="Size.Small"
+                                     Color="@(context.Status == "Completed" ? Color.Success : Color.Error)"
+                                     Variant="Variant.Outlined">
+                                @context.Status
+                            </MudChip>
+                        </MudTd>
+                        <MudTd Style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            @(context.Notes ?? "—")
+                        </MudTd>
+                    </RowTemplate>
+                    <PagerContent>
+                        <MudTablePager />
+                    </PagerContent>
+                </MudTable>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Info" Dense="true">
+                    No GDPR requests have been made yet. Use the subject lookup above to get started.
+                </MudAlert>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    // ── State ──────────────────────────────────────────────────────────
+    private string _searchQuery = "";
+    private bool _searching;
+    private bool _searchPerformed;
+    private List<string> _searchResults = [];
+
+    private string _selectedSubject = "";
+
+    private bool _exporting;
+    private string _exportType = "";
+    private GdprDataExport? _lastExport;
+
+    private bool _erasing;
+    private GdprErasureResult? _lastErasure;
+
+    private bool _loadingHistory;
+    private List<GdprRequest> _requestHistory = [];
+
+    // ── Lifecycle ──────────────────────────────────────────────────────
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadHistory();
+    }
+
+    // ── Search ─────────────────────────────────────────────────────────
+    private async Task SearchSubjects()
+    {
+        if (string.IsNullOrWhiteSpace(_searchQuery) || _searchQuery.Length < 2) return;
+
+        _searching = true;
+        _searchPerformed = true;
+        _lastExport = null;
+        _lastErasure = null;
+
+        try
+        {
+            _searchResults = await GdprService.SearchSubjectsAsync(
+                TenantContext.TenantId, _searchQuery.Trim());
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Search failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _searching = false;
+        }
+    }
+
+    private void SelectSubject(string subject)
+    {
+        _selectedSubject = subject;
+        _lastExport = null;
+        _lastErasure = null;
+    }
+
+    // ── Export JSON ────────────────────────────────────────────────────
+    private async Task ExportJson()
+    {
+        if (string.IsNullOrEmpty(_selectedSubject)) return;
+
+        _exporting = true;
+        _exportType = "json";
+        _lastExport = null;
+        StateHasChanged();
+
+        try
+        {
+            var export = await GdprService.ExportSubjectDataAsync(
+                TenantContext.TenantId, _selectedSubject, CurrentUser.UserName);
+
+            _lastExport = export;
+
+            if (export.JsonBytes != null && export.JsonBytes.Length > 0)
+            {
+                await DownloadFile(export.JsonBytes,
+                    $"gdpr-export-{_selectedSubject}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json",
+                    "application/json");
+                Snackbar.Add($"DSAR export complete — {export.TotalRecords} records downloaded.", Severity.Success);
+            }
+
+            await LoadHistory();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _exporting = false;
+        }
+    }
+
+    // ── Export CSV ─────────────────────────────────────────────────────
+    private async Task ExportCsv()
+    {
+        if (string.IsNullOrEmpty(_selectedSubject)) return;
+
+        _exporting = true;
+        _exportType = "csv";
+        _lastExport = null;
+        StateHasChanged();
+
+        try
+        {
+            var csvBytes = await GdprService.ExportSubjectDataCsvAsync(
+                TenantContext.TenantId, _selectedSubject, CurrentUser.UserName);
+
+            await DownloadFile(csvBytes,
+                $"gdpr-export-{_selectedSubject}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.csv",
+                "text/csv");
+            Snackbar.Add("DSAR CSV export downloaded.", Severity.Success);
+
+            await LoadHistory();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"CSV export failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _exporting = false;
+        }
+    }
+
+    // ── Erasure with Confirmation ──────────────────────────────────────
+    private async Task ConfirmErasure()
+    {
+        var parameters = new DialogParameters<ConfirmGdprErasureDialog>
+        {
+            { x => x.SubjectId, _selectedSubject }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmGdprErasureDialog>(
+            "Confirm Right to Erasure", parameters, new DialogOptions
+            {
+                MaxWidth = MaxWidth.Small,
+                FullWidth = true,
+                CloseOnEscapeKey = true
+            });
+
+        var result = await dialog.Result;
+        if (result == null || result.Canceled) return;
+
+        await ExecuteErasure();
+    }
+
+    private async Task ExecuteErasure()
+    {
+        _erasing = true;
+        _lastErasure = null;
+        StateHasChanged();
+
+        try
+        {
+            var erasure = await GdprService.AnonymizeSubjectDataAsync(
+                TenantContext.TenantId, _selectedSubject, CurrentUser.UserName);
+
+            _lastErasure = erasure;
+            _selectedSubject = "";
+            _searchResults.Clear();
+            _searchPerformed = false;
+
+            Snackbar.Add($"Erasure complete — {erasure.TotalRecords} records anonymized.", Severity.Warning);
+            await LoadHistory();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erasure failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _erasing = false;
+        }
+    }
+
+    // ── History ────────────────────────────────────────────────────────
+    private async Task LoadHistory()
+    {
+        _loadingHistory = true;
+
+        try
+        {
+            _requestHistory = await GdprService.GetRequestHistoryAsync(TenantContext.TenantId, 100);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load history: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingHistory = false;
+        }
+    }
+
+    // ── File Download via JS Interop ──────────────────────────────────
+    private async Task DownloadFile(byte[] bytes, string fileName, string contentType)
+    {
+        var base64 = Convert.ToBase64String(bytes);
+        await JS.InvokeVoidAsync("eval", $@"
+            (function() {{
+                var byteCharacters = atob('{base64}');
+                var byteNumbers = new Array(byteCharacters.length);
+                for (var i = 0; i < byteCharacters.length; i++) {{
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }}
+                var byteArray = new Uint8Array(byteNumbers);
+                var blob = new Blob([byteArray], {{ type: '{contentType}' }});
+                var link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = '{fileName}';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+            }})();
+        ");
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────
+    private static Color GetRequestTypeColor(string type) => type switch
+    {
+        "DSAR_EXPORT" => Color.Primary,
+        "DSAR_CSV" => Color.Success,
+        "ERASURE" => Color.Error,
+        _ => Color.Default
+    };
+
+    private static string GetRequestTypeLabel(string type) => type switch
+    {
+        "DSAR_EXPORT" => "Data Export (JSON)",
+        "DSAR_CSV" => "Data Export (CSV)",
+        "ERASURE" => "Erasure",
+        _ => type
+    };
+}

@@ -1,0 +1,69 @@
+@using Microsoft.AspNetCore.Components
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" />
+            <MudText Typo="Typo.h6">Irreversible Erasure</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudAlert Severity="Severity.Error" Class="mb-4">
+            <strong>This action cannot be undone.</strong>
+        </MudAlert>
+
+        <MudText Typo="Typo.body1" Class="mb-3">
+            You are about to exercise the <strong>Right to Erasure (GDPR Art. 17)</strong> for:
+        </MudText>
+
+        <MudPaper Class="pa-3 mb-4" Elevation="0" Style="background: var(--mud-palette-background-grey); border-radius: 8px;">
+            <MudText Typo="Typo.body1" Style="font-family: monospace; font-weight: 600;">@SubjectId</MudText>
+        </MudPaper>
+
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+            This will:
+        </MudText>
+        <MudList T="string" Dense="true">
+            <MudListItem T="string" Icon="@Icons.Material.Filled.Check" IconColor="Color.Error">
+                Replace sender/receiver IDs with an irreversible hash
+            </MudListItem>
+            <MudListItem T="string" Icon="@Icons.Material.Filled.Check" IconColor="Color.Error">
+                Redact raw webhook payloads
+            </MudListItem>
+            <MudListItem T="string" Icon="@Icons.Material.Filled.Check" IconColor="Color.Error">
+                Scrub subject references from risk explanations and audit logs
+            </MudListItem>
+            <MudListItem T="string" Icon="@Icons.Material.Filled.Check" IconColor="Color.Error">
+                Delete the customer profile entirely
+            </MudListItem>
+        </MudList>
+
+        <MudText Typo="Typo.body2" Class="mt-3">
+            To confirm, type <strong>ERASE</strong> below:
+        </MudText>
+        <MudTextField @bind-Value="_confirmText" Variant="Variant.Outlined" Class="mt-2"
+                      Placeholder="Type ERASE to confirm" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error"
+                   StartIcon="@Icons.Material.Filled.DeleteForever"
+                   Disabled="@(_confirmText != "ERASE")"
+                   OnClick="Submit">
+            Permanently Anonymize
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public string SubjectId { get; set; } = "";
+
+    private string _confirmText = "";
+
+    private void Cancel() => MudDialog.Cancel();
+    private void Submit() => MudDialog.Close(DialogResult.Ok(true));
+}

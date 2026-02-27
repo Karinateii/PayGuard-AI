@@ -264,6 +264,9 @@ builder.Services.AddScoped<IRuleVersioningService, RuleVersioningService>();
 // Register Fraud Savings service — calculates ROI dashboard metrics
 builder.Services.AddScoped<IFraudSavingsService, FraudSavingsService>();
 
+// Register GDPR compliance service — DSAR exports, anonymization, request audit
+builder.Services.AddScoped<IGdprService, GdprService>();
+
 // Add controllers for API endpoints (webhooks)
 builder.Services.AddControllers();
 

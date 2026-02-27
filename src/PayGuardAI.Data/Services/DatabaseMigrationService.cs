@@ -61,6 +61,9 @@ public class DatabaseMigrationService : IDatabaseMigrationService
             // Create RuleVersions table (rule versioning & rollback)
             await CreateRuleVersionsTableAsync(dbType);
 
+            // Create GdprRequests table (GDPR compliance audit trail)
+            await CreateGdprRequestsTableAsync(dbType);
+
             // Mark existing tenants as onboarded so they aren't redirected
             await MarkExistingTenantsOnboardedAsync(dbType);
 
@@ -1024,6 +1027,85 @@ public class DatabaseMigrationService : IDatabaseMigrationService
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Skipping RuleVersions table creation");
+        }
+    }
+
+    /// <summary>
+    /// Creates the GdprRequests table if it doesn't already exist.
+    /// Added for the GDPR Compliance feature — tracks data-subject requests.
+    /// </summary>
+    private async Task CreateGdprRequestsTableAsync(string dbType)
+    {
+        try
+        {
+            if (dbType == "PostgreSQL")
+            {
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS "GdprRequests" (
+                        "Id" uuid NOT NULL PRIMARY KEY,
+                        "TenantId" text NOT NULL DEFAULT '',
+                        "SubjectId" text NOT NULL DEFAULT '',
+                        "RequestType" text NOT NULL DEFAULT '',
+                        "RequestedBy" text NOT NULL DEFAULT '',
+                        "RequestedAt" timestamp with time zone NOT NULL DEFAULT now(),
+                        "Status" text NOT NULL DEFAULT 'Completed',
+                        "RecordsAffected" integer NOT NULL DEFAULT 0,
+                        "Notes" text
+                    )
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS "IX_GdprRequests_TenantId"
+                    ON "GdprRequests" ("TenantId")
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS "IX_GdprRequests_SubjectId"
+                    ON "GdprRequests" ("SubjectId")
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS "IX_GdprRequests_RequestedAt"
+                    ON "GdprRequests" ("RequestedAt")
+                    """);
+            }
+            else
+            {
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS GdprRequests (
+                        Id TEXT NOT NULL PRIMARY KEY,
+                        TenantId TEXT NOT NULL DEFAULT '',
+                        SubjectId TEXT NOT NULL DEFAULT '',
+                        RequestType TEXT NOT NULL DEFAULT '',
+                        RequestedBy TEXT NOT NULL DEFAULT '',
+                        RequestedAt TEXT NOT NULL DEFAULT (datetime('now')),
+                        Status TEXT NOT NULL DEFAULT 'Completed',
+                        RecordsAffected INTEGER NOT NULL DEFAULT 0,
+                        Notes TEXT
+                    )
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS IX_GdprRequests_TenantId
+                    ON GdprRequests (TenantId)
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS IX_GdprRequests_SubjectId
+                    ON GdprRequests (SubjectId)
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS IX_GdprRequests_RequestedAt
+                    ON GdprRequests (RequestedAt)
+                    """);
+            }
+
+            _logger.LogDebug("GdprRequests table ensured");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipping GdprRequests table creation");
         }
     }
 }

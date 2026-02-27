@@ -63,6 +63,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<RuleGroup> RuleGroups => Set<RuleGroup>();
     public DbSet<RuleGroupCondition> RuleGroupConditions => Set<RuleGroupCondition>();
     public DbSet<RuleVersion> RuleVersions => Set<RuleVersion>();
+    public DbSet<GdprRequest> GdprRequests => Set<GdprRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -88,6 +89,7 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<MLModel>().HasQueryFilter(e => e.TenantId == TenantId);
         modelBuilder.Entity<RuleGroup>().HasQueryFilter(e => e.TenantId == TenantId);
         modelBuilder.Entity<RuleVersion>().HasQueryFilter(e => e.TenantId == TenantId);
+        modelBuilder.Entity<GdprRequest>().HasQueryFilter(e => e.TenantId == TenantId);
 
         // Entity configuration
 
@@ -187,6 +189,15 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(e => new { e.EntityId, e.VersionNumber });
             entity.HasIndex(e => e.TenantId);
             entity.HasIndex(e => e.CreatedAt);
+        });
+
+        // GdprRequest configuration (GDPR compliance audit trail)
+        modelBuilder.Entity<GdprRequest>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.TenantId);
+            entity.HasIndex(e => e.SubjectId);
+            entity.HasIndex(e => e.RequestedAt);
         });
 
         // AuditLog configuration
