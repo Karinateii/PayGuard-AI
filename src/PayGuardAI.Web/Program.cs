@@ -270,6 +270,9 @@ builder.Services.AddScoped<IGdprService, GdprService>();
 // Register Watchlist service — blocklists, watchlists, allowlists for risk scoring
 builder.Services.AddScoped<IWatchlistService, WatchlistService>();
 
+// Register Relationship Analysis service — fan-out / fan-in / mule detection
+builder.Services.AddScoped<IRelationshipAnalysisService, RelationshipAnalysisService>();
+
 // Add controllers for API endpoints (webhooks)
 builder.Services.AddControllers();
 

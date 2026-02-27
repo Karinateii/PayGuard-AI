@@ -1,0 +1,355 @@
+@page "/network"
+@using PayGuardAI.Core.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Manager,Admin,SuperAdmin")]
+
+<PageTitle>Network Analysis — PayGuard AI</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-1">
+    <MudIcon Icon="@Icons.Material.Filled.Hub" Class="mr-2" Style="vertical-align:middle;" />
+    Network Analysis
+</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+    Detect fan-out (one sender → many recipients) and fan-in (many senders → one recipient) patterns
+</MudText>
+
+@* ── Time window toggle ─────────────────────────────────────────── *@
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4" Spacing="2">
+    <MudText Typo="Typo.subtitle2">Time Window:</MudText>
+    <MudToggleGroup T="TimeWindow" @bind-Value="_selectedWindow" Color="Color.Primary"
+                    CheckMark="true" SelectionMode="SelectionMode.SingleSelection">
+        <MudToggleItem Value="TimeWindow.OneHour" Text="1 Hour" />
+        <MudToggleItem Value="TimeWindow.TwentyFourHours" Text="24 Hours" />
+        <MudToggleItem Value="TimeWindow.SevenDays" Text="7 Days" />
+        <MudToggleItem Value="TimeWindow.ThirtyDays" Text="30 Days" />
+    </MudToggleGroup>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
+               OnClick="LoadSummaryAsync" Disabled="_loading">
+        Analyze
+    </MudButton>
+</MudStack>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+@* ── Summary cards ──────────────────────────────────────────────── *@
+@if (_summary != null)
+{
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="3">
+            <MudPaper Class="pa-4 d-flex flex-column align-center" Elevation="2">
+                <MudIcon Icon="@Icons.Material.Filled.CallSplit" Color="Color.Error" Size="Size.Large" />
+                <MudText Typo="Typo.h5" Class="mt-2">@_summary.TopFanOut.Count(x => x.IsSuspicious)</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Suspicious Fan-Out</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudPaper Class="pa-4 d-flex flex-column align-center" Elevation="2">
+                <MudIcon Icon="@Icons.Material.Filled.CallMerge" Color="Color.Warning" Size="Size.Large" />
+                <MudText Typo="Typo.h5" Class="mt-2">@_summary.TopFanIn.Count(x => x.IsSuspicious)</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Suspicious Fan-In</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudPaper Class="pa-4 d-flex flex-column align-center" Elevation="2">
+                <MudIcon Icon="@Icons.Material.Filled.SwapHoriz" Color="Color.Info" Size="Size.Large" />
+                <MudText Typo="Typo.h5" Class="mt-2">@_summary.TotalUniqueRelationships</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Unique Relationships</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudPaper Class="pa-4 d-flex flex-column align-center" Elevation="2">
+                <MudIcon Icon="@Icons.Material.Filled.Receipt" Color="Color.Default" Size="Size.Large" />
+                <MudText Typo="Typo.h5" Class="mt-2">@_summary.TotalTransactions</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Total Transactions</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @* ── Fan-Out Table ───────────────────────────────────────────── *@
+    <MudGrid>
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.CallSplit" Color="Color.Error" />
+                    <MudText Typo="Typo.h6">Top Fan-Out Senders</MudText>
+                </MudStack>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3">
+                    Senders distributing to the most unique recipients — classic money laundering pattern
+                </MudText>
+                <MudTable Items="@_summary.TopFanOut" Dense="true" Hover="true" Elevation="0"
+                          RowClassFunc="@((ActorSummary item, int _) => item.IsSuspicious ? "mud-theme-error" : "")">
+                    <HeaderContent>
+                        <MudTh>Customer</MudTh>
+                        <MudTh Style="text-align:right;">Recipients</MudTh>
+                        <MudTh Style="text-align:right;">Txns</MudTh>
+                        <MudTh Style="text-align:right;">Total</MudTh>
+                        <MudTh Style="text-align:center;">Graph</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                @if (context.IsSuspicious)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" Size="Size.Small" />
+                                }
+                                <MudText Typo="Typo.body2" Style="font-family:monospace; font-size:0.8rem;">
+                                    @TruncateId(context.CustomerId)
+                                </MudText>
+                            </MudStack>
+                        </MudTd>
+                        <MudTd Style="text-align:right;">
+                            <MudChip T="string" Color="@(context.IsSuspicious ? Color.Error : Color.Default)" Size="Size.Small">
+                                @context.UniqueCounterparties
+                            </MudChip>
+                        </MudTd>
+                        <MudTd Style="text-align:right;">@context.TransactionCount</MudTd>
+                        <MudTd Style="text-align:right;">@context.TotalAmount.ToString("C0")</MudTd>
+                        <MudTd Style="text-align:center;">
+                            <MudIconButton Icon="@Icons.Material.Filled.AccountTree" Size="Size.Small"
+                                           Color="Color.Primary"
+                                           OnClick="@(() => LoadGraphAsync(context.CustomerId))" />
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudPaper>
+        </MudItem>
+
+        @* ── Fan-In Table ────────────────────────────────────────── *@
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.CallMerge" Color="Color.Warning" />
+                    <MudText Typo="Typo.h6">Top Fan-In Receivers</MudText>
+                </MudStack>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3">
+                    Receivers collecting from the most unique senders — potential collection accounts
+                </MudText>
+                <MudTable Items="@_summary.TopFanIn" Dense="true" Hover="true" Elevation="0"
+                          RowClassFunc="@((ActorSummary item, int _) => item.IsSuspicious ? "mud-theme-warning" : "")">
+                    <HeaderContent>
+                        <MudTh>Customer</MudTh>
+                        <MudTh Style="text-align:right;">Senders</MudTh>
+                        <MudTh Style="text-align:right;">Txns</MudTh>
+                        <MudTh Style="text-align:right;">Total</MudTh>
+                        <MudTh Style="text-align:center;">Graph</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                @if (context.IsSuspicious)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Size="Size.Small" />
+                                }
+                                <MudText Typo="Typo.body2" Style="font-family:monospace; font-size:0.8rem;">
+                                    @TruncateId(context.CustomerId)
+                                </MudText>
+                            </MudStack>
+                        </MudTd>
+                        <MudTd Style="text-align:right;">
+                            <MudChip T="string" Color="@(context.IsSuspicious ? Color.Warning : Color.Default)" Size="Size.Small">
+                                @context.UniqueCounterparties
+                            </MudChip>
+                        </MudTd>
+                        <MudTd Style="text-align:right;">@context.TransactionCount</MudTd>
+                        <MudTd Style="text-align:right;">@context.TotalAmount.ToString("C0")</MudTd>
+                        <MudTd Style="text-align:center;">
+                            <MudIconButton Icon="@Icons.Material.Filled.AccountTree" Size="Size.Small"
+                                           Color="Color.Primary"
+                                           OnClick="@(() => LoadGraphAsync(context.CustomerId))" />
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@* ── Relationship Graph Panel ───────────────────────────────────── *@
+@if (_graph != null)
+{
+    <MudPaper Elevation="2" Class="pa-4 mt-4">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.AccountTree" Color="Color.Primary" />
+                <MudText Typo="Typo.h6">Relationship Graph: @TruncateId(_graph.FocalCustomerId)</MudText>
+            </MudStack>
+            <MudStack Row="true" Spacing="2">
+                <MudChip T="string" Color="Color.Error" Size="Size.Small" Icon="@Icons.Material.Filled.CallSplit">
+                    Fan-Out: @_graph.FanOutCount
+                </MudChip>
+                <MudChip T="string" Color="Color.Warning" Size="Size.Small" Icon="@Icons.Material.Filled.CallMerge">
+                    Fan-In: @_graph.FanInCount
+                </MudChip>
+                <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                               OnClick="@(() => _graph = null)" />
+            </MudStack>
+        </MudStack>
+
+        @* Simple radial layout rendered with CSS — no JS dependency *@
+        <MudGrid>
+            @* Left: Incoming (senders → focal) *@
+            <MudItem xs="12" md="4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Warning" Class="mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" /> Incoming Senders
+                </MudText>
+                @foreach (var edge in _graph.Edges.Where(e => e.Target == _graph.FocalCustomerId).OrderByDescending(e => e.TotalAmount))
+                {
+                    <MudPaper Class="pa-2 mb-1" Elevation="0" Style="border-left: 3px solid var(--mud-palette-warning);">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                            <MudText Typo="Typo.body2" Style="font-family:monospace; font-size:0.8rem;">
+                                @TruncateId(edge.Source)
+                            </MudText>
+                            <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                                <MudChip T="string" Size="Size.Small" Color="Color.Default">@edge.Count txn</MudChip>
+                                <MudText Typo="Typo.body2" Color="Color.Success">@edge.TotalAmount.ToString("C0")</MudText>
+                            </MudStack>
+                        </MudStack>
+                    </MudPaper>
+                }
+                @if (!_graph.Edges.Any(e => e.Target == _graph.FocalCustomerId))
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="ml-2">No incoming transfers</MudText>
+                }
+            </MudItem>
+
+            @* Center: Focal node *@
+            <MudItem xs="12" md="4" Class="d-flex flex-column align-center justify-center">
+                <MudPaper Class="pa-4 d-flex flex-column align-center" Elevation="4"
+                          Style="border: 3px solid var(--mud-palette-primary); border-radius: 16px; min-width: 200px;">
+                    <MudIcon Icon="@Icons.Material.Filled.Person" Color="Color.Primary" Size="Size.Large" />
+                    <MudText Typo="Typo.subtitle1" Class="mt-1" Style="font-family:monospace; font-size:0.85rem;">
+                        @TruncateId(_graph.FocalCustomerId)
+                    </MudText>
+                    <MudDivider Class="my-2" />
+                    <MudText Typo="Typo.body2">@_graph.Nodes.First(n => n.IsFocal).TransactionCount txns</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Success">
+                        @_graph.Nodes.First(n => n.IsFocal).TotalAmount.ToString("C0")
+                    </MudText>
+                    <MudStack Row="true" Spacing="1" Class="mt-2">
+                        @if (_graph.FanOutCount > 0)
+                        {
+                            <MudChip T="string" Color="@(_graph.FanOutCount >= 5 ? Color.Error : Color.Default)" Size="Size.Small">
+                                ↗ @_graph.FanOutCount out
+                            </MudChip>
+                        }
+                        @if (_graph.FanInCount > 0)
+                        {
+                            <MudChip T="string" Color="@(_graph.FanInCount >= 5 ? Color.Warning : Color.Default)" Size="Size.Small">
+                                ↘ @_graph.FanInCount in
+                            </MudChip>
+                        }
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+
+            @* Right: Outgoing (focal → receivers) *@
+            <MudItem xs="12" md="4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Error" Class="mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" /> Outgoing Recipients
+                </MudText>
+                @foreach (var edge in _graph.Edges.Where(e => e.Source == _graph.FocalCustomerId).OrderByDescending(e => e.TotalAmount))
+                {
+                    <MudPaper Class="pa-2 mb-1" Elevation="0" Style="border-left: 3px solid var(--mud-palette-error);">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                            <MudText Typo="Typo.body2" Style="font-family:monospace; font-size:0.8rem;">
+                                @TruncateId(edge.Target)
+                            </MudText>
+                            <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                                <MudChip T="string" Size="Size.Small" Color="Color.Default">@edge.Count txn</MudChip>
+                                <MudText Typo="Typo.body2" Color="Color.Success">@edge.TotalAmount.ToString("C0")</MudText>
+                            </MudStack>
+                        </MudStack>
+                    </MudPaper>
+                }
+                @if (!_graph.Edges.Any(e => e.Source == _graph.FocalCustomerId))
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="ml-2">No outgoing transfers</MudText>
+                }
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+}
+
+@* ── Customer lookup ─────────────────────────────────────────────── *@
+<MudPaper Elevation="2" Class="pa-4 mt-4">
+    <MudText Typo="Typo.h6" Class="mb-2">
+        <MudIcon Icon="@Icons.Material.Filled.Search" Class="mr-1" Style="vertical-align:middle;" />
+        Investigate Customer
+    </MudText>
+    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+        <MudTextField @bind-Value="_lookupCustomerId" Label="Customer / Sender ID"
+                      Variant="Variant.Outlined" Immediate="true" Style="max-width:400px;"
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Person" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.AccountTree"
+                   OnClick="@(() => LoadGraphAsync(_lookupCustomerId!))"
+                   Disabled="@(string.IsNullOrWhiteSpace(_lookupCustomerId) || _loading)">
+            View Graph
+        </MudButton>
+    </MudStack>
+</MudPaper>
+
+@code {
+    [Inject] private IRelationshipAnalysisService RelService { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+
+    private TimeWindow _selectedWindow = TimeWindow.TwentyFourHours;
+    private NetworkAnalysisSummary? _summary;
+    private RelationshipGraph? _graph;
+    private bool _loading;
+    private string? _lookupCustomerId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSummaryAsync();
+    }
+
+    private async Task LoadSummaryAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+        try
+        {
+            _summary = await RelService.GetNetworkSummaryAsync(_selectedWindow);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load network summary: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadGraphAsync(string customerId)
+    {
+        if (string.IsNullOrWhiteSpace(customerId)) return;
+        _loading = true;
+        StateHasChanged();
+        try
+        {
+            _graph = await RelService.GetRelationshipGraphAsync(customerId.Trim(), _selectedWindow);
+            if (_graph.Nodes.Count <= 1)
+            {
+                Snackbar.Add("No relationships found for this customer in the selected window.", Severity.Info);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load graph: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private static string TruncateId(string id) =>
+        id.Length > 16 ? id[..8] + "…" + id[^4..] : id;
+}

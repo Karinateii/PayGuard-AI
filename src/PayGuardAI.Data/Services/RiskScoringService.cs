@@ -19,6 +19,7 @@ public class RiskScoringService : IRiskScoringService
     private readonly ITenantContext _tenantContext;
     private readonly IMLScoringService _mlScoringService;
     private readonly IWatchlistService _watchlistService;
+    private readonly IRelationshipAnalysisService _relationshipService;
 
     // Risk level thresholds
     private const int LowRiskThreshold = 25;
@@ -35,7 +36,8 @@ public class RiskScoringService : IRiskScoringService
         IEmailNotificationService emailNotificationService,
         ITenantContext tenantContext,
         IMLScoringService mlScoringService,
-        IWatchlistService watchlistService)
+        IWatchlistService watchlistService,
+        IRelationshipAnalysisService relationshipService)
     {
         _context = context;
         _logger = logger;
@@ -44,6 +46,7 @@ public class RiskScoringService : IRiskScoringService
         _tenantContext = tenantContext;
         _mlScoringService = mlScoringService;
         _watchlistService = watchlistService;
+        _relationshipService = relationshipService;
     }
 
     public async Task<RiskAnalysis> AnalyzeTransactionAsync(Transaction transaction, CancellationToken cancellationToken = default)
@@ -175,6 +178,50 @@ public class RiskScoringService : IRiskScoringService
         {
             // Watchlist failure is non-fatal — fall back to rules + ML
             _logger.LogWarning(ex, "Watchlist check failed for {TransactionId}", transaction.Id);
+        }
+
+        // ── Fan-out / Fan-in relationship analysis ────────────────
+        try
+        {
+            var relHits = await _relationshipService.CheckTransactionAsync(transaction, cancellationToken);
+            foreach (var hit in relHits)
+            {
+                var severity = hit.PatternType switch
+                {
+                    "FAN_OUT" => FactorSeverity.Critical,
+                    "FAN_IN" => FactorSeverity.Warning,
+                    "MULE_RELAY" => FactorSeverity.Alert,
+                    _ => FactorSeverity.Warning
+                };
+
+                riskFactors.Add(new RiskFactor
+                {
+                    TenantId = _tenantContext.TenantId,
+                    Category = "Relationship",
+                    RuleName = hit.PatternType,
+                    Description = hit.Description,
+                    ScoreContribution = hit.ScoreAdjustment,
+                    Severity = severity,
+                    ContextData = System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        patternType = hit.PatternType,
+                        actor = hit.Actor,
+                        uniqueCounterparties = hit.UniqueCounterparties,
+                        transactionCount = hit.TransactionCount,
+                        totalAmount = hit.TotalAmount,
+                        timeWindow = hit.TimeWindowLabel,
+                        threshold = hit.Threshold
+                    })
+                });
+
+                totalScore += hit.ScoreAdjustment;
+                totalScore = Math.Clamp(totalScore, 0, 100);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Relationship analysis failure is non-fatal
+            _logger.LogWarning(ex, "Relationship analysis failed for {TransactionId}", transaction.Id);
         }
 
         // ── ML scoring enhancement ──────────────────────────────────
