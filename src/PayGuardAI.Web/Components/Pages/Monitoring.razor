@@ -1,0 +1,418 @@
+@page "/admin/monitoring"
+@using Microsoft.AspNetCore.Authorization
+@using PayGuardAI.Core.Services
+@using PayGuardAI.Data.Services
+@attribute [Authorize(Policy = "RequireAdmin")]
+@inject MonitoringService MonitoringService
+@inject ITenantContext TenantContext
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+<PageTitle>System Monitoring — PayGuard AI</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4" Style="flex-wrap: wrap; gap: 12px;">
+    <MudText Typo="Typo.h4">
+        <MudIcon Icon="@Icons.Material.Filled.Monitor" Class="mr-2" />
+        System Monitoring
+    </MudText>
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+        @if (_snapshot != null)
+        {
+            <MudChip T="string" Style="@($"background-color: {_snapshot.HealthColor}; color: white;")"
+                     Size="Size.Small" Icon="@Icons.Material.Filled.Circle">
+                @_snapshot.HealthStatus
+            </MudChip>
+        }
+        <MudText Typo="Typo.caption" Color="Color.Secondary">
+            Auto-refresh: @(_autoRefresh ? "30s" : "off")
+        </MudText>
+        <MudToggleIconButton Toggled="_autoRefresh" ToggledChanged="OnAutoRefreshChanged"
+                             Icon="@Icons.Material.Filled.PauseCircle"
+                             ToggledIcon="@Icons.Material.Filled.PlayCircle"
+                             Color="Color.Default" ToggledColor="Color.Success"
+                             Size="Size.Small" />
+        <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadDataAsync"
+                       Size="Size.Small" Color="Color.Primary" Title="Refresh now" />
+    </MudStack>
+</MudStack>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_snapshot != null)
+{
+    @* ── Health Status Banner ── *@
+    <MudPaper Class="pa-4 mb-4" Elevation="3"
+              Style="@($"background: linear-gradient(135deg, {_snapshot.HealthColor}dd, {_snapshot.HealthColor}); color: white; border-radius: 12px;")">
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                    <MudIcon Icon="@(StatusIcon(_snapshot.HealthStatus))" Size="Size.Large" Style="font-size: 3rem;" />
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.overline" Style="opacity: 0.85; letter-spacing: 1px;">SYSTEM STATUS</MudText>
+                        <MudText Typo="Typo.h4" Style="font-weight: 700;">@_snapshot.HealthStatus</MudText>
+                        <MudText Typo="Typo.caption" Style="opacity: 0.8;">
+                            Updated @_snapshot.GeneratedAt.ToString("HH:mm:ss") UTC
+                        </MudText>
+                    </MudStack>
+                </MudStack>
+            </MudItem>
+            <MudItem xs="6" md="2">
+                <MudStack AlignItems="AlignItems.Center" Spacing="0">
+                    <MudText Typo="Typo.overline" Style="opacity: 0.85;">UPTIME</MudText>
+                    <MudText Typo="Typo.h5" Style="font-weight: 700;">@_snapshot.UptimePercent%</MudText>
+                    <MudText Typo="Typo.caption" Style="opacity: 0.8;">7-day</MudText>
+                </MudStack>
+            </MudItem>
+            <MudItem xs="6" md="2">
+                <MudStack AlignItems="AlignItems.Center" Spacing="0">
+                    <MudText Typo="Typo.overline" Style="opacity: 0.85;">ERROR RATE</MudText>
+                    <MudText Typo="Typo.h5" Style="font-weight: 700;">@_snapshot.ErrorRate%</MudText>
+                    <MudText Typo="Typo.caption" Style="opacity: 0.8;">24h</MudText>
+                </MudStack>
+            </MudItem>
+            <MudItem xs="6" md="2">
+                <MudStack AlignItems="AlignItems.Center" Spacing="0">
+                    <MudText Typo="Typo.overline" Style="opacity: 0.85;">THROUGHPUT</MudText>
+                    <MudText Typo="Typo.h5" Style="font-weight: 700;">@_snapshot.ThroughputPerMinute.ToString("F1")/min</MudText>
+                    <MudText Typo="Typo.caption" Style="opacity: 0.8;">last hour</MudText>
+                </MudStack>
+            </MudItem>
+            <MudItem xs="6" md="2">
+                <MudStack AlignItems="AlignItems.Center" Spacing="0">
+                    <MudText Typo="Typo.overline" Style="opacity: 0.85;">QUEUE</MudText>
+                    <MudText Typo="Typo.h5" Style="font-weight: 700;">@_snapshot.PendingReviews</MudText>
+                    <MudText Typo="Typo.caption" Style="opacity: 0.8;">pending reviews</MudText>
+                </MudStack>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    @* ── Metric Cards Row ── *@
+    <MudGrid Spacing="4" Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.Speed" Size="Size.Large" Color="Color.Primary" />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Transactions (24h)</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight:700;">@_snapshot.TransactionsLast24h.ToString("N0")</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        @_snapshot.TransactionsLastHour.ToString("N0") last hour
+                    </MudText>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Large" Color="Color.Error" />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">High Risk (24h)</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight:700;">@_snapshot.HighRiskLast24h.ToString("N0")</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        @((_snapshot.TransactionsLast24h > 0 ? 100.0 * _snapshot.HighRiskLast24h / _snapshot.TransactionsLast24h : 0).ToString("F1"))% flagged
+                    </MudText>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.BugReport" Size="Size.Large"
+                             Color="@(_snapshot.ErrorsLast24h > 0 ? Color.Error : Color.Success)" />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Errors / Warnings (24h)</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight:700;">
+                        @_snapshot.ErrorsLast24h / @_snapshot.WarningsLast24h
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        @_snapshot.ActiveRules active rules
+                    </MudText>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.RateReview" Size="Size.Large" Color="Color.Info" />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Reviews (24h)</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight:700;">@_snapshot.ReviewedLast24h.ToString("N0")</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Avg risk: @_snapshot.AverageRiskScore
+                    </MudText>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @* ── Charts Row ── *@
+    <MudGrid Spacing="4" Class="mb-4">
+        @* Hourly Throughput Chart *@
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Timeline" Class="mr-1" Size="Size.Small" />
+                    Hourly Throughput (24h)
+                </MudText>
+                @if (_hourlyLabels.Length > 0)
+                {
+                    <MudChart ChartType="ChartType.Line"
+                              ChartSeries="@_hourlySeries"
+                              XAxisLabels="@_hourlyLabels"
+                              Width="100%" Height="280px"
+                              ChartOptions="_chartOptions" />
+                }
+                else
+                {
+                    <MudText Color="Color.Secondary">No throughput data yet.</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+
+        @* Risk Distribution Donut *@
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.PieChart" Class="mr-1" Size="Size.Small" />
+                    Risk Breakdown (24h)
+                </MudText>
+                @if (_riskData.Any(d => d > 0))
+                {
+                    <MudChart ChartType="ChartType.Donut"
+                              InputData="@_riskData"
+                              InputLabels="@_riskLabels"
+                              Width="100%" Height="280px" />
+                }
+                else
+                {
+                    <MudText Color="Color.Secondary">No risk data yet.</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @* ── Daily Trend + Recent Errors Row ── *@
+    <MudGrid Spacing="4" Class="mb-4">
+        @* 7-Day Volume Trend *@
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Class="mr-1" Size="Size.Small" />
+                    7-Day Transaction Trend
+                </MudText>
+                @if (_dailyLabels.Length > 0)
+                {
+                    <MudChart ChartType="ChartType.Bar"
+                              ChartSeries="@_dailySeries"
+                              XAxisLabels="@_dailyLabels"
+                              Width="100%" Height="250px"
+                              ChartOptions="_chartOptions" />
+                }
+                else
+                {
+                    <MudText Color="Color.Secondary">No trend data yet.</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+
+        @* Recent Errors *@
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Class="mr-1" Size="Size.Small" />
+                    Recent Errors
+                </MudText>
+                @if (_snapshot.RecentErrors.Any())
+                {
+                    <MudList T="RecentError" Dense="true">
+                        @foreach (var err in _snapshot.RecentErrors)
+                        {
+                            <MudListItem T="RecentError" Icon="@(err.Level == "Fatal" ? Icons.Material.Filled.Dangerous : Icons.Material.Filled.Error)"
+                                        IconColor="@(err.Level == "Fatal" ? Color.Error : Color.Warning)">
+                                <MudStack Spacing="0">
+                                    <MudText Typo="Typo.body2" Style="font-weight:600;">
+                                        @Truncate(err.Message, 120)
+                                    </MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @err.Source — @err.OccurredAt.ToString("MMM dd HH:mm:ss") UTC
+                                    </MudText>
+                                </MudStack>
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Success" Variant="Variant.Text">
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-1" />
+                        No recent errors — system running cleanly.
+                    </MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @* ── System Stats Table ── *@
+    <MudPaper Class="pa-4" Elevation="2">
+        <MudText Typo="Typo.h6" Class="mb-3">
+            <MudIcon Icon="@Icons.Material.Filled.Storage" Class="mr-1" Size="Size.Small" />
+            System Metrics
+        </MudText>
+        <MudSimpleTable Dense="true" Hover="true" Bordered="true">
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Value</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><MudIcon Icon="@Icons.Material.Filled.Receipt" Size="Size.Small" Class="mr-1" /> Total Transactions</td>
+                    <td>@_snapshot.TotalTransactions.ToString("N0")</td>
+                    <td><MudChip T="string" Size="Size.Small" Color="Color.Success">OK</MudChip></td>
+                </tr>
+                <tr>
+                    <td><MudIcon Icon="@Icons.Material.Filled.DateRange" Size="Size.Small" Class="mr-1" /> Transactions (7d)</td>
+                    <td>@_snapshot.TransactionsLast7d.ToString("N0")</td>
+                    <td><MudChip T="string" Size="Size.Small" Color="Color.Success">OK</MudChip></td>
+                </tr>
+                <tr>
+                    <td><MudIcon Icon="@Icons.Material.Filled.Rule" Size="Size.Small" Class="mr-1" /> Active Risk Rules</td>
+                    <td>@_snapshot.ActiveRules</td>
+                    <td>
+                        <MudChip T="string" Size="Size.Small" Color="@(_snapshot.ActiveRules > 0 ? Color.Success : Color.Warning)">
+                            @(_snapshot.ActiveRules > 0 ? "OK" : "No Rules")
+                        </MudChip>
+                    </td>
+                </tr>
+                <tr>
+                    <td><MudIcon Icon="@Icons.Material.Filled.Webhook" Size="Size.Small" Class="mr-1" /> Webhook Events (24h)</td>
+                    <td>@_snapshot.WebhookEventsLast24h</td>
+                    <td><MudChip T="string" Size="Size.Small" Color="Color.Info">Tracked</MudChip></td>
+                </tr>
+                <tr>
+                    <td><MudIcon Icon="@Icons.Material.Filled.Error" Size="Size.Small" Class="mr-1" /> Error Rate (24h)</td>
+                    <td>@_snapshot.ErrorRate%</td>
+                    <td>
+                        <MudChip T="string" Size="Size.Small"
+                                 Color="@(_snapshot.ErrorRate > 5 ? Color.Error : _snapshot.ErrorRate > 1 ? Color.Warning : Color.Success)">
+                            @(_snapshot.ErrorRate > 5 ? "High" : _snapshot.ErrorRate > 1 ? "Elevated" : "Normal")
+                        </MudChip>
+                    </td>
+                </tr>
+                <tr>
+                    <td><MudIcon Icon="@Icons.Material.Filled.Timer" Size="Size.Small" Class="mr-1" /> Uptime (7d)</td>
+                    <td>@_snapshot.UptimePercent%</td>
+                    <td>
+                        <MudChip T="string" Size="Size.Small"
+                                 Color="@(_snapshot.UptimePercent >= 99.5 ? Color.Success : _snapshot.UptimePercent >= 99 ? Color.Warning : Color.Error)">
+                            @(_snapshot.UptimePercent >= 99.5 ? "Excellent" : _snapshot.UptimePercent >= 99 ? "Good" : "Degraded")
+                        </MudChip>
+                    </td>
+                </tr>
+            </tbody>
+        </MudSimpleTable>
+    </MudPaper>
+}
+
+@code {
+    private MonitoringSnapshot? _snapshot;
+    private bool _loading = true;
+    private bool _autoRefresh = true;
+    private Timer? _refreshTimer;
+
+    // Chart data
+    private List<ChartSeries> _hourlySeries = [];
+    private string[] _hourlyLabels = [];
+    private List<ChartSeries> _dailySeries = [];
+    private string[] _dailyLabels = [];
+    private double[] _riskData = [];
+    private string[] _riskLabels = [];
+    private readonly ChartOptions _chartOptions = new() { YAxisTicks = 5 };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+        StartAutoRefresh();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = _snapshot == null; // Only show loading on first load
+        try
+        {
+            _snapshot = await MonitoringService.GetSnapshotAsync();
+            BuildCharts();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load monitoring data: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void BuildCharts()
+    {
+        if (_snapshot == null) return;
+
+        // Hourly throughput line chart
+        _hourlyLabels = _snapshot.HourlyThroughput.Select(h => h.Hour.ToString("HH:mm")).ToArray();
+        _hourlySeries =
+        [
+            new ChartSeries { Name = "Total", Data = _snapshot.HourlyThroughput.Select(h => (double)h.Count).ToArray() },
+            new ChartSeries { Name = "High Risk", Data = _snapshot.HourlyThroughput.Select(h => (double)h.HighRiskCount).ToArray() }
+        ];
+
+        // Daily trend bar chart
+        _dailyLabels = _snapshot.DailyTrend.Select(d => d.Date.ToString("MMM dd")).ToArray();
+        _dailySeries =
+        [
+            new ChartSeries { Name = "Transactions", Data = _snapshot.DailyTrend.Select(d => (double)d.TransactionCount).ToArray() }
+        ];
+
+        // Risk breakdown donut
+        _riskLabels = ["High/Critical", "Medium", "Low"];
+        _riskData = [(double)_snapshot.HighRiskLast24h, (double)_snapshot.MediumRiskLast24h, (double)_snapshot.LowRiskLast24h];
+    }
+
+    private void StartAutoRefresh()
+    {
+        _refreshTimer?.Dispose();
+        if (_autoRefresh)
+        {
+            _refreshTimer = new Timer(async _ =>
+            {
+                await InvokeAsync(async () =>
+                {
+                    await LoadDataAsync();
+                });
+            }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+        }
+    }
+
+    private void OnAutoRefreshChanged(bool toggled)
+    {
+        _autoRefresh = toggled;
+        StartAutoRefresh();
+    }
+
+    private static string StatusIcon(string status) => status switch
+    {
+        "Healthy" => Icons.Material.Filled.CheckCircle,
+        "Warning" => Icons.Material.Filled.Warning,
+        "Degraded" => Icons.Material.Filled.Error,
+        _ => Icons.Material.Filled.HelpOutline
+    };
+
+    private static string Truncate(string text, int maxLength) =>
+        text.Length > maxLength ? text[..maxLength] + "…" : text;
+
+    public void Dispose()
+    {
+        _refreshTimer?.Dispose();
+    }
+}

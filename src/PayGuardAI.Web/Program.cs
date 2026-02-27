@@ -298,6 +298,9 @@ builder.Services.AddScoped<IRuleSuggestionService, RuleSuggestionService>();
 builder.Services.AddScoped<InvoiceService>();
 builder.Services.AddSingleton<InvoicePdfService>();
 
+// Register Monitoring service — real-time operational dashboard metrics
+builder.Services.AddScoped<MonitoringService>();
+
 // Add controllers for API endpoints (webhooks)
 builder.Services.AddControllers();
 
