@@ -177,15 +177,15 @@ else if (!_loading)
                 <MudDivider />
 
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Message</MudText>
-                <MudPaper Class="pa-3" Elevation="0" Style="background:#f5f5f5;word-break:break-word;">
+                <MudPaper Class="pa-3" Elevation="0" Outlined="true" Style="word-break:break-word;">
                     <MudText Typo="Typo.body2">@_selectedLog.Message</MudText>
                 </MudPaper>
 
                 @if (!string.IsNullOrWhiteSpace(_selectedLog.Exception))
                 {
                     <MudText Typo="Typo.caption" Color="Color.Error">Exception</MudText>
-                    <MudPaper Class="pa-3" Elevation="0" Style="background:#fff3f3;overflow-x:auto;">
-                        <pre style="font-size:12px;margin:0;white-space:pre-wrap;">@_selectedLog.Exception</pre>
+                    <MudPaper Class="pa-3" Elevation="0" Outlined="true" Style="overflow-x:auto;border-color:var(--mud-palette-error);">
+                        <pre style="font-size:12px;margin:0;white-space:pre-wrap;color:var(--mud-palette-error);">@_selectedLog.Exception</pre>
                     </MudPaper>
                 }
 
@@ -207,7 +207,7 @@ else if (!_loading)
                 @if (!string.IsNullOrWhiteSpace(_selectedLog.Properties))
                 {
                     <MudText Typo="Typo.caption" Color="Color.Secondary">Structured Properties</MudText>
-                    <MudPaper Class="pa-3" Elevation="0" Style="background:#f5f5f5;overflow-x:auto;">
+                    <MudPaper Class="pa-3" Elevation="0" Outlined="true" Style="overflow-x:auto;">
                         <pre style="font-size:12px;margin:0;white-space:pre-wrap;">@FormatJson(_selectedLog.Properties)</pre>
                     </MudPaper>
                 }

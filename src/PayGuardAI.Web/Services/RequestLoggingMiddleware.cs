@@ -39,7 +39,9 @@ public class RequestLoggingMiddleware
         sw.Stop();
 
         // Warn on slow requests — useful for Railway performance monitoring
-        if (sw.ElapsedMilliseconds > 1500)
+        // Skip WebSocket/SignalR endpoints — they're long-lived by design
+        var path = context.Request.Path.Value ?? "";
+        if (sw.ElapsedMilliseconds > 1500 && !path.StartsWith("/_blazor") && !path.StartsWith("/hubs/"))
         {
             _logger.LogWarning(
                 "Slow request detected: {Method} {Path} took {ElapsedMs}ms (Status: {StatusCode}, CorrelationId: {CorrelationId})",
