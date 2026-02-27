@@ -43,9 +43,24 @@ public class RuleGroup
     public string Category { get; set; } = "Compound";
 
     /// <summary>
-    /// Is this compound rule currently active?
+    /// Rule mode: "Active" (scores transactions), "Shadow" (evaluates but doesn't score),
+    /// or "Disabled" (not evaluated).
     /// </summary>
-    public bool IsEnabled { get; set; } = true;
+    public string Mode { get; set; } = "Active";
+
+    /// <summary>
+    /// Backward-compatible convenience property.
+    /// </summary>
+    public bool IsEnabled
+    {
+        get => Mode != "Disabled";
+        set => Mode = value ? "Active" : "Disabled";
+    }
+
+    /// <summary>
+    /// True when this compound rule evaluates in shadow mode.
+    /// </summary>
+    public bool IsShadow => Mode == "Shadow";
 
     /// <summary>
     /// When the rule was created.

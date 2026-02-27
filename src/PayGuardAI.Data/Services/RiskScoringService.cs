@@ -47,9 +47,10 @@ public class RiskScoringService : IRiskScoringService
     {
         _logger.LogInformation("Starting risk analysis for transaction {TransactionId}", transaction.Id);
 
-        // Get active rules — deduplicate so tenant-scoped rules override globals
+        // Get active + shadow rules — deduplicate so tenant-scoped rules override globals
+        // Disabled rules are excluded entirely; Shadow rules are evaluated but don't affect score.
         var allRules = await _context.RiskRules
-            .Where(r => r.IsEnabled)
+            .Where(r => r.Mode != "Disabled")
             .ToListAsync(cancellationToken);
 
         // Group by RuleCode: if a tenant has their own version, skip the global (TenantId=="")
@@ -71,8 +72,14 @@ public class RiskScoringService : IRiskScoringService
             if (factor != null)
             {
                 factor.TenantId = _tenantContext.TenantId;
+                factor.IsShadow = rule.IsShadow;
                 riskFactors.Add(factor);
-                totalScore += factor.ScoreContribution;
+
+                // Shadow factors are logged but don't affect the real score
+                if (!rule.IsShadow)
+                {
+                    totalScore += factor.ScoreContribution;
+                }
             }
         }
 
@@ -82,11 +89,12 @@ public class RiskScoringService : IRiskScoringService
         // ── Compound rules (AND/OR groups) ──────────────────────────
         // Evaluate compound rules that combine multiple conditions.
         // These are additive — they run alongside single rules.
+        // Shadow compound rules are evaluated but their score is logged only.
         try
         {
             var compoundRuleGroups = await _context.RuleGroups
                 .Include(g => g.Conditions)
-                .Where(g => g.IsEnabled && g.Conditions.Count > 0)
+                .Where(g => g.Mode != "Disabled" && g.Conditions.Count > 0)
                 .ToListAsync(cancellationToken);
 
             foreach (var group in compoundRuleGroups)
@@ -95,9 +103,15 @@ public class RiskScoringService : IRiskScoringService
                 if (factor != null)
                 {
                     factor.TenantId = _tenantContext.TenantId;
+                    factor.IsShadow = group.IsShadow;
                     riskFactors.Add(factor);
-                    totalScore += factor.ScoreContribution;
-                    totalScore = Math.Min(totalScore, 100);
+
+                    // Shadow factors are logged but don't affect the real score
+                    if (!group.IsShadow)
+                    {
+                        totalScore += factor.ScoreContribution;
+                        totalScore = Math.Min(totalScore, 100);
+                    }
                 }
             }
         }
@@ -615,13 +629,17 @@ public class RiskScoringService : IRiskScoringService
 
     private string GenerateExplanation(List<RiskFactor> factors, int score, RiskLevel level)
     {
-        if (factors.Count == 0)
+        // Only include active (non-shadow) factors in the main explanation
+        var activeFactors = factors.Where(f => !f.IsShadow).ToList();
+        var shadowFactors = factors.Where(f => f.IsShadow).ToList();
+
+        if (activeFactors.Count == 0 && shadowFactors.Count == 0)
         {
             return "No risk factors detected. Transaction appears normal.";
         }
 
-        var criticalFactors = factors.Where(f => f.Severity == FactorSeverity.Critical).ToList();
-        var warningFactors = factors.Where(f => f.Severity >= FactorSeverity.Warning).ToList();
+        var criticalFactors = activeFactors.Where(f => f.Severity == FactorSeverity.Critical).ToList();
+        var warningFactors = activeFactors.Where(f => f.Severity >= FactorSeverity.Warning).ToList();
 
         var explanation = $"Risk Score: {score}/100 ({level}). ";
 
@@ -636,9 +654,16 @@ public class RiskScoringService : IRiskScoringService
             explanation += $"Warnings: {string.Join("; ", nonCriticalWarnings.Select(f => f.Description))}. ";
         }
 
-        if (factors.Any(f => f.Severity == FactorSeverity.Info))
+        if (activeFactors.Any(f => f.Severity == FactorSeverity.Info))
         {
-            explanation += $"Additional observations: {factors.Count(f => f.Severity == FactorSeverity.Info)} minor indicators noted.";
+            explanation += $"Additional observations: {activeFactors.Count(f => f.Severity == FactorSeverity.Info)} minor indicators noted.";
+        }
+
+        // Mention shadow rules at the end so analysts know they ran
+        if (shadowFactors.Count > 0)
+        {
+            var shadowScore = shadowFactors.Sum(f => f.ScoreContribution);
+            explanation += $" [Shadow mode: {shadowFactors.Count} rule(s) matched (+{shadowScore} pts not scored).]";
         }
 
         return explanation;

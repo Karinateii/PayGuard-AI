@@ -47,9 +47,25 @@ public class RiskRule
     public int ScoreWeight { get; set; }
     
     /// <summary>
-    /// Is this rule currently active?
+    /// Rule mode: "Active" (scores transactions), "Shadow" (evaluates but doesn't score),
+    /// or "Disabled" (not evaluated). Replaces the old IsEnabled boolean.
     /// </summary>
-    public bool IsEnabled { get; set; } = true;
+    public string Mode { get; set; } = "Active";
+
+    /// <summary>
+    /// Backward-compatible convenience property.
+    /// A rule is "enabled" if its mode is Active or Shadow (it gets evaluated either way).
+    /// </summary>
+    public bool IsEnabled
+    {
+        get => Mode != "Disabled";
+        set => Mode = value ? "Active" : "Disabled";
+    }
+
+    /// <summary>
+    /// True when the rule evaluates but its score is logged only — not added to the total.
+    /// </summary>
+    public bool IsShadow => Mode == "Shadow";
     
     // ── Expression Engine fields ─────────────────────────────────────
     // When these are populated, the scoring engine evaluates the rule

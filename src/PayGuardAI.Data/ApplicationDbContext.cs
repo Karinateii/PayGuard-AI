@@ -142,8 +142,10 @@ public class ApplicationDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.TenantId, e.RuleCode }).IsUnique();
-            entity.HasIndex(e => e.IsEnabled);
+            entity.HasIndex(e => e.Mode);
             entity.Property(e => e.Threshold).HasPrecision(18, 4);
+            entity.Ignore(e => e.IsEnabled);
+            entity.Ignore(e => e.IsShadow);
         });
 
         // MLModel configuration
@@ -159,7 +161,9 @@ public class ApplicationDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.TenantId);
-            entity.HasIndex(e => e.IsEnabled);
+            entity.HasIndex(e => e.Mode);
+            entity.Ignore(e => e.IsEnabled);
+            entity.Ignore(e => e.IsShadow);
         });
 
         // RuleGroupCondition configuration
@@ -286,7 +290,7 @@ public class ApplicationDbContext : DbContext
                 Category = "Amount",
                 Threshold = 5000m,
                 ScoreWeight = 35,
-                IsEnabled = true
+                Mode = "Active"
             },
             new RiskRule
             {
@@ -297,7 +301,7 @@ public class ApplicationDbContext : DbContext
                 Category = "Velocity",
                 Threshold = 5m,
                 ScoreWeight = 30,
-                IsEnabled = true
+                Mode = "Active"
             },
             new RiskRule
             {
@@ -308,7 +312,7 @@ public class ApplicationDbContext : DbContext
                 Category = "Pattern",
                 Threshold = 5m,
                 ScoreWeight = 25,
-                IsEnabled = true
+                Mode = "Active"
             },
             new RiskRule
             {
@@ -319,7 +323,7 @@ public class ApplicationDbContext : DbContext
                 Category = "Geography",
                 Threshold = 1m,
                 ScoreWeight = 30,
-                IsEnabled = true
+                Mode = "Active"
             },
             new RiskRule
             {
@@ -330,7 +334,7 @@ public class ApplicationDbContext : DbContext
                 Category = "Pattern",
                 Threshold = 1000m,
                 ScoreWeight = 10,
-                IsEnabled = true
+                Mode = "Active"
             },
             new RiskRule
             {
@@ -341,7 +345,7 @@ public class ApplicationDbContext : DbContext
                 Category = "Pattern",
                 Threshold = 1m,
                 ScoreWeight = 10,
-                IsEnabled = true
+                Mode = "Active"
             }
         );
 

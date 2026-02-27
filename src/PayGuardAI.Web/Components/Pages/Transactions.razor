@@ -121,7 +121,7 @@
                     <MudText Typo="Typo.body2" Class="mb-3" Color="Color.Primary">
                         @_selectedTransaction.RiskAnalysis.Explanation
                     </MudText>
-                    <MudTable Items="@_selectedTransaction.RiskAnalysis.RiskFactors" Dense="true" Breakpoint="Breakpoint.Sm">
+                    <MudTable Items="@_selectedTransaction.RiskAnalysis.RiskFactors.Where(f => !f.IsShadow).ToList()" Dense="true" Breakpoint="Breakpoint.Sm">
                         <HeaderContent>
                             <MudTh>Category</MudTh>
                             <MudTh>Rule</MudTh>
@@ -142,6 +142,36 @@
                         </RowTemplate>
                     </MudTable>
                 </MudPaper>
+
+                @* ── Shadow factors (logged only, did not affect score) ── *@
+                @if (_selectedTransaction.RiskAnalysis.RiskFactors.Any(f => f.IsShadow))
+                {
+                    <MudPaper Class="pa-4 mt-3" Elevation="1" Style="opacity: 0.75; border-left: 4px solid var(--mud-palette-warning);">
+                        <MudText Typo="Typo.subtitle1" Class="mb-2" Color="Color.Warning">
+                            <MudIcon Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Class="mr-1" />
+                            Shadow Mode Factors (not scored)
+                        </MudText>
+                        <MudText Typo="Typo.caption" Class="mb-2" Color="Color.Secondary">
+                            These rules matched but are in shadow mode — they did not affect the risk score.
+                        </MudText>
+                        <MudTable Items="@_selectedTransaction.RiskAnalysis.RiskFactors.Where(f => f.IsShadow).ToList()" Dense="true" Breakpoint="Breakpoint.Sm">
+                            <HeaderContent>
+                                <MudTh>Category</MudTh>
+                                <MudTh>Rule</MudTh>
+                                <MudTh>Description</MudTh>
+                                <MudTh>Would-Be Impact</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>@context.Category</MudTd>
+                                <MudTd>@context.RuleName</MudTd>
+                                <MudTd>@context.Description</MudTd>
+                                <MudTd Style="color: var(--mud-palette-text-secondary);">
+                                    <em>+@context.ScoreContribution (shadow)</em>
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </MudPaper>
+                }
             }
         </MudItem>
 
@@ -436,7 +466,7 @@ else
                     @_selectedTransaction.RiskAnalysis.Explanation
                 </MudText>
                 <MudStack Spacing="2">
-                    @foreach (var factor in _selectedTransaction.RiskAnalysis.RiskFactors)
+                    @foreach (var factor in _selectedTransaction.RiskAnalysis.RiskFactors.Where(f => !f.IsShadow))
                     {
                         <MudPaper Class="pa-2" Outlined="true">
                             <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
@@ -451,6 +481,30 @@ else
                         </MudPaper>
                     }
                 </MudStack>
+
+                @* ── Shadow factors in drawer ── *@
+                @if (_selectedTransaction.RiskAnalysis.RiskFactors.Any(f => f.IsShadow))
+                {
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.caption" Color="Color.Warning" Class="mb-1">
+                        <MudIcon Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Class="mr-1" />
+                        Shadow Mode (not scored)
+                    </MudText>
+                    @foreach (var factor in _selectedTransaction.RiskAnalysis.RiskFactors.Where(f => f.IsShadow))
+                    {
+                        <MudPaper Class="pa-2" Outlined="true" Style="opacity: 0.65; border-left: 3px solid var(--mud-palette-warning);">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                <MudStack Spacing="0">
+                                    <MudText Typo="Typo.body2">@factor.RuleName</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@factor.Description</MudText>
+                                </MudStack>
+                                <MudText Typo="Typo.caption" Color="Color.Warning">
+                                    <em>+@factor.ScoreContribution (shadow)</em>
+                                </MudText>
+                            </MudStack>
+                        </MudPaper>
+                    }
+                }
             }
             
             @if (_selectedTransaction.RiskAnalysis?.ReviewStatus == ReviewStatus.Pending ||

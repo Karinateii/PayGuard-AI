@@ -44,6 +44,12 @@ public class RiskFactor
     /// Additional context data (JSON format).
     /// </summary>
     public string? ContextData { get; set; }
+
+    /// <summary>
+    /// True if this factor came from a shadow-mode rule.
+    /// Shadow factors are logged for analysis but did NOT contribute to the actual risk score.
+    /// </summary>
+    public bool IsShadow { get; set; }
     
     // Navigation
     public RiskAnalysis RiskAnalysis { get; set; } = null!;

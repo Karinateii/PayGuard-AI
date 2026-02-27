@@ -31,7 +31,7 @@
         Configure risk scoring thresholds and weights. <strong>System rules</strong> (built-in) have hardcoded
         evaluation logic — adjust their thresholds and weights. <strong>Custom rules</strong> evaluate dynamically
         based on the condition you define. <strong>Compound rules</strong> combine multiple conditions with AND/OR logic.
-        Changes apply to new transactions immediately.
+        Use <strong>Shadow mode</strong> to test a rule without affecting real scores. Changes apply to new transactions immediately.
     </MudText>
 </MudAlert>
 
@@ -69,9 +69,14 @@ else
                                         </MudChip>
                                     </MudStack>
                                 </MudStack>
-                                <MudSwitch T="bool" Value="@rule.IsEnabled" 
-                                           ValueChanged="@((val) => ToggleRule(rule, val))"
-                                           Color="Color.Success" />
+                                <MudSelect T="string" Value="@rule.Mode" Label="Mode"
+                                           ValueChanged="@((val) => ChangeRuleMode(rule, val))"
+                                           Variant="Variant.Outlined" Style="max-width: 140px;"
+                                           Margin="Margin.Dense">
+                                    <MudSelectItem T="string" Value="@("Active")">✅ Active</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("Shadow")">👁 Shadow</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("Disabled")">⛔ Disabled</MudSelectItem>
+                                </MudSelect>
                             </MudStack>
                         </CardHeaderContent>
                     </MudCardHeader>
@@ -87,7 +92,7 @@ else
                                                      ValueChanged="@((val) => UpdateThreshold(rule, val))"
                                                      Variant="Variant.Outlined" 
                                                      Min="0"
-                                                     Disabled="@(!rule.IsEnabled)" />
+                                                     Disabled="@(rule.Mode != "Active")" />
                                 }
                                 else
                                 {
@@ -103,7 +108,7 @@ else
                                                  ValueChanged="@((val) => UpdateWeight(rule, val))"
                                                  Variant="Variant.Outlined"
                                                  Min="0" Max="50"
-                                                 Disabled="@(!rule.IsEnabled)" />
+                                                 Disabled="@(rule.Mode != "Active")" />
                             </MudItem>
                         </MudGrid>
                         
@@ -169,9 +174,14 @@ else
                                             </MudChip>
                                         </MudStack>
                                     </MudStack>
-                                    <MudSwitch T="bool" Value="@rule.IsEnabled" 
-                                               ValueChanged="@((val) => ToggleRule(rule, val))"
-                                               Color="Color.Success" />
+                                    <MudSelect T="string" Value="@rule.Mode" Label="Mode"
+                                               ValueChanged="@((val) => ChangeRuleMode(rule, val))"
+                                               Variant="Variant.Outlined" Style="max-width: 140px;"
+                                               Margin="Margin.Dense">
+                                        <MudSelectItem T="string" Value="@("Active")">✅ Active</MudSelectItem>
+                                        <MudSelectItem T="string" Value="@("Shadow")">👁 Shadow</MudSelectItem>
+                                        <MudSelectItem T="string" Value="@("Disabled")">⛔ Disabled</MudSelectItem>
+                                    </MudSelect>
                                 </MudStack>
                             </CardHeaderContent>
                         </MudCardHeader>
@@ -204,7 +214,7 @@ else
                                                      ValueChanged="@((val) => UpdateWeight(rule, val))"
                                                      Variant="Variant.Outlined"
                                                      Min="0" Max="50"
-                                                     Disabled="@(!rule.IsEnabled)" />
+                                                     Disabled="@(rule.Mode != "Active")" />
                                 </MudItem>
                             </MudGrid>
                             
@@ -271,9 +281,14 @@ else
                                             </MudChip>
                                         </MudStack>
                                     </MudStack>
-                                    <MudSwitch T="bool" Value="@group.IsEnabled" 
-                                               ValueChanged="@((val) => ToggleCompoundRule(group, val))"
-                                               Color="Color.Success" />
+                                    <MudSelect T="string" Value="@group.Mode" Label="Mode"
+                                               ValueChanged="@((val) => ChangeCompoundRuleMode(group, val))"
+                                               Variant="Variant.Outlined" Style="max-width: 140px;"
+                                               Margin="Margin.Dense">
+                                        <MudSelectItem T="string" Value="@("Active")">✅ Active</MudSelectItem>
+                                        <MudSelectItem T="string" Value="@("Shadow")">👁 Shadow</MudSelectItem>
+                                        <MudSelectItem T="string" Value="@("Disabled")">⛔ Disabled</MudSelectItem>
+                                    </MudSelect>
                                 </MudStack>
                             </CardHeaderContent>
                         </MudCardHeader>
@@ -297,7 +312,7 @@ else
                                                  ValueChanged="@((val) => UpdateCompoundWeight(group, val))"
                                                  Variant="Variant.Outlined"
                                                  Min="0" Max="50"
-                                                 Disabled="@(!group.IsEnabled)"
+                                                 Disabled="@(group.Mode != "Active")"
                                                  Style="max-width: 140px;" />
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">
                                     Created @group.CreatedAt.ToString("MM/dd") by @group.CreatedBy
@@ -398,14 +413,27 @@ else
         }
     }
 
-    private async Task ToggleRule(RiskRule rule, bool enabled)
+    private async Task ChangeRuleMode(RiskRule rule, string mode)
     {
-        rule.IsEnabled = enabled;
+        rule.Mode = mode;
         rule.UpdatedAt = DateTime.UtcNow;
         rule.UpdatedBy = CurrentUser.UserName;
         await DbContext.SaveChangesAsync();
-        Snackbar.Add($"Rule '{rule.Name}' {(enabled ? "enabled" : "disabled")}", 
-            enabled ? Severity.Success : Severity.Warning);
+
+        var label = mode switch
+        {
+            "Active" => "activated",
+            "Shadow" => "set to shadow mode (evaluates but won't score)",
+            "Disabled" => "disabled",
+            _ => "updated"
+        };
+        var severity = mode switch
+        {
+            "Active" => Severity.Success,
+            "Shadow" => Severity.Warning,
+            _ => Severity.Info
+        };
+        Snackbar.Add($"Rule '{rule.Name}' {label}", severity);
     }
 
     private async Task UpdateThreshold(RiskRule rule, decimal value)
@@ -490,13 +518,26 @@ else
         }
     }
 
-    private async Task ToggleCompoundRule(RuleGroup group, bool enabled)
+    private async Task ChangeCompoundRuleMode(RuleGroup group, string mode)
     {
-        group.IsEnabled = enabled;
+        group.Mode = mode;
         group.UpdatedAt = DateTime.UtcNow;
         await DbContext.SaveChangesAsync();
-        Snackbar.Add($"Compound rule '{group.Name}' {(enabled ? "enabled" : "disabled")}", 
-            enabled ? Severity.Success : Severity.Warning);
+
+        var label = mode switch
+        {
+            "Active" => "activated",
+            "Shadow" => "set to shadow mode",
+            "Disabled" => "disabled",
+            _ => "updated"
+        };
+        var severity = mode switch
+        {
+            "Active" => Severity.Success,
+            "Shadow" => Severity.Warning,
+            _ => Severity.Info
+        };
+        Snackbar.Add($"Compound rule '{group.Name}' {label}", severity);
     }
 
     private async Task UpdateCompoundWeight(RuleGroup group, int value)

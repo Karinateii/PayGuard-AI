@@ -121,6 +121,10 @@ public class DatabaseMigrationService : IDatabaseMigrationService
             ("RiskRules",               "ExpressionOperator", ""),
             ("RiskRules",               "ExpressionValue", ""),
 
+            // ── Shadow mode — Mode column (Active/Shadow/Disabled) ──
+            ("RiskRules",               "Mode", "Active"),
+            ("RuleGroups",              "Mode", "Active"),
+
             // ── CustomRole extras ──
             // (IsBuiltIn is boolean — handled separately below)
         };
@@ -197,6 +201,10 @@ public class DatabaseMigrationService : IDatabaseMigrationService
         // ── Boolean columns need the correct native type (not TEXT) ──
         await AddBooleanColumnIfMissing(dbType, "OrganizationSettings", "OnboardingCompleted");
         await AddBooleanColumnIfMissing(dbType, "CustomRoles", "IsBuiltIn");
+
+        // ── Shadow mode: IsShadow flag on RiskFactors ──
+        await AddBooleanColumnIfMissing(dbType, "RiskFactors", "IsShadow");
+        await AddBooleanColumnIfMissing(dbType, "RiskFactors", "IsShadow");
     }
 
     /// <summary>
