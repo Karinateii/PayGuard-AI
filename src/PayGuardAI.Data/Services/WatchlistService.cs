@@ -106,7 +106,11 @@ public class WatchlistService : IWatchlistService
 
     public async Task RemoveEntryAsync(Guid entryId, CancellationToken ct = default)
     {
-        var entry = await _db.WatchlistEntries.FindAsync([entryId], ct)
+        // Load entry through its parent Watchlist (tenant-filtered) to prevent cross-tenant deletion
+        var entry = await _db.WatchlistEntries
+            .Where(e => e.Id == entryId)
+            .Where(e => _db.Watchlists.Any(w => w.Id == e.WatchlistId)) // Watchlist has tenant query filter
+            .FirstOrDefaultAsync(ct)
             ?? throw new ArgumentException($"Entry {entryId} not found");
 
         _db.WatchlistEntries.Remove(entry);

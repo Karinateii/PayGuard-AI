@@ -295,6 +295,7 @@
 @code {
     [Inject] private IRelationshipAnalysisService RelService { get; set; } = null!;
     [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    [Inject] private PayGuardAI.Core.Services.ITenantContext TenantCtx { get; set; } = null!;
 
     private TimeWindow _selectedWindow = TimeWindow.TwentyFourHours;
     private NetworkAnalysisSummary? _summary;
@@ -313,7 +314,7 @@
         StateHasChanged();
         try
         {
-            _summary = await RelService.GetNetworkSummaryAsync(_selectedWindow);
+            _summary = await RelService.GetNetworkSummaryAsync(_selectedWindow, tenantId: TenantCtx.TenantId);
         }
         catch (Exception ex)
         {
@@ -333,7 +334,7 @@
         StateHasChanged();
         try
         {
-            _graph = await RelService.GetRelationshipGraphAsync(customerId.Trim(), _selectedWindow);
+            _graph = await RelService.GetRelationshipGraphAsync(customerId.Trim(), _selectedWindow, tenantId: TenantCtx.TenantId);
             if (_graph.Nodes.Count <= 1)
             {
                 Snackbar.Add("No relationships found for this customer in the selected window.", Severity.Info);

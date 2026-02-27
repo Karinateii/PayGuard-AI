@@ -193,6 +193,7 @@ public class SlackAlertService : IAlertingService
             try
             {
                 await using var db = await _dbFactory.CreateDbContextAsync(ct);
+                db.SetTenantId(tenantId);
                 var settings = await db.OrganizationSettings
                     .AsNoTracking()
                     .FirstOrDefaultAsync(s => s.TenantId == tenantId, ct);

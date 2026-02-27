@@ -30,6 +30,7 @@ public class RuleSuggestionService : IRuleSuggestionService
     public async Task<List<RuleSuggestion>> GenerateSuggestionsAsync(string tenantId, int lookbackDays = 30)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
+        db.SetTenantId(tenantId);
         var cutoff = DateTime.UtcNow.AddDays(-lookbackDays);
 
         // ── Load flagged/high-risk transactions with their risk analyses ──

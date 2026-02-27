@@ -18,13 +18,13 @@ public interface IRelationshipAnalysisService
     /// Build a full relationship graph for a given customer (sender or receiver)
     /// within the requested time window.  Used by the UI visualisation page.
     /// </summary>
-    Task<RelationshipGraph> GetRelationshipGraphAsync(string customerId, TimeWindow window, CancellationToken ct = default);
+    Task<RelationshipGraph> GetRelationshipGraphAsync(string customerId, TimeWindow window, string? tenantId = null, CancellationToken ct = default);
 
     /// <summary>
     /// Return the top fan-out and fan-in actors across the tenant for a time window.
     /// Powers the Network Analysis dashboard.
     /// </summary>
-    Task<NetworkAnalysisSummary> GetNetworkSummaryAsync(TimeWindow window, int topN = 10, CancellationToken ct = default);
+    Task<NetworkAnalysisSummary> GetNetworkSummaryAsync(TimeWindow window, int topN = 10, string? tenantId = null, CancellationToken ct = default);
 }
 
 // ────────────────────────────────────────────────────────────────

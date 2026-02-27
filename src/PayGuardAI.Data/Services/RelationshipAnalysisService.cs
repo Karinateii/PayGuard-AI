@@ -43,6 +43,7 @@ public class RelationshipAnalysisService : IRelationshipAnalysisService
         var hits = new List<RelationshipHit>();
 
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        db.SetTenantId(transaction.TenantId);
 
         var now = transaction.CreatedAt;
 
@@ -97,9 +98,10 @@ public class RelationshipAnalysisService : IRelationshipAnalysisService
     // ──────────────────────────────────────────────────────────────
 
     public async Task<RelationshipGraph> GetRelationshipGraphAsync(
-        string customerId, TimeWindow window, CancellationToken ct = default)
+        string customerId, TimeWindow window, string? tenantId = null, CancellationToken ct = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        if (!string.IsNullOrEmpty(tenantId)) db.SetTenantId(tenantId);
         var cutoff = CutoffFor(window);
 
         // Transactions where customer is sender
@@ -207,9 +209,10 @@ public class RelationshipAnalysisService : IRelationshipAnalysisService
     // ──────────────────────────────────────────────────────────────
 
     public async Task<NetworkAnalysisSummary> GetNetworkSummaryAsync(
-        TimeWindow window, int topN = 10, CancellationToken ct = default)
+        TimeWindow window, int topN = 10, string? tenantId = null, CancellationToken ct = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        if (!string.IsNullOrEmpty(tenantId)) db.SetTenantId(tenantId);
         var cutoff = CutoffFor(window);
 
         var txns = db.Transactions.Where(t => t.CreatedAt >= cutoff);
