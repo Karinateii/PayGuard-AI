@@ -77,29 +77,29 @@ public class RiskRule
     /// <summary>
     /// The transaction/profile field to evaluate.
     /// e.g., "Amount", "SourceCountry", "TotalTransactions", "TransactionHour".
-    /// Null means this is a built-in rule (evaluated via RuleCode switch).
+    /// Empty string means this is a built-in rule (evaluated via RuleCode switch).
     /// </summary>
-    public string? ExpressionField { get; set; }
+    public string ExpressionField { get; set; } = string.Empty;
 
     /// <summary>
-    /// Comparison operator: ">=", "<=", ">", "&lt;", "==", "!=", "contains", "not_contains".
+    /// Comparison operator: ">=" , "<=", ">", "&lt;", "==", "!=", "contains", "not_contains".
     /// </summary>
-    public string? ExpressionOperator { get; set; }
+    public string ExpressionOperator { get; set; } = string.Empty;
 
     /// <summary>
     /// The value to compare against (stored as string, parsed at evaluation time).
     /// </summary>
-    public string? ExpressionValue { get; set; }
+    public string ExpressionValue { get; set; } = string.Empty;
 
     /// <summary>
     /// True if this is a built-in system rule (cannot be deleted, only configured).
     /// </summary>
-    public bool IsBuiltIn => string.IsNullOrEmpty(ExpressionField) && BuiltInRuleCodes.Contains(RuleCode);
+    public bool IsBuiltIn => ExpressionField.Length == 0 && BuiltInRuleCodes.Contains(RuleCode);
 
     /// <summary>
     /// True if this is a dynamic expression rule (user-created).
     /// </summary>
-    public bool IsExpression => !string.IsNullOrEmpty(ExpressionField);
+    public bool IsExpression => ExpressionField.Length > 0;
 
     /// <summary>
     /// When the rule was last modified.

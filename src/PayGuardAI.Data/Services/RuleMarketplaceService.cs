@@ -245,7 +245,10 @@ public class RuleMarketplaceService : IRuleMarketplaceService
                 Threshold = template.Threshold,
                 ScoreWeight = template.ScoreWeight,
                 IsEnabled = true,
-                UpdatedBy = importedBy
+                UpdatedBy = importedBy,
+                ExpressionField = string.Empty,
+                ExpressionOperator = string.Empty,
+                ExpressionValue = string.Empty
             });
 
             _logger.LogInformation(
