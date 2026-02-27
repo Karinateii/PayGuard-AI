@@ -5,6 +5,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
+@inject PayGuardAI.Core.Services.IRuleVersioningService VersioningService
 @using Microsoft.EntityFrameworkCore
 
 <PageTitle>Risk Rules - PayGuard AI</PageTitle>
@@ -123,6 +124,14 @@ else
                             Last updated: @rule.UpdatedAt.ToString("MM/dd HH:mm") by <strong>@(rule.UpdatedBy ?? "system")</strong>
                         </MudText>
                     </MudCardContent>
+                    <MudCardActions>
+                        <MudSpacer />
+                        <MudTooltip Text="Version History">
+                            <MudIconButton Icon="@Icons.Material.Filled.History" 
+                                           Color="Color.Default" Size="Size.Small"
+                                           OnClick="@(() => ShowVersionHistory(rule.Id, rule.Name, RuleEntityType_RiskRule))" />
+                        </MudTooltip>
+                    </MudCardActions>
                 </MudCard>
             </MudItem>
         }
@@ -224,6 +233,11 @@ else
                         </MudCardContent>
                         <MudCardActions>
                             <MudSpacer />
+                            <MudTooltip Text="Version History">
+                                <MudIconButton Icon="@Icons.Material.Filled.History" 
+                                               Color="Color.Default" Size="Size.Small"
+                                               OnClick="@(() => ShowVersionHistory(rule.Id, rule.Name, RuleEntityType_RiskRule))" />
+                            </MudTooltip>
                             <MudIconButton Icon="@Icons.Material.Filled.Delete" 
                                            Color="Color.Error" Size="Size.Small"
                                            OnClick="@(() => DeleteRule(rule))" />
@@ -321,6 +335,11 @@ else
                         </MudCardContent>
                         <MudCardActions>
                             <MudSpacer />
+                            <MudTooltip Text="Version History">
+                                <MudIconButton Icon="@Icons.Material.Filled.History" 
+                                               Color="Color.Default" Size="Size.Small"
+                                               OnClick="@(() => ShowVersionHistory(group.Id, group.Name, RuleEntityType_RuleGroup))" />
+                            </MudTooltip>
                             <MudIconButton Icon="@Icons.Material.Filled.Delete" 
                                            Color="Color.Error" Size="Size.Small"
                                            OnClick="@(() => DeleteCompoundRule(group))" />
@@ -369,7 +388,68 @@ else
     </MudPaper>
 }
 
+@* ── Version History Overlay ─────────────────────────────────────── *@
+@if (_showVersionHistory)
+{
+    <MudOverlay Visible="true" DarkBackground="true" OnClick="@(() => _showVersionHistory = false)" />
+    <MudPaper Elevation="8" Style="position: fixed; top: 0; right: 0; bottom: 0; width: 480px; z-index: 1301; overflow-y: auto; display: flex; flex-direction: column;">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="pa-4" Style="border-bottom: 1px solid var(--mud-palette-lines-default);">
+            <MudStack>
+                <MudText Typo="Typo.h6">
+                    <MudIcon Icon="@Icons.Material.Filled.History" Class="mr-1" />
+                    Version History
+                </MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">@_versionHistoryTitle</MudText>
+            </MudStack>
+            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                           OnClick="@(() => _showVersionHistory = false)" />
+        </MudStack>
+        <div style="flex: 1; overflow-y: auto; padding: 8px;">
+            @if (_versions.Count == 0)
+            {
+                <MudPaper Class="pa-6 ma-3" Elevation="0" Style="border: 2px dashed var(--mud-palette-lines-default); text-align: center;">
+                    <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Large" Color="Color.Secondary" />
+                    <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mt-2">
+                        No version history yet.
+                    </MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-1">
+                        Versions are recorded automatically when you change a rule's mode, threshold, weight, or risk points.
+                    </MudText>
+                </MudPaper>
+            }
+            else
+            {
+                @foreach (var version in _versions)
+                {
+                    <MudPaper Class="pa-3 ma-2" Elevation="1" Style="border-left: 3px solid var(--mud-palette-primary);">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                            <MudStack>
+                                <MudText Typo="Typo.subtitle2">
+                                    v@(version.VersionNumber)
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Default" Class="ml-1">
+                                        @version.CreatedAt.ToString("MMM dd, HH:mm")
+                                    </MudChip>
+                                </MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">@version.ChangeDescription</MudText>
+                                <MudText Typo="Typo.caption">by <strong>@version.ChangedBy</strong></MudText>
+                            </MudStack>
+                            <MudTooltip Text="Restore this version">
+                                <MudIconButton Icon="@Icons.Material.Filled.RestorePage" 
+                                               Color="Color.Warning" Size="Size.Small"
+                                               OnClick="@(() => RollbackToVersion(version))" />
+                            </MudTooltip>
+                        </MudStack>
+                    </MudPaper>
+                }
+            }
+        </div>
+    </MudPaper>
+}
+
 @code {
+    private const string RuleEntityType_RiskRule = "RiskRule";
+    private const string RuleEntityType_RuleGroup = "RuleGroup";
+
     private bool _loading = true;
     private List<RiskRule> _rules = new();
     private List<RiskRule> _expressionRules = new();
@@ -415,6 +495,7 @@ else
 
     private async Task ChangeRuleMode(RiskRule rule, string mode)
     {
+        await VersioningService.SnapshotRuleAsync(rule, CurrentUser.UserName, $"Mode: {rule.Mode} → {mode}");
         rule.Mode = mode;
         rule.UpdatedAt = DateTime.UtcNow;
         rule.UpdatedBy = CurrentUser.UserName;
@@ -438,6 +519,7 @@ else
 
     private async Task UpdateThreshold(RiskRule rule, decimal value)
     {
+        await VersioningService.SnapshotRuleAsync(rule, CurrentUser.UserName, $"Threshold: {rule.Threshold} → {value}");
         rule.Threshold = value;
         rule.UpdatedAt = DateTime.UtcNow;
         rule.UpdatedBy = CurrentUser.UserName;
@@ -447,6 +529,7 @@ else
 
     private async Task UpdateWeight(RiskRule rule, int value)
     {
+        await VersioningService.SnapshotRuleAsync(rule, CurrentUser.UserName, $"Weight: {rule.ScoreWeight} → {value}");
         rule.ScoreWeight = value;
         rule.UpdatedAt = DateTime.UtcNow;
         rule.UpdatedBy = CurrentUser.UserName;
@@ -520,6 +603,7 @@ else
 
     private async Task ChangeCompoundRuleMode(RuleGroup group, string mode)
     {
+        await VersioningService.SnapshotCompoundRuleAsync(group, CurrentUser.UserName, $"Mode: {group.Mode} → {mode}");
         group.Mode = mode;
         group.UpdatedAt = DateTime.UtcNow;
         await DbContext.SaveChangesAsync();
@@ -542,6 +626,7 @@ else
 
     private async Task UpdateCompoundWeight(RuleGroup group, int value)
     {
+        await VersioningService.SnapshotCompoundRuleAsync(group, CurrentUser.UserName, $"RiskPoints: {group.RiskPoints} → {value}");
         group.RiskPoints = value;
         group.UpdatedAt = DateTime.UtcNow;
         await DbContext.SaveChangesAsync();
@@ -631,4 +716,60 @@ else
         "not_contains" => "does not contain",
         _ => op ?? ""
     };
+
+    // ── Version History ─────────────────────────────────────────
+
+    private bool _showVersionHistory;
+    private string _versionHistoryTitle = "";
+    private string _versionEntityType = "";
+    private Guid _versionEntityId;
+    private List<PayGuardAI.Core.Entities.RuleVersion> _versions = new();
+
+    private async Task ShowVersionHistory(Guid entityId, string ruleName, string entityType)
+    {
+        _versionEntityId = entityId;
+        _versionEntityType = entityType;
+        _versionHistoryTitle = ruleName;
+        _versions = await VersioningService.GetVersionHistoryAsync(entityId);
+        _showVersionHistory = true;
+        StateHasChanged();
+    }
+
+    private async Task RollbackToVersion(PayGuardAI.Core.Entities.RuleVersion version)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Rollback Rule",
+            $"Restore '{version.RuleName}' to version {version.VersionNumber} from {version.CreatedAt:MMM dd, HH:mm}?\n\nThe current config will be auto-saved as a new version before restoring.",
+            yesText: "Rollback", cancelText: "Cancel");
+
+        if (confirmed != true) return;
+
+        if (version.EntityType == RuleEntityType_RiskRule)
+        {
+            var rule = await VersioningService.RollbackRuleAsync(version.Id, CurrentUser.UserName);
+            if (rule != null)
+            {
+                Snackbar.Add($"Rule '{rule.Name}' restored to v{version.VersionNumber}", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Rollback failed — rule not found or snapshot corrupted", Severity.Error);
+            }
+        }
+        else
+        {
+            var group = await VersioningService.RollbackCompoundRuleAsync(version.Id, CurrentUser.UserName);
+            if (group != null)
+            {
+                Snackbar.Add($"Compound rule '{group.Name}' restored to v{version.VersionNumber}", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Rollback failed — rule not found or snapshot corrupted", Severity.Error);
+            }
+        }
+
+        _showVersionHistory = false;
+        await LoadRules();
+    }
 }

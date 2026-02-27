@@ -62,6 +62,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<RuleTemplate> RuleTemplates => Set<RuleTemplate>();
     public DbSet<RuleGroup> RuleGroups => Set<RuleGroup>();
     public DbSet<RuleGroupCondition> RuleGroupConditions => Set<RuleGroupCondition>();
+    public DbSet<RuleVersion> RuleVersions => Set<RuleVersion>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -86,6 +87,7 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<CustomReport>().HasQueryFilter(e => e.TenantId == TenantId);
         modelBuilder.Entity<MLModel>().HasQueryFilter(e => e.TenantId == TenantId);
         modelBuilder.Entity<RuleGroup>().HasQueryFilter(e => e.TenantId == TenantId);
+        modelBuilder.Entity<RuleVersion>().HasQueryFilter(e => e.TenantId == TenantId);
 
         // Entity configuration
 
@@ -176,6 +178,15 @@ public class ApplicationDbContext : DbContext
                   .WithMany(g => g.Conditions)
                   .HasForeignKey(e => e.RuleGroupId)
                   .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // RuleVersion configuration (rule versioning & rollback)
+        modelBuilder.Entity<RuleVersion>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.EntityId, e.VersionNumber });
+            entity.HasIndex(e => e.TenantId);
+            entity.HasIndex(e => e.CreatedAt);
         });
 
         // AuditLog configuration

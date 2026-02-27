@@ -258,6 +258,9 @@ builder.Services.AddHostedService<MLRetrainingBackgroundService>();
 // Register Rule Marketplace service — browse, import, and analyze rule templates
 builder.Services.AddScoped<IRuleMarketplaceService, RuleMarketplaceService>();
 
+// Register Rule Versioning service — snapshot, history, and rollback for rules
+builder.Services.AddScoped<IRuleVersioningService, RuleVersioningService>();
+
 // Register Fraud Savings service — calculates ROI dashboard metrics
 builder.Services.AddScoped<IFraudSavingsService, FraudSavingsService>();
 

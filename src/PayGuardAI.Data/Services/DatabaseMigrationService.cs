@@ -58,6 +58,9 @@ public class DatabaseMigrationService : IDatabaseMigrationService
             // Create RuleGroups + RuleGroupConditions tables (compound rules)
             await CreateRuleGroupsTableAsync(dbType);
 
+            // Create RuleVersions table (rule versioning & rollback)
+            await CreateRuleVersionsTableAsync(dbType);
+
             // Mark existing tenants as onboarded so they aren't redirected
             await MarkExistingTenantsOnboardedAsync(dbType);
 
@@ -950,6 +953,77 @@ public class DatabaseMigrationService : IDatabaseMigrationService
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Skipping RuleGroups table creation");
+        }
+    }
+
+    /// <summary>
+    /// Creates the RuleVersions table if it doesn't already exist.
+    /// Added for the Rule Versioning & Rollback feature — stores immutable snapshots.
+    /// </summary>
+    private async Task CreateRuleVersionsTableAsync(string dbType)
+    {
+        try
+        {
+            if (dbType == "PostgreSQL")
+            {
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS "RuleVersions" (
+                        "Id" uuid NOT NULL PRIMARY KEY,
+                        "TenantId" text NOT NULL DEFAULT '',
+                        "EntityType" text NOT NULL DEFAULT '',
+                        "EntityId" uuid NOT NULL,
+                        "VersionNumber" integer NOT NULL DEFAULT 1,
+                        "ConfigJson" text NOT NULL DEFAULT '',
+                        "ChangeDescription" text NOT NULL DEFAULT '',
+                        "ChangedBy" text NOT NULL DEFAULT 'system',
+                        "CreatedAt" timestamp with time zone NOT NULL DEFAULT now(),
+                        "RuleName" text NOT NULL DEFAULT ''
+                    )
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS "IX_RuleVersions_EntityId_VersionNumber"
+                    ON "RuleVersions" ("EntityId", "VersionNumber")
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS "IX_RuleVersions_TenantId"
+                    ON "RuleVersions" ("TenantId")
+                    """);
+            }
+            else
+            {
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS RuleVersions (
+                        Id TEXT NOT NULL PRIMARY KEY,
+                        TenantId TEXT NOT NULL DEFAULT '',
+                        EntityType TEXT NOT NULL DEFAULT '',
+                        EntityId TEXT NOT NULL,
+                        VersionNumber INTEGER NOT NULL DEFAULT 1,
+                        ConfigJson TEXT NOT NULL DEFAULT '',
+                        ChangeDescription TEXT NOT NULL DEFAULT '',
+                        ChangedBy TEXT NOT NULL DEFAULT 'system',
+                        CreatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+                        RuleName TEXT NOT NULL DEFAULT ''
+                    )
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS IX_RuleVersions_EntityId_VersionNumber
+                    ON RuleVersions (EntityId, VersionNumber)
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS IX_RuleVersions_TenantId
+                    ON RuleVersions (TenantId)
+                    """);
+            }
+
+            _logger.LogDebug("RuleVersions table ensured");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipping RuleVersions table creation");
         }
     }
 }
