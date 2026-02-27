@@ -60,6 +60,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<CustomReport> CustomReports => Set<CustomReport>();
     public DbSet<MLModel> MLModels => Set<MLModel>();
     public DbSet<RuleTemplate> RuleTemplates => Set<RuleTemplate>();
+    public DbSet<RuleGroup> RuleGroups => Set<RuleGroup>();
+    public DbSet<RuleGroupCondition> RuleGroupConditions => Set<RuleGroupCondition>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -83,6 +85,7 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<CustomRole>().HasQueryFilter(e => e.TenantId == TenantId);
         modelBuilder.Entity<CustomReport>().HasQueryFilter(e => e.TenantId == TenantId);
         modelBuilder.Entity<MLModel>().HasQueryFilter(e => e.TenantId == TenantId);
+        modelBuilder.Entity<RuleGroup>().HasQueryFilter(e => e.TenantId == TenantId);
 
         // Entity configuration
 
@@ -149,6 +152,26 @@ public class ApplicationDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.TenantId, e.IsActive });
             entity.HasIndex(e => e.TrainedAt);
+        });
+
+        // RuleGroup configuration (compound rules)
+        modelBuilder.Entity<RuleGroup>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.TenantId);
+            entity.HasIndex(e => e.IsEnabled);
+        });
+
+        // RuleGroupCondition configuration
+        modelBuilder.Entity<RuleGroupCondition>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.RuleGroupId);
+
+            entity.HasOne(e => e.RuleGroup)
+                  .WithMany(g => g.Conditions)
+                  .HasForeignKey(e => e.RuleGroupId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         // AuditLog configuration

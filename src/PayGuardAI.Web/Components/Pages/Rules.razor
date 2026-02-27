@@ -19,13 +19,19 @@
                OnClick="@OpenAddRuleDialog">
         Add Custom Rule
     </MudButton>
+    <MudButton Variant="Variant.Filled" Color="Color.Warning" 
+               StartIcon="@Icons.Material.Filled.AccountTree"
+               OnClick="@OpenAddCompoundRuleDialog">
+        Add Compound Rule
+    </MudButton>
 </MudStack>
 
 <MudAlert Severity="Severity.Info" Class="mb-4">
     <MudText>
         Configure risk scoring thresholds and weights. <strong>System rules</strong> (built-in) have hardcoded
         evaluation logic — adjust their thresholds and weights. <strong>Custom rules</strong> evaluate dynamically
-        based on the condition you define. Changes apply to new transactions immediately.
+        based on the condition you define. <strong>Compound rules</strong> combine multiple conditions with AND/OR logic.
+        Changes apply to new transactions immediately.
     </MudText>
 </MudAlert>
 
@@ -218,6 +224,98 @@ else
         </MudGrid>
     }
 
+    @* ── Compound Rules (AND/OR groups) ───────────────────────────── *@
+    <MudText Typo="Typo.h6" Class="mb-2 mt-6">
+        <MudIcon Icon="@Icons.Material.Filled.AccountTree" Size="Size.Small" Class="mr-1" />
+        Compound Rules
+        @if (_compoundRules.Count > 0)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Tertiary" Class="ml-2">@_compoundRules.Count</MudChip>
+        }
+    </MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+        Multi-condition rules that combine fields with AND/OR logic. More powerful than single-condition rules.
+    </MudText>
+
+    @if (_compoundRules.Count == 0)
+    {
+        <MudPaper Class="pa-6 mb-4" Elevation="0" Style="border: 2px dashed var(--mud-palette-lines-default); text-align: center;">
+            <MudIcon Icon="@Icons.Material.Filled.AccountTree" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mt-2">
+                No compound rules yet. Click <strong>"Add Compound Rule"</strong> to create multi-condition rules.
+            </MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-1">
+                Example: Flag when Amount > $5,000 <strong>AND</strong> Source Country = NG <strong>AND</strong> Customer Txns &lt; 3
+            </MudText>
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var group in _compoundRules)
+            {
+                <MudItem xs="12" md="6">
+                    <MudCard Elevation="2" Style="border-left: 4px solid var(--mud-palette-tertiary);">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                    <MudStack>
+                                        <MudText Typo="Typo.h6">⚡ @group.Name</MudText>
+                                        <MudStack Row="true" Spacing="1">
+                                            <MudChip T="string" Size="Size.Small" Color="@GetCategoryColor(group.Category)">
+                                                @group.Category
+                                            </MudChip>
+                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                                                     Color="@(group.LogicalOperator == "AND" ? Color.Primary : Color.Warning)">
+                                                @group.LogicalOperator · @group.Conditions.Count conditions
+                                            </MudChip>
+                                        </MudStack>
+                                    </MudStack>
+                                    <MudSwitch T="bool" Value="@group.IsEnabled" 
+                                               ValueChanged="@((val) => ToggleCompoundRule(group, val))"
+                                               Color="Color.Success" />
+                                </MudStack>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            @* Show each condition *@
+                            @foreach (var condition in group.Conditions.OrderBy(c => c.OrderIndex))
+                            {
+                                <MudPaper Class="pa-2 mb-1" Elevation="0" Style="background-color: var(--mud-palette-background-grey);">
+                                    <MudText Typo="Typo.body2">
+                                        <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" />
+                                        <strong>@GetFieldDisplayName(condition.ExpressionField)</strong>
+                                        @GetOperatorDisplay(condition.ExpressionOperator)
+                                        <strong>@condition.ExpressionValue</strong>
+                                    </MudText>
+                                </MudPaper>
+                            }
+
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mt-3" Spacing="2">
+                                <MudNumericField T="int" Label="Risk Points" 
+                                                 Value="@group.RiskPoints"
+                                                 ValueChanged="@((val) => UpdateCompoundWeight(group, val))"
+                                                 Variant="Variant.Outlined"
+                                                 Min="0" Max="50"
+                                                 Disabled="@(!group.IsEnabled)"
+                                                 Style="max-width: 140px;" />
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    Created @group.CreatedAt.ToString("MM/dd") by @group.CreatedBy
+                                </MudText>
+                            </MudStack>
+                        </MudCardContent>
+                        <MudCardActions>
+                            <MudSpacer />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                           Color="Color.Error" Size="Size.Small"
+                                           OnClick="@(() => DeleteCompoundRule(group))" />
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+
     <MudPaper Class="pa-4 mt-4" Elevation="2">
         <MudText Typo="Typo.h6" Class="mb-3">Risk Level Thresholds</MudText>
         <MudText Typo="Typo.body2" Class="mb-3">
@@ -260,6 +358,7 @@ else
     private bool _loading = true;
     private List<RiskRule> _rules = new();
     private List<RiskRule> _expressionRules = new();
+    private List<RuleGroup> _compoundRules = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -286,6 +385,12 @@ else
                 .ToList();
 
             _expressionRules = _rules.Where(r => r.IsExpression).ToList();
+
+            // Load compound rules
+            _compoundRules = await DbContext.RuleGroups
+                .Include(g => g.Conditions)
+                .OrderBy(g => g.Name)
+                .ToListAsync();
         }
         finally
         {
@@ -356,6 +461,64 @@ else
             DbContext.RiskRules.Remove(rule);
             await DbContext.SaveChangesAsync();
             Snackbar.Add($"Rule '{rule.Name}' deleted", Severity.Warning);
+            await LoadRules();
+        }
+    }
+
+    // ── Compound Rule Handlers ──────────────────────────────────────
+
+    private async Task OpenAddCompoundRuleDialog()
+    {
+        var parameters = new DialogParameters<AddCompoundRuleDialog>();
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<AddCompoundRuleDialog>("Create Compound Rule", parameters, options);
+        var result = await dialog.Result;
+        
+        if (result is { Canceled: false, Data: RuleGroup newGroup })
+        {
+            // Set tenant context
+            newGroup.TenantId = CurrentUser.TenantId;
+            foreach (var condition in newGroup.Conditions)
+            {
+                condition.RuleGroupId = newGroup.Id;
+            }
+
+            DbContext.RuleGroups.Add(newGroup);
+            await DbContext.SaveChangesAsync();
+            Snackbar.Add($"Compound rule '{newGroup.Name}' created with {newGroup.Conditions.Count} conditions!", Severity.Success);
+            await LoadRules();
+        }
+    }
+
+    private async Task ToggleCompoundRule(RuleGroup group, bool enabled)
+    {
+        group.IsEnabled = enabled;
+        group.UpdatedAt = DateTime.UtcNow;
+        await DbContext.SaveChangesAsync();
+        Snackbar.Add($"Compound rule '{group.Name}' {(enabled ? "enabled" : "disabled")}", 
+            enabled ? Severity.Success : Severity.Warning);
+    }
+
+    private async Task UpdateCompoundWeight(RuleGroup group, int value)
+    {
+        group.RiskPoints = value;
+        group.UpdatedAt = DateTime.UtcNow;
+        await DbContext.SaveChangesAsync();
+        Snackbar.Add($"Risk points updated for '{group.Name}'", Severity.Info);
+    }
+
+    private async Task DeleteCompoundRule(RuleGroup group)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Delete Compound Rule",
+            $"Are you sure you want to delete '{group.Name}'? All {group.Conditions.Count} conditions will be removed. This action cannot be undone.",
+            yesText: "Delete", cancelText: "Cancel");
+        
+        if (confirmed == true)
+        {
+            DbContext.RuleGroups.Remove(group);
+            await DbContext.SaveChangesAsync();
+            Snackbar.Add($"Compound rule '{group.Name}' deleted", Severity.Warning);
             await LoadRules();
         }
     }

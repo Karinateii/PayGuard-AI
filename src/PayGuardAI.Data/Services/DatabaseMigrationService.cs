@@ -55,6 +55,9 @@ public class DatabaseMigrationService : IDatabaseMigrationService
             // Seed default rule templates if the table is empty
             await SeedRuleTemplatesDataAsync(dbType);
 
+            // Create RuleGroups + RuleGroupConditions tables (compound rules)
+            await CreateRuleGroupsTableAsync(dbType);
+
             // Mark existing tenants as onboarded so they aren't redirected
             await MarkExistingTenantsOnboardedAsync(dbType);
 
@@ -833,6 +836,112 @@ public class DatabaseMigrationService : IDatabaseMigrationService
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Skipping MarkExistingTenantsOnboarded (table may not exist yet)");
+        }
+    }
+
+    /// <summary>
+    /// Creates the RuleGroups and RuleGroupConditions tables if they don't already exist.
+    /// Added for the Compound Rules feature — allows AND/OR chaining of multiple conditions.
+    /// </summary>
+    private async Task CreateRuleGroupsTableAsync(string dbType)
+    {
+        try
+        {
+            if (dbType == "PostgreSQL")
+            {
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS "RuleGroups" (
+                        "Id" uuid NOT NULL PRIMARY KEY,
+                        "TenantId" text NOT NULL DEFAULT '',
+                        "Name" text NOT NULL DEFAULT '',
+                        "Description" text NOT NULL DEFAULT '',
+                        "LogicalOperator" text NOT NULL DEFAULT 'AND',
+                        "RiskPoints" integer NOT NULL DEFAULT 20,
+                        "Category" text NOT NULL DEFAULT 'Compound',
+                        "IsEnabled" boolean NOT NULL DEFAULT true,
+                        "CreatedAt" timestamp with time zone NOT NULL DEFAULT now(),
+                        "UpdatedAt" timestamp with time zone NOT NULL DEFAULT now(),
+                        "CreatedBy" text NOT NULL DEFAULT 'system'
+                    )
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS "IX_RuleGroups_TenantId"
+                    ON "RuleGroups" ("TenantId")
+                    """);
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS "IX_RuleGroups_IsEnabled"
+                    ON "RuleGroups" ("IsEnabled")
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS "RuleGroupConditions" (
+                        "Id" uuid NOT NULL PRIMARY KEY,
+                        "RuleGroupId" uuid NOT NULL,
+                        "ExpressionField" text NOT NULL DEFAULT '',
+                        "ExpressionOperator" text NOT NULL DEFAULT '',
+                        "ExpressionValue" text NOT NULL DEFAULT '',
+                        "OrderIndex" integer NOT NULL DEFAULT 0,
+                        CONSTRAINT "FK_RuleGroupConditions_RuleGroups" FOREIGN KEY ("RuleGroupId")
+                            REFERENCES "RuleGroups" ("Id") ON DELETE CASCADE
+                    )
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS "IX_RuleGroupConditions_RuleGroupId"
+                    ON "RuleGroupConditions" ("RuleGroupId")
+                    """);
+            }
+            else
+            {
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS RuleGroups (
+                        Id TEXT NOT NULL PRIMARY KEY,
+                        TenantId TEXT NOT NULL DEFAULT '',
+                        Name TEXT NOT NULL DEFAULT '',
+                        Description TEXT NOT NULL DEFAULT '',
+                        LogicalOperator TEXT NOT NULL DEFAULT 'AND',
+                        RiskPoints INTEGER NOT NULL DEFAULT 20,
+                        Category TEXT NOT NULL DEFAULT 'Compound',
+                        IsEnabled INTEGER NOT NULL DEFAULT 1,
+                        CreatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+                        UpdatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+                        CreatedBy TEXT NOT NULL DEFAULT 'system'
+                    )
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS IX_RuleGroups_TenantId
+                    ON RuleGroups (TenantId)
+                    """);
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS IX_RuleGroups_IsEnabled
+                    ON RuleGroups (IsEnabled)
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS RuleGroupConditions (
+                        Id TEXT NOT NULL PRIMARY KEY,
+                        RuleGroupId TEXT NOT NULL,
+                        ExpressionField TEXT NOT NULL DEFAULT '',
+                        ExpressionOperator TEXT NOT NULL DEFAULT '',
+                        ExpressionValue TEXT NOT NULL DEFAULT '',
+                        OrderIndex INTEGER NOT NULL DEFAULT 0,
+                        FOREIGN KEY (RuleGroupId) REFERENCES RuleGroups (Id) ON DELETE CASCADE
+                    )
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS IX_RuleGroupConditions_RuleGroupId
+                    ON RuleGroupConditions (RuleGroupId)
+                    """);
+            }
+
+            _logger.LogDebug("RuleGroups + RuleGroupConditions tables ensured");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipping RuleGroups table creation");
         }
     }
 }

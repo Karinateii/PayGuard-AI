@@ -1,0 +1,343 @@
+@using PayGuardAI.Core.Entities
+@inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.AccountTree" />
+            <MudText Typo="Typo.h6">Create Compound Rule</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-1">
+                <MudText Typo="Typo.body2">
+                    Compound rules combine multiple conditions with <strong>AND</strong> (all must match) or <strong>OR</strong> (any must match).
+                    <br />Example: Flag when <em>Amount > $5,000</em> <strong>AND</strong> <em>Source Country = NG</em> <strong>AND</strong> <em>Customer Txns &lt; 3</em>
+                </MudText>
+            </MudAlert>
+
+            <MudTextField @bind-Value="_name" Label="Rule Name" Required="true"
+                          Variant="Variant.Outlined"
+                          Placeholder="e.g., High-Value New Customer from Nigeria"
+                          HelperText="A descriptive name for this compound rule" />
+
+            <MudDivider />
+
+            @* ── Logic operator toggle ──────────────────────────── *@
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudText Typo="Typo.subtitle2" Color="Color.Primary">
+                    <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Size="Size.Small" Class="mr-1" />
+                    Flag when
+                </MudText>
+                <MudToggleGroup T="string" @bind-Value="_logicalOperator" Style="flex-shrink: 0;">
+                    <MudToggleItem Value="@("AND")" Text="ALL match (AND)" />
+                    <MudToggleItem Value="@("OR")" Text="ANY matches (OR)" />
+                </MudToggleGroup>
+            </MudStack>
+
+            @* ── Conditions list ────────────────────────────────── *@
+            @for (int i = 0; i < _conditions.Count; i++)
+            {
+                var index = i; // capture for closure
+                var cond = _conditions[index];
+
+                <MudPaper Class="pa-3" Elevation="1" Style="border-left: 3px solid var(--mud-palette-primary);">
+                    <MudStack Spacing="2">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.overline" Color="Color.Primary">
+                                Condition @(index + 1)
+                            </MudText>
+                            @if (_conditions.Count > 2)
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                                               Color="Color.Error"
+                                               OnClick="@(() => RemoveCondition(index))" />
+                            }
+                        </MudStack>
+
+                        <MudGrid>
+                            <MudItem xs="12" sm="4">
+                                <MudSelect T="string" Value="@cond.Field"
+                                           ValueChanged="@((val) => UpdateConditionField(index, val))"
+                                           Label="Field" Variant="Variant.Outlined"
+                                           AnchorOrigin="Origin.BottomCenter">
+                                    <MudText Typo="Typo.overline" Class="px-4 pt-2" Style="color: var(--mud-palette-text-secondary);">
+                                        Transaction Fields
+                                    </MudText>
+                                    @foreach (var f in RiskRule.ExpressionFields.Where(f => !IsProfileField(f.Key)))
+                                    {
+                                        <MudSelectItem T="string" Value="@f.Key">@f.Value.DisplayName</MudSelectItem>
+                                    }
+                                    <MudText Typo="Typo.overline" Class="px-4 pt-2" Style="color: var(--mud-palette-text-secondary);">
+                                        Customer Profile
+                                    </MudText>
+                                    @foreach (var f in RiskRule.ExpressionFields.Where(f => IsProfileField(f.Key)))
+                                    {
+                                        <MudSelectItem T="string" Value="@f.Key">@f.Value.DisplayName</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="12" sm="4">
+                                <MudSelect T="string" Value="@cond.Operator"
+                                           ValueChanged="@((val) => UpdateConditionOperator(index, val))"
+                                           Label="Condition" Variant="Variant.Outlined"
+                                           Disabled="@(string.IsNullOrEmpty(cond.Field))"
+                                           AnchorOrigin="Origin.BottomCenter">
+                                    @foreach (var op in GetOperatorsForField(cond.Field))
+                                    {
+                                        <MudSelectItem T="string" Value="@op.Key">@op.Value</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="12" sm="4">
+                                <MudTextField T="string" Value="@cond.Value"
+                                              ValueChanged="@((val) => UpdateConditionValue(index, val))"
+                                              Label="Value" Variant="Variant.Outlined"
+                                              Disabled="@(string.IsNullOrEmpty(cond.Operator))"
+                                              Placeholder="@GetFieldHint(cond.Field)" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudStack>
+                </MudPaper>
+
+                @* AND/OR badge between conditions *@
+                @if (index < _conditions.Count - 1)
+                {
+                    <MudStack Row="true" Justify="Justify.Center" Class="my-n2">
+                        <MudChip T="string" Size="Size.Small" 
+                                 Color="@(_logicalOperator == "AND" ? Color.Primary : Color.Warning)"
+                                 Variant="Variant.Filled">
+                            @_logicalOperator
+                        </MudChip>
+                    </MudStack>
+                }
+            }
+
+            @* Add condition button *@
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="AddCondition" FullWidth="true"
+                       Disabled="@(_conditions.Count >= 6)">
+                Add Condition @(_conditions.Count >= 6 ? "(max 6)" : "")
+            </MudButton>
+
+            @* ── Preview ────────────────────────────────────────── *@
+            @if (IsPreviewReady)
+            {
+                <MudPaper Class="pa-3" Elevation="0" Style="background-color: var(--mud-palette-background-grey);">
+                    <MudText Typo="Typo.body2">
+                        <MudIcon Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Class="mr-1" />
+                        <strong>Preview:</strong> Flag when
+                        @for (int i = 0; i < _conditions.Count; i++)
+                        {
+                            var c = _conditions[i];
+                            if (!c.IsComplete) continue;
+
+                            if (i > 0)
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                                         Color="@(_logicalOperator == "AND" ? Color.Primary : Color.Warning)"
+                                         Class="mx-1" Style="vertical-align: middle;">
+                                    @_logicalOperator
+                                </MudChip>
+                            }
+                            <em>@GetFieldDisplayName(c.Field)</em>
+                            @(" ")@GetOperatorDisplay(c.Operator)@(" ")
+                            <strong>@c.Value</strong>
+                        }
+                    </MudText>
+                </MudPaper>
+            }
+
+            <MudDivider />
+
+            @* Category and weight *@
+            <MudGrid>
+                <MudItem xs="6">
+                    <MudSelect T="string" @bind-Value="_category" Label="Category"
+                               Variant="Variant.Outlined" Required="true">
+                        <MudSelectItem Value="@("Compound")">Compound</MudSelectItem>
+                        <MudSelectItem Value="@("Amount")">Amount</MudSelectItem>
+                        <MudSelectItem Value="@("Velocity")">Velocity</MudSelectItem>
+                        <MudSelectItem Value="@("Geography")">Geography</MudSelectItem>
+                        <MudSelectItem Value="@("Pattern")">Pattern</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="6">
+                    <MudNumericField T="int" @bind-Value="_riskPoints"
+                                     Label="Risk Points" Variant="Variant.Outlined"
+                                     Min="1" Max="50"
+                                     HelperText="1 (low) to 50 (critical)" />
+                </MudItem>
+            </MudGrid>
+
+            <MudTextField @bind-Value="_description" Label="Description (optional)"
+                          Variant="Variant.Outlined" Lines="2"
+                          Placeholder="Explain the business rationale for this compound rule" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   OnClick="Submit" Disabled="@(!IsValid)"
+                   StartIcon="@Icons.Material.Filled.AccountTree">
+            Create Compound Rule
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance? MudDialog { get; set; }
+
+    private string _name = "";
+    private string _logicalOperator = "AND";
+    private string _description = "";
+    private string _category = "Compound";
+    private int _riskPoints = 20;
+
+    // Start with 2 empty conditions
+    private List<ConditionEntry> _conditions = new()
+    {
+        new ConditionEntry(),
+        new ConditionEntry()
+    };
+
+    private bool IsValid =>
+        !string.IsNullOrWhiteSpace(_name) &&
+        _conditions.Count >= 2 &&
+        _conditions.Count(c => c.IsComplete) >= 2;
+
+    private bool IsPreviewReady =>
+        _conditions.Count(c => c.IsComplete) >= 2;
+
+    private void Cancel() => MudDialog?.Cancel();
+
+    private void Submit()
+    {
+        var completedConditions = _conditions.Where(c => c.IsComplete).ToList();
+
+        // Auto-generate description if not provided
+        var desc = string.IsNullOrWhiteSpace(_description)
+            ? $"Compound rule ({_logicalOperator}): " + string.Join(
+                $" {_logicalOperator} ",
+                completedConditions.Select(c =>
+                    $"{GetFieldDisplayName(c.Field)} {GetOperatorDisplay(c.Operator)} {c.Value}"))
+            : _description;
+
+        var ruleGroup = new RuleGroup
+        {
+            Id = Guid.NewGuid(),
+            Name = _name,
+            Description = desc,
+            LogicalOperator = _logicalOperator,
+            RiskPoints = _riskPoints,
+            Category = _category,
+            IsEnabled = true,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            CreatedBy = CurrentUser.UserName,
+            Conditions = completedConditions.Select((c, idx) => new RuleGroupCondition
+            {
+                Id = Guid.NewGuid(),
+                ExpressionField = c.Field,
+                ExpressionOperator = c.Operator,
+                ExpressionValue = c.Value,
+                OrderIndex = idx
+            }).ToList()
+        };
+
+        MudDialog?.Close(DialogResult.Ok(ruleGroup));
+    }
+
+    // ── Condition management ────────────────────────────────────────
+
+    private void AddCondition()
+    {
+        if (_conditions.Count < 6)
+            _conditions.Add(new ConditionEntry());
+    }
+
+    private void RemoveCondition(int index)
+    {
+        if (_conditions.Count > 2)
+            _conditions.RemoveAt(index);
+    }
+
+    private void UpdateConditionField(int index, string value)
+    {
+        _conditions[index].Field = value;
+        _conditions[index].Operator = ""; // reset operator when field changes
+        _conditions[index].Value = "";
+    }
+
+    private void UpdateConditionOperator(int index, string value)
+    {
+        _conditions[index].Operator = value;
+    }
+
+    private void UpdateConditionValue(int index, string value)
+    {
+        _conditions[index].Value = value;
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────
+
+    private static bool IsProfileField(string field) =>
+        field is "TotalTransactions" or "TotalVolume" or "AvgTransaction"
+             or "MaxTransaction" or "FlaggedCount";
+
+    private static Dictionary<string, string> GetOperatorsForField(string field)
+    {
+        if (string.IsNullOrEmpty(field) || !RiskRule.ExpressionFields.TryGetValue(field, out var info))
+            return RiskRule.NumericOperators;
+
+        return info.FieldType is "decimal" or "int"
+            ? RiskRule.NumericOperators
+            : RiskRule.StringOperators;
+    }
+
+    private static string GetFieldHint(string field)
+    {
+        if (string.IsNullOrEmpty(field)) return "Enter a value";
+        return RiskRule.ExpressionFields.TryGetValue(field, out var info)
+            ? info.Hint
+            : "Enter a value";
+    }
+
+    private static string GetFieldDisplayName(string field)
+    {
+        if (string.IsNullOrEmpty(field)) return "?";
+        return RiskRule.ExpressionFields.TryGetValue(field, out var info)
+            ? info.DisplayName
+            : field;
+    }
+
+    private static string GetOperatorDisplay(string op) => op switch
+    {
+        ">=" => "is ≥",
+        "<=" => "is ≤",
+        ">"  => "is >",
+        "<"  => "is <",
+        "==" => "equals",
+        "!=" => "does not equal",
+        "contains" => "contains",
+        "not_contains" => "does not contain",
+        _ => op ?? ""
+    };
+
+    // ── Inner model ─────────────────────────────────────────────────
+
+    private class ConditionEntry
+    {
+        public string Field { get; set; } = "";
+        public string Operator { get; set; } = "";
+        public string Value { get; set; } = "";
+
+        public bool IsComplete =>
+            !string.IsNullOrWhiteSpace(Field) &&
+            !string.IsNullOrWhiteSpace(Operator) &&
+            !string.IsNullOrWhiteSpace(Value);
+    }
+}

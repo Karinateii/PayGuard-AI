@@ -79,6 +79,34 @@ public class RiskScoringService : IRiskScoringService
         // Cap score at 100
         totalScore = Math.Min(totalScore, 100);
 
+        // ── Compound rules (AND/OR groups) ──────────────────────────
+        // Evaluate compound rules that combine multiple conditions.
+        // These are additive — they run alongside single rules.
+        try
+        {
+            var compoundRuleGroups = await _context.RuleGroups
+                .Include(g => g.Conditions)
+                .Where(g => g.IsEnabled && g.Conditions.Count > 0)
+                .ToListAsync(cancellationToken);
+
+            foreach (var group in compoundRuleGroups)
+            {
+                var factor = EvaluateCompoundRule(group, transaction, customerProfile);
+                if (factor != null)
+                {
+                    factor.TenantId = _tenantContext.TenantId;
+                    riskFactors.Add(factor);
+                    totalScore += factor.ScoreContribution;
+                    totalScore = Math.Min(totalScore, 100);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Compound rule failure is non-fatal — fall back to single rules + ML
+            _logger.LogWarning(ex, "Compound rule evaluation failed for {TransactionId}", transaction.Id);
+        }
+
         // ── ML scoring enhancement ──────────────────────────────────
         // Try ML scoring for this tenant. ScoreTransactionAsync handles
         // lazy-loading the model from DB and returns null if no model exists.
@@ -422,6 +450,93 @@ public class RiskScoringService : IRiskScoringService
         {
             _logger.LogWarning(ex, "Expression rule '{RuleCode}' failed to evaluate: {Error}",
                 rule.RuleCode, ex.Message);
+        }
+
+        return null;
+    }
+
+    // ── Compound rule evaluation ────────────────────────────────────
+
+    /// <summary>
+    /// Evaluates a compound rule (RuleGroup) with AND/OR logic.
+    /// AND = all conditions must match; OR = any condition matches.
+    /// </summary>
+    private RiskFactor? EvaluateCompoundRule(RuleGroup group, Transaction transaction, CustomerProfile profile)
+    {
+        if (group.Conditions == null || group.Conditions.Count == 0) return null;
+
+        try
+        {
+            var conditions = group.Conditions.OrderBy(c => c.OrderIndex).ToList();
+            var conditionResults = new List<(RuleGroupCondition condition, bool matched, object? actualValue)>();
+
+            foreach (var condition in conditions)
+            {
+                var fieldValue = GetExpressionFieldValue(condition.ExpressionField, transaction, profile);
+                bool matched = fieldValue != null && EvaluateCondition(fieldValue, condition.ExpressionOperator, condition.ExpressionValue);
+                conditionResults.Add((condition, matched, fieldValue));
+            }
+
+            bool triggered = group.LogicalOperator.Equals("AND", StringComparison.OrdinalIgnoreCase)
+                ? conditionResults.All(r => r.matched)
+                : conditionResults.Any(r => r.matched);
+
+            if (triggered)
+            {
+                // Build a description showing which conditions matched
+                var matchedConditions = conditionResults
+                    .Where(r => r.matched)
+                    .Select(r =>
+                    {
+                        var fieldName = RiskRule.ExpressionFields.TryGetValue(r.condition.ExpressionField, out var info)
+                            ? info.DisplayName
+                            : r.condition.ExpressionField;
+                        var opDisplay = r.condition.ExpressionOperator switch
+                        {
+                            ">=" => "≥", "<=" => "≤", ">" => ">", "<" => "<",
+                            "==" => "=", "!=" => "≠",
+                            "contains" => "contains", "not_contains" => "doesn't contain",
+                            _ => r.condition.ExpressionOperator
+                        };
+                        return $"{fieldName} ({r.actualValue}) {opDisplay} {r.condition.ExpressionValue}";
+                    })
+                    .ToList();
+
+                var operatorLabel = group.LogicalOperator.Equals("AND", StringComparison.OrdinalIgnoreCase) ? "AND" : "OR";
+                var conditionSummary = string.Join($" {operatorLabel} ", matchedConditions);
+
+                return new RiskFactor
+                {
+                    Category = group.Category,
+                    RuleName = $"⚡ {group.Name}",
+                    Description = $"Compound rule ({operatorLabel}): {conditionSummary}",
+                    ScoreContribution = group.RiskPoints,
+                    Severity = group.RiskPoints >= 30 ? FactorSeverity.Critical
+                             : group.RiskPoints >= 20 ? FactorSeverity.Warning
+                             : FactorSeverity.Info,
+                    ContextData = System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        ruleGroupId = group.Id,
+                        ruleGroupName = group.Name,
+                        logicalOperator = group.LogicalOperator,
+                        conditionsEvaluated = conditionResults.Count,
+                        conditionsMatched = conditionResults.Count(r => r.matched),
+                        conditions = conditionResults.Select(r => new
+                        {
+                            field = r.condition.ExpressionField,
+                            op = r.condition.ExpressionOperator,
+                            expected = r.condition.ExpressionValue,
+                            actual = r.actualValue?.ToString(),
+                            matched = r.matched
+                        })
+                    })
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Compound rule '{RuleName}' failed to evaluate: {Error}",
+                group.Name, ex.Message);
         }
 
         return null;
