@@ -8,6 +8,8 @@
 [![Tests](https://img.shields.io/badge/tests-266%20passing-brightgreen)](https://github.com/Karinateii/PayGuard-AI/actions)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
+🌐 **Live Demo:** [https://payguard-ai-production.up.railway.app](https://payguard-ai-production.up.railway.app)
+
 ## Overview
 
 PayGuard AI is a compliance and risk tooling SaaS platform built for the [Afriex Cross-Border Fintech Hackathon](https://afriex.com). It provides financial institutions with real-time transaction monitoring, ML-powered risk scoring, a Human-in-the-Loop (HITL) review workflow, multi-tenancy, and a Rule Marketplace — all deployed on Railway with PostgreSQL.
@@ -36,12 +38,12 @@ PayGuard AI automates the first line of defense while keeping humans in control 
 ## Features
 
 ### Core Platform
-- 📊 **Live Dashboard** — Real-time stats, charts, and transaction monitoring
+- 📊 **Live Dashboard** — Real-time stats, charts, risk distribution, and transaction monitoring
 - 🔍 **Risk Analysis Engine** — 6 configurable rules + ML scoring with per-rule analytics
 - 👥 **HITL Review Queue** — Prioritized list of transactions needing human review
 - ⚡ **Real-time Updates** — SignalR-powered instant notifications
 - 📋 **Rules Management** — Create, edit, toggle, and import risk detection rules
-- 📈 **Compliance Reports** — Visual analytics with risk distribution charts
+- 📈 **Compliance Reports** — Visual analytics with risk distribution charts and CSV export
 - 📝 **Audit Logging** — Complete history of all actions and decisions
 
 ### AI & Machine Learning
@@ -49,31 +51,46 @@ PayGuard AI automates the first line of defense while keeping humans in control 
 - 🔄 **Auto-Retraining** — Background service checks hourly for new labeled data
 - 📊 **Model Management** — View training metrics (AUC, F1, precision/recall), activate/deactivate models
 - 🧠 **Feature Engineering** — 12 features extracted from transaction context (amount, velocity, time, corridor risk)
+- 💡 **Smart Rule Suggestions** — ML-driven analysis of review patterns to suggest new rules and threshold adjustments
 
 ### Rule Marketplace
 - 🏪 **Template Catalog** — 24 pre-built templates across 4 industries
 - 📦 **Industry Packs** — One-click import of all 6 rules optimized for your industry
 - 📊 **Rule Analytics** — Per-rule effectiveness: hit rate, precision, false positive rate
 - 🔄 **Import/Update** — Import new rules or update existing ones with recommended thresholds
+- 📜 **Rule Versioning** — Full version history with diff comparison and rollback
+
+### Fraud Detection & Intelligence
+- 🕸️ **Fan-out/Fan-in Detection** — Network analysis to detect structuring rings where one sender splits to many receivers or many senders funnel to one receiver
+- 🚫 **Watchlists & Blocklists** — Custom watchlists with automatic matching against transactions using name/email/country criteria
+- 🔗 **Relationship Analysis** — Graph-based visualization of transaction networks between entities
+
+### Compliance & Reporting
+- 🛡️ **GDPR Compliance** — Data subject search, export (JSON/CSV), right-to-erasure with full audit trail
+- 📄 **Invoice PDF Generation** — QuestPDF-powered professional invoices with automatic numbering and PDF download
+- 📊 **Advanced Reports** — Scheduled report generation with background processing and viewer dialog
+- 🧾 **System Logs** — Centralized, structured logging with retention policies and level-based filtering
 
 ### Enterprise Features
 - 🏢 **Multi-Tenancy** — Tenant-scoped data isolation via middleware + EF Core query filters
 - 🔐 **OAuth 2.0 & Magic Links** — Production-ready auth (Azure AD/Google/Okta) + passwordless login
 - 👮 **RBAC** — 4-tier roles: Reviewer, Manager, Admin, SuperAdmin with custom permissions
 - 🚀 **Tenant Onboarding** — Guided wizard for new organizations
-- 💳 **Billing** — Paystack-powered subscription management with usage-based pricing tiers
-- 📧 **Email Notifications** — Resend-powered alerts for critical risk events
-- 🔑 **API Keys & Webhooks** — Self-service API key management and webhook configuration
+- 💳 **Billing** — Paystack-powered subscription management with usage-based pricing tiers (Trial/Starter/Pro/Enterprise)
+- 📧 **Email Notifications** — Resend-powered alerts for critical risk events with per-user preferences
+- 🔑 **API Keys & Webhooks** — Self-service API key management and webhook configuration with signature verification
 - 💱 **Multi-Provider Support** — Afriex, Flutterwave, Wise payment provider abstraction
 
-### Infrastructure
+### Operations & Monitoring
+- 📡 **Monitoring Dashboard** — Real-time operational metrics: throughput, error rates, risk distribution, review queue depth, webhook activity, and 7-day trends
 - 🚦 **Rate Limiting** — Fixed-window rate limiter scoped per tenant
 - 💾 **Response Caching** — In-memory caching for dashboard stats and transactions
 - 🚨 **Alerting Service** — Automatic alerts for critical-risk transactions
 - 📡 **Health Checks** — `/health` endpoint for uptime monitoring
-- 📊 **Prometheus Metrics** — Request logging with slow-request warnings
+- 📊 **Prometheus Metrics** — `/metrics` endpoint with request timing and slow-request warnings
 - 🚩 **Feature Flags** — Safe deployment with instant rollback
 - 🐘 **PostgreSQL** — Production database on Railway (SQLite for local dev)
+- 🔒 **Security Hardened** — No eval() injection, Swagger restricted to dev, secure cookie policies, sanitized error messages
 
 ### Mobile & PWA
 - 📱 **Progressive Web App** — Installable on mobile with offline shell caching
@@ -95,6 +112,7 @@ PayGuard AI automates the first line of defense while keeping humans in control 
 | **Auth** | OAuth 2.0 / Magic Links / Demo mode |
 | **Email** | Resend HTTP API |
 | **Billing** | Paystack |
+| **PDF** | QuestPDF |
 | **Providers** | Afriex, Flutterwave, Wise |
 | **Caching** | IMemoryCache (tenant-scoped) |
 | **Monitoring** | Prometheus, Health Checks, Serilog |
@@ -106,63 +124,112 @@ PayGuard AI automates the first line of defense while keeping humans in control 
 ```
 PayGuardAI/
 ├── src/
-│   ├── PayGuardAI.Core/              # Domain entities and interfaces
-│   │   ├── Entities/
-│   │   │   ├── Transaction.cs         # Transaction entity
-│   │   │   ├── RiskAnalysis.cs        # Risk scoring results
-│   │   │   ├── RiskRule.cs            # Configurable risk rules
-│   │   │   ├── RuleTemplate.cs        # Marketplace templates
-│   │   │   ├── MLModel.cs             # ML model storage
-│   │   │   ├── CustomerProfile.cs     # Customer risk profiles
-│   │   │   ├── AuditLog.cs            # Audit trail
-│   │   │   ├── TeamMember.cs          # RBAC team members
-│   │   │   ├── CustomRole.cs          # Custom permission roles
-│   │   │   └── ...                    # 15+ entities total
-│   │   └── Services/
+│   ├── PayGuardAI.Core/                  # Domain entities and interfaces
+│   │   ├── Entities/                      # 23 entities
+│   │   │   ├── Transaction.cs             # Transaction entity
+│   │   │   ├── RiskAnalysis.cs            # Risk scoring results
+│   │   │   ├── RiskRule.cs                # Configurable risk rules
+│   │   │   ├── RuleTemplate.cs            # Marketplace templates
+│   │   │   ├── RuleVersion.cs             # Rule version history
+│   │   │   ├── RuleGroup.cs               # Compound rule groups
+│   │   │   ├── MLModel.cs                 # ML model storage
+│   │   │   ├── CustomerProfile.cs         # Customer risk profiles
+│   │   │   ├── AuditLog.cs                # Audit trail
+│   │   │   ├── SystemLog.cs               # Centralized system logs
+│   │   │   ├── TeamMember.cs              # RBAC team members
+│   │   │   ├── CustomRole.cs              # Custom permission roles
+│   │   │   ├── Invoice.cs                 # Billing invoices
+│   │   │   ├── Watchlist.cs               # Watchlists & blocklists
+│   │   │   ├── WatchlistEntry.cs          # Watchlist entries
+│   │   │   ├── WebhookEndpoint.cs         # Webhook configuration
+│   │   │   ├── TenantSubscription.cs      # Billing subscriptions
+│   │   │   ├── OrganizationSettings.cs    # Tenant settings
+│   │   │   └── ...                        # ApiKey, MagicLinkToken, etc.
+│   │   └── Services/                      # 23 service interfaces
 │   │       ├── IRiskScoringService.cs
 │   │       ├── IRuleMarketplaceService.cs
+│   │       ├── IRuleSuggestionService.cs
 │   │       ├── IMLScoringService.cs
+│   │       ├── IWatchlistService.cs
+│   │       ├── IRelationshipAnalysisService.cs
+│   │       ├── IGdprService.cs
 │   │       ├── ITenantContext.cs
-│   │       └── ...                    # 15+ service interfaces
+│   │       └── ...
 │   │
-│   ├── PayGuardAI.Data/              # Data access and service implementations
-│   │   ├── ApplicationDbContext.cs    # EF Core context with multi-tenant filters
-│   │   └── Services/
-│   │       ├── RiskScoringService.cs      # Rule evaluation + ML scoring
-│   │       ├── RuleMarketplaceService.cs  # Template browsing, import, analytics
-│   │       ├── MLScoringService.cs        # ML prediction engine
-│   │       ├── MLTrainingService.cs       # Model training pipeline
-│   │       ├── TransactionService.cs      # Cached, tenant-scoped
-│   │       ├── ReviewService.cs           # HITL review workflow
-│   │       ├── TenantOnboardingService.cs # Guided tenant setup
-│   │       ├── DatabaseMigrationService.cs # Auto-migration for PostgreSQL/SQLite
-│   │       └── ...                        # 15+ service implementations
+│   ├── PayGuardAI.Data/                  # Data access and service implementations
+│   │   ├── ApplicationDbContext.cs        # EF Core context with multi-tenant query filters
+│   │   └── Services/                      # 34 service implementations
+│   │       ├── RiskScoringService.cs          # Rule evaluation + ML scoring
+│   │       ├── RuleMarketplaceService.cs      # Template browsing, import, analytics
+│   │       ├── RuleSuggestionService.cs       # ML-driven rule suggestions
+│   │       ├── RuleVersioningService.cs       # Rule version tracking
+│   │       ├── MLScoringService.cs            # ML prediction engine
+│   │       ├── MLTrainingService.cs           # Model training pipeline
+│   │       ├── TransactionService.cs          # Cached, tenant-scoped
+│   │       ├── ReviewService.cs               # HITL review workflow
+│   │       ├── WatchlistService.cs            # Watchlist matching
+│   │       ├── RelationshipAnalysisService.cs # Fan-out/fan-in detection
+│   │       ├── GdprService.cs                 # GDPR data operations
+│   │       ├── InvoiceService.cs              # Invoice CRUD
+│   │       ├── MonitoringService.cs           # Real-time operational metrics
+│   │       ├── TenantOnboardingService.cs     # Guided tenant setup
+│   │       ├── DatabaseMigrationService.cs    # Auto-migration for PostgreSQL/SQLite
+│   │       ├── WebhookDeliveryService.cs      # Webhook dispatch + retry
+│   │       └── ...
 │   │
-│   └── PayGuardAI.Web/              # Blazor UI, API controllers, middleware
-│       ├── Components/Pages/
-│       │   ├── Home.razor             # Dashboard with live stats
-│       │   ├── Transactions.razor     # Transaction list with filters
-│       │   ├── Reviews.razor          # HITL review queue
-│       │   ├── Rules.razor            # Rule management
-│       │   ├── RuleMarketplace.razor  # Template browsing + analytics
-│       │   ├── MLModels.razor         # ML model management
-│       │   ├── Reports.razor          # Compliance analytics
-│       │   ├── Audit.razor            # Audit log viewer
-│       │   ├── Send.razor             # Transaction simulator
-│       │   └── ...                    # 20+ pages total
-│       ├── Controllers/
-│       │   └── WebhooksController.cs  # Multi-provider webhooks
-│       ├── Services/
+│   └── PayGuardAI.Web/                   # Blazor UI, API controllers, middleware
+│       ├── Components/Pages/              # 47 pages/dialogs
+│       │   ├── Home.razor                 # Dashboard with live stats
+│       │   ├── Transactions.razor         # Transaction list with filters
+│       │   ├── Reviews.razor              # HITL review queue
+│       │   ├── Rules.razor                # Rule management + suggestions
+│       │   ├── RuleMarketplace.razor      # Template browsing + analytics
+│       │   ├── MLModels.razor             # ML model management
+│       │   ├── Reports.razor              # Compliance analytics + CSV export
+│       │   ├── Audit.razor                # Audit log viewer
+│       │   ├── Send.razor                 # Transaction simulator
+│       │   ├── NetworkAnalysis.razor      # Fan-out/fan-in graph visualization
+│       │   ├── Watchlists.razor           # Watchlist management
+│       │   ├── GdprCompliance.razor       # GDPR search, export, erasure
+│       │   ├── Invoices.razor             # Invoice management + PDF download
+│       │   ├── Monitoring.razor           # Operational monitoring dashboard
+│       │   ├── SystemLogs.razor           # Centralized log viewer
+│       │   └── ...                        # Billing, Profile, Settings, etc.
+│       ├── Controllers/                   # 6 API controllers
+│       │   ├── WebhooksController.cs      # Multi-provider webhooks
+│       │   ├── AuthController.cs          # Auth endpoints (OAuth, magic link, demo)
+│       │   ├── InvoiceController.cs       # PDF download endpoint
+│       │   └── ...
+│       ├── Services/                      # 20 middleware & background services
 │       │   ├── TenantResolutionMiddleware.cs
+│       │   ├── SecurityHeadersMiddleware.cs
+│       │   ├── InputValidationMiddleware.cs
 │       │   ├── MLRetrainingBackgroundService.cs
-│       │   └── CurrentUserService.cs
-│       └── Hubs/
-│           └── TransactionHub.cs      # SignalR real-time hub
+│       │   ├── ScheduledReportBackgroundService.cs
+│       │   ├── LogRetentionBackgroundService.cs
+│       │   ├── InvoicePdfService.cs
+│       │   └── ...
+│       ├── Hubs/
+│       │   └── TransactionHub.cs          # SignalR real-time hub
+│       └── wwwroot/
+│           └── js/payguard.js             # Safe JS interop helpers
 │
 └── tests/
-    └── PayGuardAI.Tests/             # 266 tests
-        ├── Services/                  # Unit tests (10 test classes)
-        └── Integration/              # API integration tests
+    └── PayGuardAI.Tests/                  # 266 tests
+        ├── Services/                       # 10 unit test classes
+        │   ├── RuleMarketplaceServiceTests.cs
+        │   ├── TenantOnboardingTests.cs
+        │   ├── RbacServiceTests.cs
+        │   ├── MLFeatureExtractorTests.cs
+        │   ├── SecurityMiddlewareTests.cs
+        │   ├── AfriexProviderTests.cs
+        │   ├── FlutterwaveProviderTests.cs
+        │   ├── WiseProviderTests.cs
+        │   ├── PaymentProviderFactoryTests.cs
+        │   └── TenantIsolationTests.cs
+        └── Integration/                    # API integration tests
+            ├── WebhooksControllerIntegrationTests.cs
+            └── SecurityIntegrationTests.cs
 ```
 
 ## Getting Started
@@ -248,13 +315,23 @@ Enable enterprise-grade authentication by setting `FeatureFlags:OAuthEnabled` to
 
 **Supported Providers:** Azure AD, Google Workspace, Okta, any OIDC provider.
 
+### Security Hardening
+
+- **No `eval()` injection** — All JS interop uses safe, parameterised helper functions (`wwwroot/js/payguard.js`)
+- **Swagger restricted to development** — API docs are not exposed in production
+- **Secure cookies** — `HttpOnly`, `SameSite=Lax`, `SecurePolicy=Always`
+- **Sanitized error messages** — Exception details never leak to the UI; generic errors shown to users with full stack traces logged server-side
+- **Security headers** — CSP, X-Content-Type-Options, X-Frame-Options, Referrer-Policy via middleware
+- **Input validation** — Request validation middleware rejects malformed payloads
+- **Webhook signature verification** — HMAC-based verification for all inbound webhooks
+
 ### Role-Based Access Control
 
 | Role | Access Level |
 |------|-------------|
-| **Reviewer** | View transactions, approve/reject flagged items |
-| **Manager** | + Rules, Billing, Audit, Rule Marketplace |
-| **Admin** | + Team, API Keys, Webhooks, Analytics, ML Models, Organization Settings |
+| **Reviewer** | View transactions, approve/reject flagged items, view reports |
+| **Manager** | + Rules, Billing, Invoices, Audit, Rule Marketplace, Watchlists |
+| **Admin** | + Team, API Keys, Webhooks, Analytics, ML Models, Organization Settings, Monitoring, System Logs, GDPR |
 | **SuperAdmin** | + Tenant Management (platform owner) |
 
 ## Multi-Provider Integration
@@ -288,7 +365,7 @@ curl -X POST http://localhost:5054/api/webhooks/afriex \
 | `NEW_CUSTOMER` | First-time or new customer | < 3 txns |
 | `HIGH_RISK_CORRIDOR` | OFAC-sanctioned countries | IR, KP, SY, YE, VE, CU |
 | `ROUND_AMOUNT` | Suspiciously round amounts | $1,000 |
-| `UNUSUAL_TIME` | Transactions at 2-5 AM UTC | Always flags |
+| `UNUSUAL_TIME` | Transactions at 2–5 AM UTC | Always flags |
 
 ### ML Risk Scoring
 
@@ -298,6 +375,13 @@ The ML model augments rule-based scoring with learned patterns:
 - **Training:** Learns from HITL review decisions (Approved = legitimate, Rejected = fraud)
 - **Auto-retraining:** Background service checks hourly, retrains when 50+ new labeled samples exist
 - **Model management:** View metrics, compare versions, activate/deactivate from Admin panel
+
+### Smart Rule Suggestions
+
+The platform analyzes review patterns and transaction data to automatically suggest:
+- **New rules** based on frequently-rejected transaction characteristics
+- **Threshold adjustments** when existing rules under- or over-flag
+- **One-click apply** to immediately enable suggested rules
 
 ### Risk Levels
 
@@ -325,6 +409,74 @@ Pre-built rule templates optimized for different industries:
 - Rule analytics with precision, hit rate, and false positive tracking
 - Import count (popularity) tracking across tenants
 
+## Fraud Intelligence
+
+### Fan-out / Fan-in Detection
+
+Network graph analysis identifies structuring rings:
+- **Fan-out:** One sender splitting transactions across many receivers to stay below thresholds
+- **Fan-in:** Many senders funnelling money to a single receiver
+- Interactive graph visualization on the Network Analysis page
+- Configurable thresholds and time windows
+
+### Watchlists & Blocklists
+
+- Create custom watchlists with name, email, and country criteria
+- Automatic real-time matching against incoming transactions
+- Manual override options for compliance officers
+- Bulk import/export support
+
+## GDPR Compliance
+
+Full General Data Protection Regulation tooling:
+- **Data Subject Search** — Find all data for a customer by email or name
+- **Data Export** — One-click export of all customer data in JSON or CSV format
+- **Right to Erasure** — Anonymize or delete customer data with confirmation dialog
+- **Audit Trail** — Every GDPR action is logged for regulatory proof
+
+## Monitoring & Observability
+
+### Operational Dashboard (`/admin/monitoring`)
+Real-time operational health with 30-second auto-refresh:
+- **Health Banner** — Healthy / Warning / Degraded status based on error rate
+- **Throughput Metrics** — 24h transaction count with hourly breakdown chart
+- **Risk Distribution** — Donut chart of risk level distribution
+- **7-Day Trend** — Daily transaction volume bar chart
+- **Error Rate** — Percentage of error-level system logs
+- **Review Queue** — Pending review count for capacity planning
+- **Webhook Activity** — Delivery success/failure rates
+- **Active Rules** — Count of enabled risk detection rules
+
+### System Logs (`/admin/logs`)
+- Centralized structured logging via Serilog
+- Filter by level (Debug, Info, Warning, Error, Fatal), source, and date range
+- Automatic log retention with configurable cleanup via background service
+
+### Endpoints
+
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `/health` | Public | Application health check |
+| `/metrics` | Admin+ | Prometheus metrics |
+
+## Invoice & Billing
+
+### Subscription Tiers
+
+| Plan | Price | Transactions/mo |
+|------|-------|-----------------|
+| **Trial** | $0 | 100 |
+| **Starter** | $99/mo | 1,000 |
+| **Pro** | $499/mo | 10,000 |
+| **Enterprise** | $2,000/mo | Unlimited |
+
+### Invoice PDF Generation
+
+- Automatic invoice numbering (`INV-YYYY-NNNN`)
+- Professional A4 PDF layout generated with QuestPDF
+- Download via API endpoint (`GET /api/invoices/{id}/pdf`)
+- Invoice history with summary cards (total billed, outstanding, overdue)
+
 ## Testing
 
 ```bash
@@ -342,16 +494,18 @@ dotnet test --filter "RuleMarketplaceServiceTests"
 
 | Test Class | Tests | Coverage |
 |------------|-------|----------|
-| RuleMarketplaceServiceTests | 25 | Template browsing, import, analytics |
-| TenantOnboardingTests | 16 | Tenant setup, rule seeding |
-| RbacServiceTests | 24 | Roles, permissions, team management |
-| MLFeatureExtractorTests | 20 | Feature extraction for ML |
-| SecurityMiddlewareTests | 15 | Auth, rate limiting, CORS |
+| PaymentProviderFactoryTests | 48 | Factory pattern, provider selection |
 | AfriexProviderTests | 30 | Afriex API integration |
 | FlutterwaveProviderTests | 28 | Flutterwave normalization |
+| RuleMarketplaceServiceTests | 25 | Template browsing, import, analytics |
+| RbacServiceTests | 24 | Roles, permissions, team management |
+| MLFeatureExtractorTests | 20 | Feature extraction for ML |
 | WiseProviderTests | 20 | Wise transfer mapping |
-| PaymentProviderFactoryTests | 48 | Factory pattern, provider selection |
+| TenantOnboardingTests | 16 | Tenant setup, rule seeding |
+| SecurityMiddlewareTests | 15 | Auth, rate limiting, CORS |
+| TenantIsolationTests | — | Multi-tenant data isolation |
 | Integration Tests | 40 | End-to-end webhook processing |
+| **Total** | **266** | |
 
 ### Continuous Integration
 
@@ -359,6 +513,38 @@ GitHub Actions workflow runs on every push:
 - ✅ Multi-platform testing (Ubuntu, Windows, macOS)
 - ✅ Code quality checks
 - ✅ Security vulnerability scanning
+
+## API Endpoints
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/webhooks/afriex` | API Key | Receive Afriex transaction webhooks |
+| POST | `/api/webhooks/flutterwave` | API Key | Receive Flutterwave webhooks |
+| POST | `/api/webhooks/wise` | API Key | Receive Wise webhooks |
+| POST | `/api/auth/demo-login` | Anonymous | Demo login (dev mode only) |
+| POST | `/api/auth/magic-link` | Anonymous | Request magic link email |
+| GET | `/api/auth/verify` | Anonymous | Verify magic link token |
+| GET | `/api/invoices/{id}/pdf` | Manager+ | Download invoice PDF |
+| GET | `/health` | Public | Application health check |
+| GET | `/metrics` | Admin+ | Prometheus metrics |
+| — | `/transactionHub` | Authenticated | SignalR real-time connection |
+
+## Multi-Tenancy
+
+Each organization gets fully isolated data:
+
+- **Middleware-based resolution:** `X-Tenant-Id` header or email→tenant lookup
+- **EF Core query filters:** All queries automatically scoped to current tenant
+- **Tenant onboarding:** Guided wizard seeds rules, settings, and team
+- **Default tenant:** `afriex-demo` for development
+
+```json
+{
+  "MultiTenancy": {
+    "DefaultTenantId": "afriex-demo"
+  }
+}
+```
 
 ## Database
 
@@ -381,33 +567,6 @@ PostgreSQL is enabled via feature flag. The `DatabaseMigrationService` automatic
   "FeatureFlags": { "PostgresEnabled": true },
   "ConnectionStrings": {
     "PostgreSQL": "Host=...;Database=payguard;Username=...;Password=..."
-  }
-}
-```
-
-## API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/webhooks/afriex` | Receive Afriex transaction webhooks |
-| POST | `/api/webhooks/flutterwave` | Receive Flutterwave webhooks |
-| POST | `/api/webhooks/wise` | Receive Wise webhooks |
-| GET | `/health` | Application health check |
-| GET | `/transactionHub` | SignalR real-time connection |
-
-## Multi-Tenancy
-
-Each organization gets fully isolated data:
-
-- **Middleware-based resolution:** `X-Tenant-Id` header or email→tenant lookup
-- **EF Core query filters:** All queries automatically scoped to current tenant
-- **Tenant onboarding:** Guided wizard seeds rules, settings, and team
-- **Default tenant:** `afriex-demo` for development
-
-```json
-{
-  "MultiTenancy": {
-    "DefaultTenantId": "afriex-demo"
   }
 }
 ```
@@ -456,6 +615,7 @@ MIT License — see [LICENSE](LICENSE) file for details.
 - [Afriex](https://afriex.com) for the hackathon opportunity and API documentation
 - [MudBlazor](https://mudblazor.com) for the Blazor component library
 - [ML.NET](https://dotnet.microsoft.com/apps/machinelearning-ai/ml-dotnet) for the machine learning framework
+- [QuestPDF](https://www.questpdf.com/) for the PDF generation library
 - The ASP.NET Core team for SignalR and the middleware pipeline
 
 ---
