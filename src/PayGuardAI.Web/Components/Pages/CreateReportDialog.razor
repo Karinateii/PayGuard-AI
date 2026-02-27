@@ -38,16 +38,19 @@
                 </MudSelectItem>
             </MudSelect>
 
-            <MudGrid>
-                <MudItem xs="6">
-                    <MudDatePicker @bind-Date="_startDate" Label="Start Date"
-                                   Variant="Variant.Outlined" DateFormat="yyyy-MM-dd" />
-                </MudItem>
-                <MudItem xs="6">
-                    <MudDatePicker @bind-Date="_endDate" Label="End Date"
-                                   Variant="Variant.Outlined" DateFormat="yyyy-MM-dd" />
-                </MudItem>
-            </MudGrid>
+            @if (!_report.IsScheduled)
+            {
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudDatePicker @bind-Date="_startDate" Label="Start Date"
+                                       Variant="Variant.Outlined" DateFormat="yyyy-MM-dd" />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudDatePicker @bind-Date="_endDate" Label="End Date"
+                                       Variant="Variant.Outlined" DateFormat="yyyy-MM-dd" />
+                    </MudItem>
+                </MudGrid>
+            }
 
             <MudSelect T="string" @bind-Value="_report.Grouping" Label="Group By (optional)"
                        Variant="Variant.Outlined" Clearable="true">
@@ -65,6 +68,10 @@
 
             @if (_report.IsScheduled)
             {
+                <MudAlert Severity="Severity.Info" Dense="true" NoIcon="false" Class="mb-2">
+                    Date range is set automatically — Daily covers last 24h, Weekly last 7 days, Monthly last 30 days.
+                </MudAlert>
+
                 <MudSelect T="string" @bind-Value="_report.ScheduleCron" Label="Delivery Frequency"
                            Variant="Variant.Outlined" Required="true">
                     <MudSelectItem T="string" Value="@("daily")">Daily</MudSelectItem>
@@ -107,12 +114,21 @@
 
     private void Submit()
     {
-        _report.StartDate = _startDate.HasValue
-            ? DateTime.SpecifyKind(_startDate.Value, DateTimeKind.Utc)
-            : null;
-        _report.EndDate = _endDate.HasValue
-            ? DateTime.SpecifyKind(_endDate.Value, DateTimeKind.Utc)
-            : null;
+        if (_report.IsScheduled)
+        {
+            // Scheduled reports get their date range set dynamically at runtime
+            _report.StartDate = null;
+            _report.EndDate = null;
+        }
+        else
+        {
+            _report.StartDate = _startDate.HasValue
+                ? DateTime.SpecifyKind(_startDate.Value, DateTimeKind.Utc)
+                : null;
+            _report.EndDate = _endDate.HasValue
+                ? DateTime.SpecifyKind(_endDate.Value, DateTimeKind.Utc)
+                : null;
+        }
         MudDialog?.Close(DialogResult.Ok(_report));
     }
 }

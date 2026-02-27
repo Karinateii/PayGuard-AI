@@ -93,6 +93,18 @@ public class ScheduledReportBackgroundService : BackgroundService
                 _logger.LogInformation("Running scheduled report '{ReportName}' for tenant {TenantId}",
                     report.Name, report.TenantId);
 
+                // Set dynamic date range based on frequency
+                var now = DateTime.UtcNow;
+                report.EndDate = now;
+                report.StartDate = (report.ScheduleCron?.ToLowerInvariant()) switch
+                {
+                    "daily"   => now.AddDays(-1),
+                    "weekly"  => now.AddDays(-7),
+                    "monthly" => now.AddDays(-30),
+                    _         => now.AddDays(-1),
+                };
+                await db.SaveChangesAsync(ct);
+
                 // Run the report
                 var data = await analyticsService.RunReportAsync(report.Id, ct);
 
