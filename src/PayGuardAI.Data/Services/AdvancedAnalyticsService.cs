@@ -76,8 +76,16 @@ public class AdvancedAnalyticsService : IAdvancedAnalyticsService
             GeneratedAt = DateTime.UtcNow
         };
 
-        var startDate = report.StartDate ?? DateTime.UtcNow.AddDays(-30);
         var endDate = report.EndDate ?? DateTime.UtcNow;
+        var startDate = report.StartDate ?? (report.IsScheduled
+            ? (report.ScheduleCron?.ToLowerInvariant()) switch
+            {
+                "daily"   => endDate.AddDays(-1),
+                "weekly"  => endDate.AddDays(-7),
+                "monthly" => endDate.AddDays(-30),
+                _         => endDate.AddDays(-1),
+            }
+            : endDate.AddDays(-30));
 
         switch (report.ReportType.ToLower())
         {
