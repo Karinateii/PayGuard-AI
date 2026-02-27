@@ -18,6 +18,7 @@ public class RiskScoringService : IRiskScoringService
     private readonly IEmailNotificationService _emailNotificationService;
     private readonly ITenantContext _tenantContext;
     private readonly IMLScoringService _mlScoringService;
+    private readonly IWatchlistService _watchlistService;
 
     // Risk level thresholds
     private const int LowRiskThreshold = 25;
@@ -33,7 +34,8 @@ public class RiskScoringService : IRiskScoringService
         IAlertingService alertingService,
         IEmailNotificationService emailNotificationService,
         ITenantContext tenantContext,
-        IMLScoringService mlScoringService)
+        IMLScoringService mlScoringService,
+        IWatchlistService watchlistService)
     {
         _context = context;
         _logger = logger;
@@ -41,6 +43,7 @@ public class RiskScoringService : IRiskScoringService
         _emailNotificationService = emailNotificationService;
         _tenantContext = tenantContext;
         _mlScoringService = mlScoringService;
+        _watchlistService = watchlistService;
     }
 
     public async Task<RiskAnalysis> AnalyzeTransactionAsync(Transaction transaction, CancellationToken cancellationToken = default)
@@ -119,6 +122,59 @@ public class RiskScoringService : IRiskScoringService
         {
             // Compound rule failure is non-fatal — fall back to single rules + ML
             _logger.LogWarning(ex, "Compound rule evaluation failed for {TransactionId}", transaction.Id);
+        }
+
+        // ── Watchlist / Blocklist / Allowlist checking ───────────────
+        try
+        {
+            var watchlistHits = await _watchlistService.CheckTransactionAsync(transaction, cancellationToken);
+            foreach (var hit in watchlistHits)
+            {
+                var severity = hit.ListType switch
+                {
+                    WatchlistType.Blocklist => FactorSeverity.Critical,
+                    WatchlistType.Watchlist => FactorSeverity.Warning,
+                    WatchlistType.Allowlist => FactorSeverity.Info,
+                    _ => FactorSeverity.Info
+                };
+
+                var description = hit.ListType switch
+                {
+                    WatchlistType.Blocklist => $"BLOCKLIST hit: {WatchlistEntry.AllowedFields.GetValueOrDefault(hit.FieldType, hit.FieldType)} \"{hit.MatchedValue}\" is on \"{hit.WatchlistName}\"",
+                    WatchlistType.Watchlist => $"WATCHLIST hit: {WatchlistEntry.AllowedFields.GetValueOrDefault(hit.FieldType, hit.FieldType)} \"{hit.MatchedValue}\" is on \"{hit.WatchlistName}\"",
+                    WatchlistType.Allowlist => $"ALLOWLIST match: {WatchlistEntry.AllowedFields.GetValueOrDefault(hit.FieldType, hit.FieldType)} \"{hit.MatchedValue}\" is trusted via \"{hit.WatchlistName}\"",
+                    _ => $"Watchlist match: {hit.MatchedValue} on {hit.WatchlistName}"
+                };
+
+                if (!string.IsNullOrEmpty(hit.EntryNotes))
+                    description += $" — {hit.EntryNotes}";
+
+                riskFactors.Add(new RiskFactor
+                {
+                    TenantId = _tenantContext.TenantId,
+                    Category = "Watchlist",
+                    RuleName = $"{hit.ListType}: {hit.WatchlistName}",
+                    Description = description,
+                    ScoreContribution = hit.ScoreAdjustment,
+                    Severity = severity,
+                    ContextData = System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        watchlistName = hit.WatchlistName,
+                        listType = hit.ListType.ToString(),
+                        fieldType = hit.FieldType,
+                        matchedValue = hit.MatchedValue,
+                        scoreAdjustment = hit.ScoreAdjustment
+                    })
+                });
+
+                totalScore += hit.ScoreAdjustment;
+                totalScore = Math.Clamp(totalScore, 0, 100);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Watchlist failure is non-fatal — fall back to rules + ML
+            _logger.LogWarning(ex, "Watchlist check failed for {TransactionId}", transaction.Id);
         }
 
         // ── ML scoring enhancement ──────────────────────────────────

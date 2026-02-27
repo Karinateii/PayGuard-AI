@@ -267,6 +267,9 @@ builder.Services.AddScoped<IFraudSavingsService, FraudSavingsService>();
 // Register GDPR compliance service — DSAR exports, anonymization, request audit
 builder.Services.AddScoped<IGdprService, GdprService>();
 
+// Register Watchlist service — blocklists, watchlists, allowlists for risk scoring
+builder.Services.AddScoped<IWatchlistService, WatchlistService>();
+
 // Add controllers for API endpoints (webhooks)
 builder.Services.AddControllers();
 

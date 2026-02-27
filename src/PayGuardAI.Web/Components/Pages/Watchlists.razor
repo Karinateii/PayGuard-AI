@@ -1,0 +1,617 @@
+@page "/watchlists"
+@using Microsoft.AspNetCore.Authorization
+@using PayGuardAI.Core.Entities
+@attribute [Authorize(Roles = "Manager,Admin,SuperAdmin")]
+@inject PayGuardAI.Core.Services.IWatchlistService WatchlistService
+@inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Watchlists — PayGuard AI</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <div>
+        <MudText Typo="Typo.h4">
+            <MudIcon Icon="@Icons.Material.Filled.PlaylistAddCheck" Class="mr-2" />
+            Watchlists &amp; Blocklists
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Manage blocklists, watchlists, and allowlists for automated risk scoring.
+            Entries are checked on every incoming transaction.
+        </MudText>
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Add" OnClick="OpenCreateDialog">
+        New Watchlist
+    </MudButton>
+</MudStack>
+
+@* ── Summary Cards ───────────────────────────────────────────────── *@
+<MudGrid Spacing="3" Class="mb-4">
+    <MudItem xs="12" sm="4">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                <MudIcon Icon="@Icons.Material.Filled.Block" Color="Color.Error" Size="Size.Large" />
+                <div>
+                    <MudText Typo="Typo.h5">@_watchlists.Count(w => w.ListType == WatchlistType.Blocklist)</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Blocklists</MudText>
+                </div>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="4">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                <MudIcon Icon="@Icons.Material.Filled.Visibility" Color="Color.Warning" Size="Size.Large" />
+                <div>
+                    <MudText Typo="Typo.h5">@_watchlists.Count(w => w.ListType == WatchlistType.Watchlist)</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Watchlists</MudText>
+                </div>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="4">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                <MudIcon Icon="@Icons.Material.Filled.VerifiedUser" Color="Color.Success" Size="Size.Large" />
+                <div>
+                    <MudText Typo="Typo.h5">@_watchlists.Count(w => w.ListType == WatchlistType.Allowlist)</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Allowlists</MudText>
+                </div>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (!_watchlists.Any())
+{
+    <MudPaper Class="pa-8" Elevation="2">
+        <MudStack AlignItems="AlignItems.Center" Spacing="3">
+            <MudIcon Icon="@Icons.Material.Filled.PlaylistAddCheck" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Typo="Typo.h6" Color="Color.Secondary">No watchlists yet</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Create a blocklist to auto-flag known bad actors, or an allowlist to trust verified partners.
+            </MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add" OnClick="OpenCreateDialog">
+                Create Your First Watchlist
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+}
+else
+{
+    @* ── Watchlist cards ───────────────────────────────────────────── *@
+    <MudGrid Spacing="4">
+        @foreach (var list in _watchlists)
+        {
+            <MudItem xs="12" md="6" lg="4">
+                <MudCard Elevation="2" Style="height: 100%;">
+                    <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="@GetListColor(list.ListType)" Variant="Variant.Filled">
+                                <MudIcon Icon="@GetListIcon(list.ListType)" />
+                            </MudAvatar>
+                        </CardHeaderAvatar>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">@list.Name</MudText>
+                            <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                                <MudChip T="string" Size="Size.Small"
+                                         Color="@GetListColor(list.ListType)"
+                                         Variant="Variant.Filled">
+                                    @list.ListType
+                                </MudChip>
+                                <MudChip T="string" Size="Size.Small"
+                                         Color="@(list.IsEnabled ? Color.Success : Color.Default)"
+                                         Variant="Variant.Outlined">
+                                    @(list.IsEnabled ? "Enabled" : "Disabled")
+                                </MudChip>
+                            </MudStack>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudMenu Icon="@Icons.Material.Filled.MoreVert" Dense="true">
+                                <MudMenuItem Icon="@Icons.Material.Filled.Edit"
+                                             OnClick="@(() => OpenEditDialog(list))">
+                                    Edit
+                                </MudMenuItem>
+                                <MudMenuItem Icon="@Icons.Material.Filled.UploadFile"
+                                             OnClick="@(() => OpenImportDialog(list))">
+                                    Bulk Import (CSV)
+                                </MudMenuItem>
+                                <MudMenuItem Icon="@(list.IsEnabled ? Icons.Material.Filled.ToggleOff : Icons.Material.Filled.ToggleOn)"
+                                             OnClick="@(() => ToggleEnabled(list))">
+                                    @(list.IsEnabled ? "Disable" : "Enable")
+                                </MudMenuItem>
+                                <MudDivider />
+                                <MudMenuItem Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error"
+                                             OnClick="@(() => ConfirmDelete(list))">
+                                    Delete
+                                </MudMenuItem>
+                            </MudMenu>
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @if (!string.IsNullOrWhiteSpace(list.Description))
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                                @list.Description
+                            </MudText>
+                        }
+
+                        <MudSimpleTable Dense="true" Bordered="false" Style="background: transparent;">
+                            <tbody>
+                                <tr>
+                                    <td style="font-weight: 500;">Entries</td>
+                                    <td><strong>@list.Entries.Count</strong></td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight: 500;">Created</td>
+                                    <td>@list.CreatedAt.ToString("MMM d, yyyy")</td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight: 500;">Updated</td>
+                                    <td>@list.UpdatedAt.ToString("MMM d, yyyy HH:mm")</td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight: 500;">By</td>
+                                    <td>@list.CreatedBy</td>
+                                </tr>
+                            </tbody>
+                        </MudSimpleTable>
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudButton Variant="Variant.Text" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.OpenInNew"
+                                   OnClick="@(() => SelectWatchlist(list))">
+                            View Entries
+                        </MudButton>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@* ── Selected Watchlist Entries Panel ────────────────────────────── *@
+@if (_selectedList != null)
+{
+    <MudPaper Class="pa-6 mt-6" Elevation="2">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@GetListIcon(_selectedList.ListType)" Class="mr-1" />
+                @_selectedList.Name — Entries (@_selectedList.Entries.Count)
+            </MudText>
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="OpenAddEntryDialog">
+                    Add Entry
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Close"
+                           OnClick="@(() => _selectedList = null)">
+                    Close
+                </MudButton>
+            </MudStack>
+        </MudStack>
+
+        @if (_selectedList.Entries.Any())
+        {
+            <MudTable Items="@_selectedList.Entries" Dense="true" Bordered="true" Striped="true"
+                      Hover="true" RowsPerPage="15">
+                <HeaderContent>
+                    <MudTh>Value</MudTh>
+                    <MudTh>Field</MudTh>
+                    <MudTh>Notes</MudTh>
+                    <MudTh>Added By</MudTh>
+                    <MudTh>Added</MudTh>
+                    <MudTh>Expires</MudTh>
+                    <MudTh Style="width: 60px;">Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd Style="font-family: monospace;">@context.Value</MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
+                            @(WatchlistEntry.AllowedFields.GetValueOrDefault(context.FieldType, context.FieldType))
+                        </MudChip>
+                    </MudTd>
+                    <MudTd Style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        @(context.Notes ?? "—")
+                    </MudTd>
+                    <MudTd>@context.AddedBy</MudTd>
+                    <MudTd>@context.AddedAt.ToString("MMM d, yyyy")</MudTd>
+                    <MudTd>
+                        @if (context.ExpiresAt.HasValue)
+                        {
+                            var expired = context.ExpiresAt.Value < DateTime.UtcNow;
+                            <MudChip T="string" Size="Size.Small"
+                                     Color="@(expired ? Color.Error : Color.Default)"
+                                     Variant="Variant.Outlined">
+                                @(expired ? "Expired" : context.ExpiresAt.Value.ToString("MMM d"))
+                            </MudChip>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Never</MudText>
+                        }
+                    </MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                       Color="Color.Error"
+                                       OnClick="@(() => RemoveEntry(context))" />
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager />
+                </PagerContent>
+            </MudTable>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info" Dense="true">
+                This list is empty. Add entries manually or use bulk CSV import.
+            </MudAlert>
+        }
+    </MudPaper>
+}
+
+@* ── Create / Edit Dialog ────────────────────────────────────────── *@
+<MudDialog @bind-Visible="_showListDialog" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            @(_editingList == null ? "Create Watchlist" : "Edit Watchlist")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_formName" Label="List Name" Required="true"
+                          Variant="Variant.Outlined" Placeholder="e.g., High-Risk Countries" />
+            <MudTextField @bind-Value="_formDescription" Label="Description"
+                          Variant="Variant.Outlined" Lines="2"
+                          Placeholder="What is this list used for?" />
+            <MudSelect @bind-Value="_formListType" Label="List Type" Variant="Variant.Outlined" Required="true">
+                <MudSelectItem Value="WatchlistType.Blocklist">
+                    🚫 Blocklist — heavy risk penalty (+35 pts)
+                </MudSelectItem>
+                <MudSelectItem Value="WatchlistType.Watchlist">
+                    👁️ Watchlist — moderate flag (+15 pts)
+                </MudSelectItem>
+                <MudSelectItem Value="WatchlistType.Allowlist">
+                    ✅ Allowlist — trust reduction (−10 pts)
+                </MudSelectItem>
+            </MudSelect>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showListDialog = false)">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="SaveList" Disabled="@string.IsNullOrWhiteSpace(_formName)">
+            @(_editingList == null ? "Create" : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* ── Add Entry Dialog ────────────────────────────────────────────── *@
+<MudDialog @bind-Visible="_showEntryDialog" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Add Entry</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_entryValue" Label="Value" Required="true"
+                          Variant="Variant.Outlined"
+                          Placeholder="e.g., NG, usr_abc123" />
+            <MudSelect @bind-Value="_entryFieldType" Label="Match Field" Variant="Variant.Outlined" Required="true">
+                @foreach (var kv in WatchlistEntry.AllowedFields)
+                {
+                    <MudSelectItem Value="@kv.Key">@kv.Value</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField @bind-Value="_entryNotes" Label="Notes (optional)"
+                          Variant="Variant.Outlined"
+                          Placeholder="Why is this entry being added?" />
+            <MudNumericField @bind-Value="_entryExpireDays" Label="Expires in (days, 0 = never)"
+                             Variant="Variant.Outlined" Min="0" Max="365" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showEntryDialog = false)">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="SaveEntry" Disabled="@string.IsNullOrWhiteSpace(_entryValue)">
+            Add
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* ── Bulk Import Dialog ──────────────────────────────────────────── *@
+<MudDialog @bind-Visible="_showImportDialog" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Bulk Import Entries</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudAlert Severity="Severity.Info" Dense="true">
+                Paste one value per line, or use CSV format: <code>value,FieldType,notes</code>.
+                <br />
+                Example: <code>NG,SourceCountry,Added for OFAC compliance</code>
+            </MudAlert>
+            <MudSelect @bind-Value="_importFieldType" Label="Default Field Type" Variant="Variant.Outlined">
+                @foreach (var kv in WatchlistEntry.AllowedFields)
+                {
+                    <MudSelectItem Value="@kv.Key">@kv.Value</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField @bind-Value="_importCsvText" Label="Entries (one per line)"
+                          Variant="Variant.Outlined" Lines="8"
+                          Placeholder="NG&#10;IR&#10;KP&#10;SY" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showImportDialog = false)">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="ExecuteImport"
+                   Disabled="@string.IsNullOrWhiteSpace(_importCsvText)">
+            Import
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    // ── State ──────────────────────────────────────────────────────────
+    private bool _loading = true;
+    private List<Watchlist> _watchlists = [];
+    private Watchlist? _selectedList;
+
+    // List form
+    private bool _showListDialog;
+    private Watchlist? _editingList;
+    private string _formName = "";
+    private string _formDescription = "";
+    private WatchlistType _formListType = WatchlistType.Blocklist;
+
+    // Entry form
+    private bool _showEntryDialog;
+    private string _entryValue = "";
+    private string _entryFieldType = "SenderId";
+    private string _entryNotes = "";
+    private int _entryExpireDays;
+
+    // Import form
+    private bool _showImportDialog;
+    private Guid _importWatchlistId;
+    private string _importFieldType = "SourceCountry";
+    private string _importCsvText = "";
+
+    // ── Lifecycle ──────────────────────────────────────────────────────
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWatchlists();
+    }
+
+    private async Task LoadWatchlists()
+    {
+        _loading = true;
+        try
+        {
+            _watchlists = await WatchlistService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load watchlists: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    // ── List CRUD ──────────────────────────────────────────────────────
+    private void OpenCreateDialog()
+    {
+        _editingList = null;
+        _formName = "";
+        _formDescription = "";
+        _formListType = WatchlistType.Blocklist;
+        _showListDialog = true;
+    }
+
+    private void OpenEditDialog(Watchlist list)
+    {
+        _editingList = list;
+        _formName = list.Name;
+        _formDescription = list.Description;
+        _formListType = list.ListType;
+        _showListDialog = true;
+    }
+
+    private async Task SaveList()
+    {
+        try
+        {
+            if (_editingList != null)
+            {
+                _editingList.Name = _formName;
+                _editingList.Description = _formDescription;
+                _editingList.ListType = _formListType;
+                await WatchlistService.UpdateAsync(_editingList);
+                Snackbar.Add($"Watchlist \"{_formName}\" updated.", Severity.Success);
+            }
+            else
+            {
+                var newList = new Watchlist
+                {
+                    Name = _formName,
+                    Description = _formDescription,
+                    ListType = _formListType,
+                    CreatedBy = CurrentUser.UserName
+                };
+                await WatchlistService.CreateAsync(newList);
+                Snackbar.Add($"Watchlist \"{_formName}\" created.", Severity.Success);
+            }
+
+            _showListDialog = false;
+            await LoadWatchlists();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to save: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ToggleEnabled(Watchlist list)
+    {
+        list.IsEnabled = !list.IsEnabled;
+        try
+        {
+            await WatchlistService.UpdateAsync(list);
+            Snackbar.Add($"{list.Name} {(list.IsEnabled ? "enabled" : "disabled")}.", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ConfirmDelete(Watchlist list)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "Delete Watchlist",
+            $"Are you sure you want to delete \"{list.Name}\" and all {list.Entries.Count} entries? This cannot be undone.",
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (result == true)
+        {
+            try
+            {
+                await WatchlistService.DeleteAsync(list.Id);
+                if (_selectedList?.Id == list.Id) _selectedList = null;
+                Snackbar.Add($"\"{list.Name}\" deleted.", Severity.Warning);
+                await LoadWatchlists();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Delete failed: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    // ── Entry management ───────────────────────────────────────────────
+    private async Task SelectWatchlist(Watchlist list)
+    {
+        try
+        {
+            _selectedList = await WatchlistService.GetByIdAsync(list.Id);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load entries: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void OpenAddEntryDialog()
+    {
+        _entryValue = "";
+        _entryFieldType = "SenderId";
+        _entryNotes = "";
+        _entryExpireDays = 0;
+        _showEntryDialog = true;
+    }
+
+    private async Task SaveEntry()
+    {
+        if (_selectedList == null) return;
+
+        try
+        {
+            var entry = new WatchlistEntry
+            {
+                Value = _entryValue.Trim(),
+                FieldType = _entryFieldType,
+                Notes = string.IsNullOrWhiteSpace(_entryNotes) ? null : _entryNotes,
+                AddedBy = CurrentUser.UserName,
+                ExpiresAt = _entryExpireDays > 0
+                    ? DateTime.UtcNow.AddDays(_entryExpireDays)
+                    : null
+            };
+
+            await WatchlistService.AddEntryAsync(_selectedList.Id, entry);
+            _showEntryDialog = false;
+            Snackbar.Add($"Entry \"{_entryValue}\" added.", Severity.Success);
+
+            // Reload entries
+            _selectedList = await WatchlistService.GetByIdAsync(_selectedList.Id);
+            await LoadWatchlists(); // refresh counts
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to add entry: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task RemoveEntry(WatchlistEntry entry)
+    {
+        try
+        {
+            await WatchlistService.RemoveEntryAsync(entry.Id);
+            Snackbar.Add($"Entry \"{entry.Value}\" removed.", Severity.Info);
+
+            if (_selectedList != null)
+                _selectedList = await WatchlistService.GetByIdAsync(_selectedList.Id);
+            await LoadWatchlists();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to remove: {ex.Message}", Severity.Error);
+        }
+    }
+
+    // ── Bulk Import ────────────────────────────────────────────────────
+    private void OpenImportDialog(Watchlist list)
+    {
+        _importWatchlistId = list.Id;
+        _importFieldType = "SourceCountry";
+        _importCsvText = "";
+        _showImportDialog = true;
+    }
+
+    private async Task ExecuteImport()
+    {
+        try
+        {
+            var count = await WatchlistService.ImportEntriesFromCsvAsync(
+                _importWatchlistId, _importCsvText, _importFieldType, CurrentUser.UserName);
+
+            _showImportDialog = false;
+            Snackbar.Add($"Imported {count} entries.", Severity.Success);
+
+            await LoadWatchlists();
+            if (_selectedList?.Id == _importWatchlistId)
+                _selectedList = await WatchlistService.GetByIdAsync(_importWatchlistId);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Import failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────
+    private static Color GetListColor(WatchlistType type) => type switch
+    {
+        WatchlistType.Blocklist => Color.Error,
+        WatchlistType.Watchlist => Color.Warning,
+        WatchlistType.Allowlist => Color.Success,
+        _ => Color.Default
+    };
+
+    private static string GetListIcon(WatchlistType type) => type switch
+    {
+        WatchlistType.Blocklist => Icons.Material.Filled.Block,
+        WatchlistType.Watchlist => Icons.Material.Filled.Visibility,
+        WatchlistType.Allowlist => Icons.Material.Filled.VerifiedUser,
+        _ => Icons.Material.Filled.List
+    };
+}

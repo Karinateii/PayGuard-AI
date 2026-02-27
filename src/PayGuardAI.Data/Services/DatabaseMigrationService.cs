@@ -64,6 +64,9 @@ public class DatabaseMigrationService : IDatabaseMigrationService
             // Create GdprRequests table (GDPR compliance audit trail)
             await CreateGdprRequestsTableAsync(dbType);
 
+            // Create Watchlists + WatchlistEntries tables (blocklists / allowlists)
+            await CreateWatchlistTablesAsync(dbType);
+
             // Mark existing tenants as onboarded so they aren't redirected
             await MarkExistingTenantsOnboardedAsync(dbType);
 
@@ -1106,6 +1109,107 @@ public class DatabaseMigrationService : IDatabaseMigrationService
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Skipping GdprRequests table creation");
+        }
+    }
+
+    private async Task CreateWatchlistTablesAsync(string dbType)
+    {
+        try
+        {
+            if (dbType == "PostgreSQL")
+            {
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS "Watchlists" (
+                        "Id" uuid NOT NULL PRIMARY KEY,
+                        "TenantId" text NOT NULL DEFAULT '',
+                        "Name" text NOT NULL DEFAULT '',
+                        "Description" text NOT NULL DEFAULT '',
+                        "ListType" integer NOT NULL DEFAULT 0,
+                        "IsEnabled" boolean NOT NULL DEFAULT true,
+                        "CreatedAt" timestamp with time zone NOT NULL DEFAULT now(),
+                        "UpdatedAt" timestamp with time zone NOT NULL DEFAULT now(),
+                        "CreatedBy" text NOT NULL DEFAULT 'system'
+                    )
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS "IX_Watchlists_TenantId"
+                    ON "Watchlists" ("TenantId")
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS "WatchlistEntries" (
+                        "Id" uuid NOT NULL PRIMARY KEY,
+                        "WatchlistId" uuid NOT NULL REFERENCES "Watchlists"("Id") ON DELETE CASCADE,
+                        "Value" text NOT NULL DEFAULT '',
+                        "FieldType" text NOT NULL DEFAULT 'SenderId',
+                        "Notes" text,
+                        "AddedBy" text NOT NULL DEFAULT 'system',
+                        "AddedAt" timestamp with time zone NOT NULL DEFAULT now(),
+                        "ExpiresAt" timestamp with time zone
+                    )
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS "IX_WatchlistEntries_WatchlistId"
+                    ON "WatchlistEntries" ("WatchlistId")
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS "IX_WatchlistEntries_FieldType_Value"
+                    ON "WatchlistEntries" ("FieldType", "Value")
+                    """);
+            }
+            else
+            {
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS Watchlists (
+                        Id TEXT NOT NULL PRIMARY KEY,
+                        TenantId TEXT NOT NULL DEFAULT '',
+                        Name TEXT NOT NULL DEFAULT '',
+                        Description TEXT NOT NULL DEFAULT '',
+                        ListType INTEGER NOT NULL DEFAULT 0,
+                        IsEnabled INTEGER NOT NULL DEFAULT 1,
+                        CreatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+                        UpdatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+                        CreatedBy TEXT NOT NULL DEFAULT 'system'
+                    )
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS IX_Watchlists_TenantId
+                    ON Watchlists (TenantId)
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS WatchlistEntries (
+                        Id TEXT NOT NULL PRIMARY KEY,
+                        WatchlistId TEXT NOT NULL REFERENCES Watchlists(Id) ON DELETE CASCADE,
+                        Value TEXT NOT NULL DEFAULT '',
+                        FieldType TEXT NOT NULL DEFAULT 'SenderId',
+                        Notes TEXT,
+                        AddedBy TEXT NOT NULL DEFAULT 'system',
+                        AddedAt TEXT NOT NULL DEFAULT (datetime('now')),
+                        ExpiresAt TEXT
+                    )
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS IX_WatchlistEntries_WatchlistId
+                    ON WatchlistEntries (WatchlistId)
+                    """);
+
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE INDEX IF NOT EXISTS IX_WatchlistEntries_FieldType_Value
+                    ON WatchlistEntries (FieldType, Value)
+                    """);
+            }
+
+            _logger.LogDebug("Watchlists + WatchlistEntries tables ensured");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipping Watchlist tables creation");
         }
     }
 }

@@ -64,6 +64,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<RuleGroupCondition> RuleGroupConditions => Set<RuleGroupCondition>();
     public DbSet<RuleVersion> RuleVersions => Set<RuleVersion>();
     public DbSet<GdprRequest> GdprRequests => Set<GdprRequest>();
+    public DbSet<Watchlist> Watchlists => Set<Watchlist>();
+    public DbSet<WatchlistEntry> WatchlistEntries => Set<WatchlistEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -90,6 +92,7 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<RuleGroup>().HasQueryFilter(e => e.TenantId == TenantId);
         modelBuilder.Entity<RuleVersion>().HasQueryFilter(e => e.TenantId == TenantId);
         modelBuilder.Entity<GdprRequest>().HasQueryFilter(e => e.TenantId == TenantId);
+        modelBuilder.Entity<Watchlist>().HasQueryFilter(e => e.TenantId == TenantId);
 
         // Entity configuration
 
@@ -198,6 +201,28 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(e => e.TenantId);
             entity.HasIndex(e => e.SubjectId);
             entity.HasIndex(e => e.RequestedAt);
+        });
+
+        // Watchlist configuration
+        modelBuilder.Entity<Watchlist>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.TenantId);
+            entity.HasIndex(e => new { e.TenantId, e.Name });
+        });
+
+        // WatchlistEntry configuration
+        modelBuilder.Entity<WatchlistEntry>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.WatchlistId);
+            entity.HasIndex(e => new { e.FieldType, e.Value });
+            entity.Ignore(e => e.IsExpired);
+
+            entity.HasOne(e => e.Watchlist)
+                  .WithMany(w => w.Entries)
+                  .HasForeignKey(e => e.WatchlistId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         // AuditLog configuration
