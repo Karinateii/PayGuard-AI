@@ -4,6 +4,7 @@
 @inject ITransactionService TransactionService
 @inject IReviewService ReviewService
 @inject IAdminService AdminService
+@inject IFraudSavingsService FraudSavingsService
 @inject ITenantContext TenantContext
 @inject NavigationManager NavigationManager
 @implements IAsyncDisposable
@@ -42,6 +43,67 @@ else if (_loading)
 }
 else
 {
+    <!-- 🛡 Fraud Saved Hero Widget -->
+    <MudPaper Class="pa-5 mb-4" Elevation="3"
+              Style="background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 50%, #388e3c 100%); color: white; border-radius: 12px;">
+        <MudGrid>
+            <MudItem xs="12" md="7">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                    <MudIcon Icon="@Icons.Material.Filled.Shield" Size="Size.Large" Style="font-size: 3rem; opacity: 0.9;" />
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.caption" Style="opacity: 0.85; letter-spacing: 1px; text-transform: uppercase;">
+                            Fraud Prevented This Month
+                        </MudText>
+                        <MudText Typo="Typo.h3" Style="font-weight: 700; letter-spacing: -1px;">
+                            @FormatCurrency(_savings.SavedThisMonth) @_savings.CurrencyCode
+                        </MudText>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mt-1">
+                            @if (_savings.TrendPercent > 0)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" Style="opacity: 0.9;" />
+                                <MudText Typo="Typo.body2" Style="opacity: 0.9;">
+                                    +@_savings.TrendPercent% vs last month
+                                </MudText>
+                            }
+                            else if (_savings.TrendPercent < 0)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.TrendingDown" Size="Size.Small" Style="opacity: 0.9;" />
+                                <MudText Typo="Typo.body2" Style="opacity: 0.9;">
+                                    @_savings.TrendPercent% vs last month
+                                </MudText>
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.TrendingFlat" Size="Size.Small" Style="opacity: 0.9;" />
+                                <MudText Typo="Typo.body2" Style="opacity: 0.9;">
+                                    No change vs last month
+                                </MudText>
+                            }
+                        </MudStack>
+                    </MudStack>
+                </MudStack>
+            </MudItem>
+            <MudItem xs="12" md="5">
+                <MudStack Row="true" Justify="Justify.SpaceAround" Style="height: 100%; flex-wrap: wrap; gap: 12px;">
+                    <MudStack AlignItems="AlignItems.Center" Spacing="0">
+                        <MudText Typo="Typo.h4" Style="font-weight: 600;">@_savings.BlockedCountThisMonth</MudText>
+                        <MudText Typo="Typo.caption" Style="opacity: 0.85;">Blocked This Month</MudText>
+                    </MudStack>
+                    <MudDivider Vertical="true" FlexItem="true" Style="border-color: rgba(255,255,255,0.3);" />
+                    <MudStack AlignItems="AlignItems.Center" Spacing="0">
+                        <MudText Typo="Typo.h4" Style="font-weight: 600;">@FormatCurrency(_savings.SavedThisWeek)</MudText>
+                        <MudText Typo="Typo.caption" Style="opacity: 0.85;">Saved This Week</MudText>
+                    </MudStack>
+                    <MudDivider Vertical="true" FlexItem="true" Style="border-color: rgba(255,255,255,0.3);" />
+                    <MudStack AlignItems="AlignItems.Center" Spacing="0">
+                        <MudText Typo="Typo.h4" Style="font-weight: 600;">@FormatCurrency(_savings.SavedAllTime)</MudText>
+                        <MudText Typo="Typo.caption" Style="opacity: 0.85;">All-Time Saved</MudText>
+                    </MudStack>
+                </MudStack>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
     <!-- Stats Cards -->
     <MudGrid>
         <MudItem xs="12" sm="6" md="3">
@@ -192,6 +254,7 @@ else
     private bool _loadError = false;
     private string _errorMessage = "";
     private DashboardStats _stats = new();
+    private FraudSavingsSummary _savings = new();
     private List<Transaction> _recentHighRisk = new();
     private HubConnection? _hubConnection;
 
@@ -277,6 +340,9 @@ else
         try
         {
             _stats = await TransactionService.GetDashboardStatsAsync();
+
+            try { _savings = await FraudSavingsService.GetSavingsSummaryAsync(); }
+            catch { /* savings refresh failure is non-fatal */ }
             
             var allTransactions = await TransactionService.GetTransactionsAsync(
                 pageNumber: 1, 
@@ -298,6 +364,10 @@ else
     {
         _loading = true;
         _stats = await TransactionService.GetDashboardStatsAsync();
+
+        // Load fraud savings (non-fatal — dashboard still works if this fails)
+        try { _savings = await FraudSavingsService.GetSavingsSummaryAsync(); }
+        catch { _savings = new FraudSavingsSummary(); }
         
         // Get both High and Critical risk transactions
         var allTransactions = await TransactionService.GetTransactionsAsync(
@@ -335,5 +405,12 @@ else
         ReviewStatus.Rejected => Color.Error,
         ReviewStatus.Escalated => Color.Info,
         _ => Color.Default
+    };
+
+    private static string FormatCurrency(decimal amount) => amount switch
+    {
+        >= 1_000_000 => $"${amount / 1_000_000:N1}M",
+        >= 1_000 => $"${amount / 1_000:N1}K",
+        _ => $"${amount:N0}"
     };
 }

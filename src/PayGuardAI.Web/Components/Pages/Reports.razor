@@ -5,6 +5,7 @@
 @inject IReviewService ReviewService
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
+@inject IFraudSavingsService FraudSavingsService
 @using Microsoft.EntityFrameworkCore
 
 <PageTitle>Compliance Reports - PayGuard AI</PageTitle>
@@ -211,7 +212,55 @@
         </MudItem>
 
         <!-- Compliance Statement -->
-        <MudItem xs="12">
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Elevation="2"
+                      Style="border-left: 4px solid var(--mud-palette-success);">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Shield" Color="Color.Success" Class="mr-2" />
+                    Fraud Savings by Rule
+                </MudText>
+                @if (_ruleSavings.Any())
+                {
+                    <MudSimpleTable Dense="true">
+                        <thead>
+                            <tr>
+                                <th>Rule</th>
+                                <th>Category</th>
+                                <th>Blocked</th>
+                                <th>Amount Saved</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var rule in _ruleSavings.Take(8))
+                            {
+                                <tr>
+                                    <td>@(rule.RuleName.Length > 25 ? rule.RuleName[..22] + "..." : rule.RuleName)</td>
+                                    <td>
+                                        <MudChip T="string" Size="Size.Small" Color="@GetCategoryColor(rule.Category)">
+                                            @rule.Category
+                                        </MudChip>
+                                    </td>
+                                    <td>@rule.TransactionCount</td>
+                                    <td Style="font-weight: 600; color: var(--mud-palette-success);">
+                                        $@rule.AmountSaved.ToString("N0")
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                    <MudText Typo="Typo.caption" Class="mt-2" Color="Color.Secondary">
+                        Total: $@_ruleSavings.Sum(r => r.AmountSaved).ToString("N0") saved across
+                        @_ruleSavings.Sum(r => r.TransactionCount) blocked transactions
+                    </MudText>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info">No rejected transactions yet — savings will appear here as fraud is blocked.</MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
             <MudPaper Class="pa-4" Elevation="2">
                 <MudText Typo="Typo.h6" Class="mb-3">
                     <MudIcon Icon="@Icons.Material.Filled.Verified" Color="Color.Success" Class="mr-2" />
@@ -263,6 +312,7 @@
     private List<ReviewActivity> _reviewActivity = new();
     private List<TopRiskFactor> _topRiskFactors = new();
     private List<CorridorSummary> _topCorridors = new();
+    private List<RuleSavingsInfo> _ruleSavings = new();
     
     // Chart data
     private double[] _riskChartData = Array.Empty<double>();
@@ -375,6 +425,10 @@
             .ToList();
 
         _reportGenerated = true;
+
+        // Load fraud savings breakdown by rule (non-fatal)
+        try { _ruleSavings = await FraudSavingsService.GetSavingsByRuleAsync(); }
+        catch { _ruleSavings = new List<RuleSavingsInfo>(); }
     }
 
     private string CalculateAvgResponseTime(IEnumerable<RiskAnalysis> analyses)
