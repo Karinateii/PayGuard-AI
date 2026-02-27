@@ -255,6 +255,9 @@ builder.Services.AddScoped<IMLTrainingService, MLTrainingService>();
 // Register ML auto-retraining background service — checks hourly for new labeled data
 builder.Services.AddHostedService<MLRetrainingBackgroundService>();
 
+// Register scheduled report delivery — runs scheduled CustomReports and emails CSV results
+builder.Services.AddHostedService<ScheduledReportBackgroundService>();
+
 // Register Rule Marketplace service — browse, import, and analyze rule templates
 builder.Services.AddScoped<IRuleMarketplaceService, RuleMarketplaceService>();
 

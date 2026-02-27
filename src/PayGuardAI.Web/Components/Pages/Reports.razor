@@ -48,6 +48,39 @@
         </MudPaper>
     </MudItem>
 
+    @* ── Additional Compliance Exports ────────────────────────────── *@
+    <MudItem xs="12">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudText Typo="Typo.subtitle1" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.FileDownload" Class="mr-1" />
+                Compliance Export Pack
+            </MudText>
+            <MudStack Row="true" Spacing="2" Style="flex-wrap: wrap;">
+                <MudButton Variant="Variant.Outlined" Color="Color.Info"
+                           StartIcon="@Icons.Material.Filled.History"
+                           OnClick="@ExportAuditLog" Disabled="@_exportingAudit">
+                    @if (_exportingAudit) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" /> }
+                    Audit Trail CSV
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Tertiary"
+                           StartIcon="@Icons.Material.Filled.People"
+                           OnClick="@ExportUserAccess" Disabled="@_exportingAccess">
+                    @if (_exportingAccess) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" /> }
+                    User Access Report
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Warning"
+                           StartIcon="@Icons.Material.Filled.Gavel"
+                           OnClick="@ExportRuleChanges" Disabled="@_exportingRules">
+                    @if (_exportingRules) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" /> }
+                    Rule Change Log
+                </MudButton>
+            </MudStack>
+            <MudText Typo="Typo.caption" Class="mt-2" Color="Color.Secondary">
+                Download compliance reports for the selected date range. These exports include full audit trails suitable for regulatory submissions.
+            </MudText>
+        </MudPaper>
+    </MudItem>
+
     @if (_reportGenerated)
     {
         <!-- Summary Statistics -->
@@ -495,6 +528,129 @@
         {
             Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
         }
+    }
+
+// ── Additional compliance export state ─────────────────────────────
+    private bool _exportingAudit;
+    private bool _exportingAccess;
+    private bool _exportingRules;
+
+    private async Task ExportAuditLog()
+    {
+        _exportingAudit = true;
+        try
+        {
+            var from = _fromDate ?? DateTime.UtcNow.Date.AddDays(-30);
+            var to = (_toDate ?? DateTime.UtcNow.Date).AddDays(1);
+
+            var logs = await DbContext.AuditLogs
+                .Where(a => a.CreatedAt >= from && a.CreatedAt < to)
+                .OrderByDescending(a => a.CreatedAt)
+                .ToListAsync();
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("Timestamp,Action,Entity Type,Entity ID,Performed By,IP Address,Notes");
+            foreach (var log in logs)
+            {
+                sb.AppendLine(string.Join(",",
+                    CsvEscape(log.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")),
+                    CsvEscape(log.Action),
+                    CsvEscape(log.EntityType),
+                    CsvEscape(log.EntityId),
+                    CsvEscape(log.PerformedBy),
+                    CsvEscape(log.IpAddress ?? ""),
+                    CsvEscape(log.Notes ?? "")
+                ));
+            }
+
+            await DownloadCsv(sb.ToString(), $"payguard-audit-log-{from:yyyyMMdd}-{to.AddDays(-1):yyyyMMdd}.csv");
+            Snackbar.Add($"Exported {logs.Count} audit log entries", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Audit export failed: {ex.Message}", Severity.Error);
+        }
+        finally { _exportingAudit = false; }
+    }
+
+    private async Task ExportUserAccess()
+    {
+        _exportingAccess = true;
+        try
+        {
+            var members = await DbContext.TeamMembers
+                .OrderBy(m => m.Email)
+                .ToListAsync();
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("Email,Display Name,Role,Status,Last Login,Invited At,Created At");
+            foreach (var m in members)
+            {
+                sb.AppendLine(string.Join(",",
+                    CsvEscape(m.Email),
+                    CsvEscape(m.DisplayName),
+                    CsvEscape(m.Role),
+                    CsvEscape(m.Status),
+                    CsvEscape(m.LastLoginAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Never"),
+                    CsvEscape(m.InvitedAt.ToString("yyyy-MM-dd HH:mm:ss")),
+                    CsvEscape(m.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"))
+                ));
+            }
+
+            await DownloadCsv(sb.ToString(), $"payguard-user-access-report-{DateTime.UtcNow:yyyyMMdd}.csv");
+            Snackbar.Add($"Exported {members.Count} user access records", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"User access export failed: {ex.Message}", Severity.Error);
+        }
+        finally { _exportingAccess = false; }
+    }
+
+    private async Task ExportRuleChanges()
+    {
+        _exportingRules = true;
+        try
+        {
+            var from = _fromDate ?? DateTime.UtcNow.Date.AddDays(-30);
+            var to = (_toDate ?? DateTime.UtcNow.Date).AddDays(1);
+
+            var versions = await DbContext.RuleVersions
+                .Where(v => v.CreatedAt >= from && v.CreatedAt < to)
+                .OrderByDescending(v => v.CreatedAt)
+                .ToListAsync();
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("Timestamp,Rule Name,Entity Type,Version #,Changed By,Description");
+            foreach (var v in versions)
+            {
+                sb.AppendLine(string.Join(",",
+                    CsvEscape(v.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")),
+                    CsvEscape(v.RuleName ?? ""),
+                    CsvEscape(v.EntityType),
+                    v.VersionNumber.ToString(),
+                    CsvEscape(v.ChangedBy),
+                    CsvEscape(v.ChangeDescription ?? "")
+                ));
+            }
+
+            await DownloadCsv(sb.ToString(), $"payguard-rule-changes-{from:yyyyMMdd}-{to.AddDays(-1):yyyyMMdd}.csv");
+            Snackbar.Add($"Exported {versions.Count} rule change records", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Rule change export failed: {ex.Message}", Severity.Error);
+        }
+        finally { _exportingRules = false; }
+    }
+
+    private async Task DownloadCsv(string csvContent, string fileName)
+    {
+        var bytes = System.Text.Encoding.UTF8.GetBytes(csvContent);
+        var base64 = Convert.ToBase64String(bytes);
+        var script = "(function() { var link = document.createElement('a'); link.download = '"
+            + fileName + "'; link.href = 'data:text/csv;base64," + base64 + "'; link.click(); })()";
+        await JS.InvokeVoidAsync("eval", script);
     }
 
     private string CsvEscape(string value)

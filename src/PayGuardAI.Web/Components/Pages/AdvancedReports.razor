@@ -83,6 +83,13 @@
                                             Group: @report.Grouping
                                         </MudChip>
                                     }
+                                    @if (report.IsScheduled)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Success" 
+                                                 Icon="@Icons.Material.Filled.Schedule">
+                                            @(report.ScheduleCron ?? "daily")
+                                        </MudChip>
+                                    }
                                 </MudStack>
                                 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
                                     Created @report.CreatedAt.ToString("MMM dd, yyyy") by @report.CreatedBy

@@ -56,6 +56,27 @@
                 <MudSelectItem T="string" Value="@("analyst")">Analyst</MudSelectItem>
                 <MudSelectItem T="string" Value="@("date")">Date</MudSelectItem>
             </MudSelect>
+
+            <MudDivider />
+
+            @* Scheduling *@
+            <MudSwitch T="bool" @bind-Value="_report.IsScheduled" Label="Schedule automatic delivery"
+                       Color="Color.Primary" />
+
+            @if (_report.IsScheduled)
+            {
+                <MudSelect T="string" @bind-Value="_report.ScheduleCron" Label="Delivery Frequency"
+                           Variant="Variant.Outlined" Required="true">
+                    <MudSelectItem T="string" Value="@("daily")">Daily</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("weekly")">Weekly</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("monthly")">Monthly</MudSelectItem>
+                </MudSelect>
+
+                <MudTextField @bind-Value="_report.EmailRecipients" Label="Email Recipients"
+                              Variant="Variant.Outlined"
+                              Placeholder="analyst@company.com, manager@company.com"
+                              HelperText="Comma-separated email addresses" />
+            }
         </MudStack>
     </DialogContent>
     <DialogActions>
