@@ -226,11 +226,27 @@ public class PaystackBillingService : IBillingService
         sub.TransactionsThisPeriod = 0;
         sub.UpdatedAt = DateTime.UtcNow;
 
+        // Try to look up the Paystack subscription code so "Manage Subscription" works
+        if (string.IsNullOrEmpty(sub.ProviderSubscriptionId) && !string.IsNullOrEmpty(customerCode))
+        {
+            var subCode = await LookupSubscriptionCodeAsync(customerCode, planCode, ct);
+            if (!string.IsNullOrEmpty(subCode))
+            {
+                sub.ProviderSubscriptionId = subCode;
+                _logger.LogInformation("Found subscription code {SubCode} for tenant {TenantId}", subCode, tenantId);
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "No subscription code found yet for tenant {TenantId} — webhook will set it later", tenantId);
+            }
+        }
+
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation(
-            "Checkout verified for tenant {TenantId}: Plan={Plan}, Reference={Reference}, Email={Email}",
-            tenantId, plan, reference, customerEmail);
+            "Checkout verified for tenant {TenantId}: Plan={Plan}, Reference={Reference}, Email={Email}, SubId={SubId}",
+            tenantId, plan, reference, customerEmail, sub.ProviderSubscriptionId ?? "(pending)");
 
         return sub;
     }
@@ -242,8 +258,23 @@ public class PaystackBillingService : IBillingService
         var sub = await _db.TenantSubscriptions.FirstOrDefaultAsync(s => s.TenantId == tenantId, ct)
             ?? throw new InvalidOperationException($"No subscription found for tenant {tenantId}");
 
+        // If subscription code is missing, try to look it up from Paystack
+        if (string.IsNullOrWhiteSpace(sub.ProviderSubscriptionId) && !string.IsNullOrWhiteSpace(sub.ProviderCustomerId))
+        {
+            _logger.LogInformation("ProviderSubscriptionId missing for tenant {TenantId}, looking up from Paystack...", tenantId);
+            var subCode = await LookupSubscriptionCodeAsync(
+                sub.ProviderCustomerId, sub.ProviderPlanCode ?? "", ct);
+            if (!string.IsNullOrEmpty(subCode))
+            {
+                sub.ProviderSubscriptionId = subCode;
+                sub.UpdatedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync(ct);
+                _logger.LogInformation("Found and saved subscription code {SubCode} for tenant {TenantId}", subCode, tenantId);
+            }
+        }
+
         if (string.IsNullOrWhiteSpace(sub.ProviderSubscriptionId))
-            throw new InvalidOperationException("Tenant has no active subscription — they need to complete checkout first.");
+            throw new InvalidOperationException("Subscription is still being set up by Paystack. Please try again in a moment.");
 
         // Paystack generates a link to manage/update the card on a subscription
         var response = await GetAsync<PaystackManageLinkResponse>(
@@ -557,6 +588,66 @@ public class PaystackBillingService : IBillingService
         }
 
         return JsonSerializer.Deserialize<T>(body, JsonOptions);
+    }
+
+    /// <summary>
+    /// Look up a customer's subscription code from Paystack's subscriptions list API.
+    /// Returns the first active subscription matching the customer (and optionally the plan).
+    /// </summary>
+    private async Task<string?> LookupSubscriptionCodeAsync(
+        string customerCode, string planCode, CancellationToken ct)
+    {
+        try
+        {
+            // Paystack GET /subscription?customer={id}&plan={id} — filter by customer
+            var path = $"/subscription?customer={Uri.EscapeDataString(customerCode)}&perPage=10";
+            var response = await _http.GetAsync(path, ct);
+            var body = await response.Content.ReadAsStringAsync(ct);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Paystack subscription lookup failed ({StatusCode}): {Body}",
+                    response.StatusCode, body);
+                return null;
+            }
+
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("data", out var dataArr) || dataArr.ValueKind != JsonValueKind.Array)
+                return null;
+
+            // Find an active subscription, prefer one matching the plan code
+            string? bestMatch = null;
+            foreach (var item in dataArr.EnumerateArray())
+            {
+                var status = item.TryGetProperty("status", out var st) ? st.GetString() : null;
+                if (!string.Equals(status, "active", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(status, "non-renewing", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(status, "attention", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var subCode = item.TryGetProperty("subscription_code", out var sc) ? sc.GetString() : null;
+                if (string.IsNullOrEmpty(subCode)) continue;
+
+                // If plan matches, return immediately
+                if (!string.IsNullOrEmpty(planCode) && item.TryGetProperty("plan", out var planObj))
+                {
+                    var pc = planObj.TryGetProperty("plan_code", out var pcVal) ? pcVal.GetString() : null;
+                    if (string.Equals(pc, planCode, StringComparison.OrdinalIgnoreCase))
+                        return subCode;
+                }
+
+                bestMatch ??= subCode; // fallback to first active subscription
+            }
+
+            return bestMatch;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error looking up subscription code for customer {CustomerCode}", customerCode);
+            return null;
+        }
     }
 
     private static string ComputeHmacSha512(string payload, string secret)
