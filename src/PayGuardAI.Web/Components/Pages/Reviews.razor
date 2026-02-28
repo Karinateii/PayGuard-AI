@@ -94,11 +94,25 @@
         <MudText Typo="Typo.caption" Class="ml-2">Pull to refresh</MudText>
     </div>
 
-    <MudGrid Spacing="2" Class="mb-3">
-        <!-- Min Risk Level Filter -->
-        <MudItem xs="6" sm="6" md="4">
-            <MudSelect T="RiskLevel?" Label="Min Risk Level" Value="@_minRiskLevel" 
-                       ValueChanged="@OnFilterChanged" Dense="true" FullWidth="true">
+    <!-- Filters: responsive grid like Transactions page -->
+    <MudGrid Spacing="2" Class="mb-2">
+        <!-- Sort Order -->
+        <MudItem xs="6" sm="4" md="2">
+            <MudSelect T="string" Label="Sort By" Value="@_sortOrder"
+                       ValueChanged="@OnSortChanged" Dense="true" Variant="Variant.Outlined" FullWidth="true">
+                <MudSelectItem T="string" Value="@("newest")">⌚ Newest First</MudSelectItem>
+                <MudSelectItem T="string" Value="@("oldest")">Oldest First</MudSelectItem>
+                <MudSelectItem T="string" Value="@("risk-high")">⚠️ Highest Risk</MudSelectItem>
+                <MudSelectItem T="string" Value="@("risk-low")">Lowest Risk</MudSelectItem>
+                <MudSelectItem T="string" Value="@("amount-high")">Largest Amount</MudSelectItem>
+                <MudSelectItem T="string" Value="@("amount-low")">Smallest Amount</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+
+        <!-- Risk Level Filter -->
+        <MudItem xs="6" sm="4" md="2">
+            <MudSelect T="RiskLevel?" Label="Risk Level" Value="@_minRiskLevel"
+                       ValueChanged="@OnFilterChanged" Dense="true" Variant="Variant.Outlined" FullWidth="true">
                 <MudSelectItem T="RiskLevel?" Value="@((RiskLevel?)null)">All</MudSelectItem>
                 <MudSelectItem T="RiskLevel?" Value="RiskLevel.Medium">Medium+</MudSelectItem>
                 <MudSelectItem T="RiskLevel?" Value="RiskLevel.High">High+</MudSelectItem>
@@ -106,37 +120,68 @@
             </MudSelect>
         </MudItem>
 
-        <!-- Reviews Count -->
-        <MudItem xs="6" sm="6" md="4" Class="d-flex align-center">
-            <MudChip T="string" Color="Color.Warning" Size="Size.Medium">@_reviews.Count Pending</MudChip>
-        </MudItem>
-
-        <!-- Per Page Filter (hidden on mobile - uses infinite scroll feel) -->
-        <MudItem xs="6" sm="6" md="2" Class="d-none d-md-flex">
-            <MudSelect T="int" Value="_pageSize" ValueChanged="OnPageSizeChanged" Label="Per page" Dense="true" FullWidth="true">
-                <MudSelectItem T="int" Value="5">5</MudSelectItem>
-                <MudSelectItem T="int" Value="10">10</MudSelectItem>
-                <MudSelectItem T="int" Value="25">25</MudSelectItem>
+        <!-- Review Status Filter -->
+        <MudItem xs="6" sm="4" md="2">
+            <MudSelect T="string" Label="Status" Value="@_filterStatus"
+                       ValueChanged="@OnStatusFilterChanged" Dense="true" Variant="Variant.Outlined" FullWidth="true">
+                <MudSelectItem T="string" Value="@("all")">All Pending</MudSelectItem>
+                <MudSelectItem T="string" Value="@("pending")">Pending Only</MudSelectItem>
+                <MudSelectItem T="string" Value="@("escalated")">Escalated Only</MudSelectItem>
             </MudSelect>
         </MudItem>
 
-        <!-- Refresh Button -->
-        <MudItem xs="6" sm="6" md="2" Class="d-flex align-center">
-            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" 
-                       OnClick="@LoadReviews" FullWidth="true" Class="mobile-action-btn">Refresh</MudButton>
+        <!-- Corridor / Country Filter -->
+        <MudItem xs="6" sm="4" md="2">
+            <MudTextField @bind-Value="_filterCorridor" Label="Corridor" Variant="Variant.Outlined"
+                          Placeholder="e.g. NG, US" Dense="true" FullWidth="true"
+                          Immediate="true" DebounceInterval="400"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.FlightTakeoff" />
+        </MudItem>
+
+        <!-- Min Amount -->
+        <MudItem xs="6" sm="4" md="2">
+            <MudNumericField @bind-Value="_filterMinAmount" Label="Min ($)" Variant="Variant.Outlined"
+                             FullWidth="true" Min="0" Step="100m" Dense="true"
+                             Placeholder="e.g. 100" />
+        </MudItem>
+
+        <!-- Max Amount -->
+        <MudItem xs="6" sm="4" md="2">
+            <MudNumericField @bind-Value="_filterMaxAmount" Label="Max ($)" Variant="Variant.Outlined"
+                             FullWidth="true" Min="0" Step="100m" Dense="true"
+                             Placeholder="e.g. 5000" />
         </MudItem>
     </MudGrid>
 
+    <!-- Action Buttons -->
+    <MudStack Row="true" Spacing="2" Class="mb-3" Style="flex-wrap: wrap;">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.FilterAlt" OnClick="@ApplyFilters">
+            Apply Filters
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.ClearAll" OnClick="@ClearFilters">
+            Clear
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Refresh" OnClick="@LoadReviews">
+            Refresh
+        </MudButton>
+        <MudChip T="string" Color="Color.Warning" Size="Size.Small" Class="d-flex align-center">
+            @FilteredReviews.Count() Pending
+        </MudChip>
+    </MudStack>
+
     <!-- Page Info Display -->
     <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3">
-        Showing @(Math.Min((_currentPage - 1) * _pageSize + 1, _reviews.Count))–@(Math.Min(_currentPage * _pageSize, _reviews.Count)) of @_reviews.Count
+        Showing @(Math.Min((_currentPage - 1) * _pageSize + 1, FilteredReviews.Count()))–@(Math.Min(_currentPage * _pageSize, FilteredReviews.Count())) of @FilteredReviews.Count()
     </MudText>
 
     @if (_loading)
     {
         <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
     }
-    else if (!_reviews.Any())
+    else if (!FilteredReviews.Any())
     {
         <MudAlert Severity="Severity.Success" Class="mt-4">
             <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-2" />
@@ -145,7 +190,7 @@
     }
     else
     {
-        @foreach (var review in PagedReviews)
+        @foreach (var review in SortedPagedReviews)
         {
             var cardId = $"review-card-{review.Id}";
             <!-- Desktop layout -->
@@ -301,16 +346,78 @@
     private HubConnection? _hubConnection;
     private Dictionary<Guid, DotNetObjectReference<SwipeHandler>> _swipeRefs = new();
 
+    // New filter/sort state
+    private string _sortOrder = "newest";
+    private string _filterStatus = "all";
+    private string _filterCorridor = "";
+    private decimal? _filterMinAmount;
+    private decimal? _filterMaxAmount;
+
     [CascadingParameter(Name = "OnReviewCompleted")]
     private Func<Task>? OnReviewCompleted { get; set; }
 
-    // Pagination - smaller page size since review cards are larger than table rows
+    // Pagination
     private int _currentPage = 1;
-    private int _pageSize = 5;
-    private int TotalPages => (int)Math.Ceiling(_reviews.Count / (double)_pageSize);
-    private IEnumerable<RiskAnalysis> PagedReviews => _reviews
-        .Skip((_currentPage - 1) * _pageSize)
-        .Take(_pageSize);
+    private int _pageSize = 10;
+    private int TotalPages => (int)Math.Ceiling(FilteredReviews.Count() / (double)_pageSize);
+
+    /// <summary>
+    /// Client-side filtering on top of the server-fetched reviews.
+    /// </summary>
+    private IEnumerable<RiskAnalysis> FilteredReviews
+    {
+        get
+        {
+            IEnumerable<RiskAnalysis> result = _reviews;
+
+            // Status filter
+            if (_filterStatus == "pending")
+                result = result.Where(r => r.ReviewStatus == ReviewStatus.Pending);
+            else if (_filterStatus == "escalated")
+                result = result.Where(r => r.ReviewStatus == ReviewStatus.Escalated);
+
+            // Corridor filter (match source or destination country)
+            if (!string.IsNullOrWhiteSpace(_filterCorridor))
+            {
+                var term = _filterCorridor.Trim().ToUpperInvariant();
+                result = result.Where(r =>
+                    (r.Transaction.SourceCountry?.ToUpperInvariant().Contains(term) == true) ||
+                    (r.Transaction.DestinationCountry?.ToUpperInvariant().Contains(term) == true));
+            }
+
+            // Amount range
+            if (_filterMinAmount.HasValue)
+                result = result.Where(r => r.Transaction.Amount >= _filterMinAmount.Value);
+            if (_filterMaxAmount.HasValue)
+                result = result.Where(r => r.Transaction.Amount <= _filterMaxAmount.Value);
+
+            return result;
+        }
+    }
+
+    /// <summary>
+    /// Sorted and paginated view of the filtered reviews.
+    /// </summary>
+    private IEnumerable<RiskAnalysis> SortedPagedReviews
+    {
+        get
+        {
+            var sorted = _sortOrder switch
+            {
+                "newest" => FilteredReviews.OrderByDescending(r => r.AnalyzedAt),
+                "oldest" => FilteredReviews.OrderBy(r => r.AnalyzedAt),
+                "risk-high" => FilteredReviews.OrderByDescending(r => r.RiskScore).ThenByDescending(r => r.AnalyzedAt),
+                "risk-low" => FilteredReviews.OrderBy(r => r.RiskScore).ThenByDescending(r => r.AnalyzedAt),
+                "amount-high" => FilteredReviews.OrderByDescending(r => r.Transaction.Amount).ThenByDescending(r => r.AnalyzedAt),
+                "amount-low" => FilteredReviews.OrderBy(r => r.Transaction.Amount).ThenByDescending(r => r.AnalyzedAt),
+                _ => FilteredReviews.OrderByDescending(r => r.AnalyzedAt)
+            };
+
+            return sorted
+                .Skip((_currentPage - 1) * _pageSize)
+                .Take(_pageSize);
+        }
+    }
 
     private void OnPageChanged(int page) => _currentPage = page;
     private void OnPageSizeChanged(int size) { _pageSize = size; _currentPage = 1; }
@@ -339,7 +446,7 @@
 
     private async Task InitSwipeHandlers()
     {
-        foreach (var review in PagedReviews)
+        foreach (var review in SortedPagedReviews)
         {
             try
             {
@@ -453,6 +560,35 @@
     private async Task OnFilterChanged(RiskLevel? value)
     {
         _minRiskLevel = value;
+        _currentPage = 1;
+        await LoadReviews();
+    }
+
+    private void OnSortChanged(string value)
+    {
+        _sortOrder = value;
+        _currentPage = 1;
+    }
+
+    private void OnStatusFilterChanged(string value)
+    {
+        _filterStatus = value;
+        _currentPage = 1;
+    }
+
+    private void ApplyFilters()
+    {
+        _currentPage = 1;
+    }
+
+    private async Task ClearFilters()
+    {
+        _sortOrder = "newest";
+        _minRiskLevel = null;
+        _filterStatus = "all";
+        _filterCorridor = "";
+        _filterMinAmount = null;
+        _filterMaxAmount = null;
         _currentPage = 1;
         await LoadReviews();
     }
