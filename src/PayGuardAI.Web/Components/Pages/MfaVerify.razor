@@ -35,7 +35,6 @@
                           Label="Verification Code"
                           Variant="Variant.Outlined"
                           MaxLength="6"
-                          Mask="@(new PatternMask("000000"))"
                           HelperText="6-digit code"
                           Immediate="true"
                           FullWidth="true"
@@ -76,7 +75,7 @@
                    FullWidth="true"
                    Size="Size.Large"
                    OnClick="VerifyCode"
-                   Disabled="@(IsVerifyDisabled)">
+                   Disabled="@IsVerifyDisabled">
             Verify
         </MudButton>
 
@@ -129,7 +128,7 @@
     private bool _showBackupEntry;
 
     private bool IsVerifyDisabled => _isLockedOut ||
-        (!_showBackupEntry && _verificationCode?.Length != 6) ||
+        (!_showBackupEntry && (string.IsNullOrWhiteSpace(_verificationCode) || _verificationCode.Length != 6 || !_verificationCode.All(char.IsDigit))) ||
         (_showBackupEntry && string.IsNullOrWhiteSpace(_backupCode));
 
     protected override async Task OnInitializedAsync()

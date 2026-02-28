@@ -73,7 +73,6 @@
                               Label="Verification Code"
                               Variant="Variant.Outlined"
                               MaxLength="6"
-                              Mask="@(new PatternMask("000000"))"
                               HelperText="Enter the 6-digit code from your app"
                               Immediate="true"
                               Class="mb-4" />
@@ -90,7 +89,7 @@
                     <MudButton Variant="Variant.Filled" 
                                Color="Color.Primary" 
                                OnClick="VerifyCode"
-                               Disabled="@(_verificationCode?.Length != 6 || _isSaving)">
+                               Disabled="@(string.IsNullOrWhiteSpace(_verificationCode) || _verificationCode.Length != 6 || !_verificationCode.All(char.IsDigit) || _isSaving)">
                         @if (_isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
                         Verify &amp; Enable
                     </MudButton>
