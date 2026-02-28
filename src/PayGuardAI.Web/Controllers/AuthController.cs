@@ -175,6 +175,13 @@ public class AuthController : ControllerBase
         _logger.LogInformation("[AUTH] Magic link login successful for {Email} → tenant {Tenant}",
             email, teamMember.TenantId);
 
+        // If MFA is enabled, redirect to verification page
+        if (teamMember.MfaEnabled)
+        {
+            _logger.LogInformation("[AUTH] MFA required for {Email}, redirecting to /mfa/verify", email);
+            return Redirect("/mfa/verify");
+        }
+
         return Redirect("/");
     }
 
@@ -206,6 +213,21 @@ public class AuthController : ControllerBase
 
         _logger.LogInformation("[AUTH-CONTROLLER] Session + cookies cleared, redirecting to /login");
         return Redirect("/login");
+    }
+
+    /// <summary>
+    /// MFA verification complete — marks the session as MFA-verified and redirects to dashboard.
+    /// Called after successful TOTP or backup code verification on /mfa/verify.
+    /// </summary>
+    /// <response code="302">MFA verified, redirecting to dashboard</response>
+    [HttpGet("mfa-complete")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status302Found)]
+    public IActionResult MfaComplete()
+    {
+        HttpContext.Session.SetString("MfaVerified", "true");
+        _logger.LogInformation("[AUTH] MFA verification completed for {User}", User.Identity?.Name);
+        return Redirect("/");
     }
 
     /// <summary>

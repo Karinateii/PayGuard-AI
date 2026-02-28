@@ -123,6 +123,28 @@ public static class AuthenticationConfiguration
                             context.ShouldRenew = true; // Re-issue the cookie
                         }
                     }
+
+                    // MFA state management: sync mfa_pending claim with session
+                    if (member.MfaEnabled)
+                    {
+                        var mfaVerified = context.HttpContext.Session.GetString("MfaVerified");
+                        var identity2 = context.Principal!.Identity as ClaimsIdentity;
+                        var hasMfaPending = context.Principal!.HasClaim(c => c.Type == "mfa_pending");
+
+                        if (mfaVerified == "true" && hasMfaPending && identity2 != null)
+                        {
+                            // MFA was verified — remove pending claim from cookie
+                            var pendingClaim = identity2.FindFirst("mfa_pending");
+                            if (pendingClaim != null) identity2.RemoveClaim(pendingClaim);
+                            context.ShouldRenew = true;
+                        }
+                        else if (mfaVerified != "true" && !hasMfaPending && identity2 != null)
+                        {
+                            // MFA enabled but not verified and no pending claim — add it
+                            identity2.AddClaim(new Claim("mfa_pending", "true"));
+                            context.ShouldRenew = true;
+                        }
+                    }
                 }
             };
         })
@@ -228,6 +250,17 @@ public static class AuthenticationConfiguration
                                 logger.LogInformation(
                                     "Auto-created SuperAdmin TeamMember for {Email}", userEmail);
                             }
+
+                            // MFA gate: check if platform owner has MFA enabled
+                            var ownerMember = await db.TeamMembers
+                                .IgnoreQueryFilters()
+                                .FirstOrDefaultAsync(t => t.Email.ToLower() == userEmail.ToLower()
+                                                    && t.TenantId == defaultTenantId);
+                            if (ownerMember?.MfaEnabled == true)
+                            {
+                                identity.AddClaim(new Claim("mfa_pending", "true"));
+                                logger.LogInformation("MFA pending for platform owner {Email}", userEmail);
+                            }
                         }
                         else
                         {
@@ -245,6 +278,13 @@ public static class AuthenticationConfiguration
                                 identity.AddClaim(new Claim("tenant_id", teamMember.TenantId));
                                 logger.LogInformation("Mapped user {Email} to tenant {Tenant} with role {Role}",
                                     userEmail, teamMember.TenantId, teamMember.Role);
+
+                                // MFA gate: check if user has MFA enabled
+                                if (teamMember.MfaEnabled)
+                                {
+                                    identity.AddClaim(new Claim("mfa_pending", "true"));
+                                    logger.LogInformation("MFA pending for {Email}", userEmail);
+                                }
                             }
                             else
                             {

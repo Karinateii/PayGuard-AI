@@ -167,7 +167,7 @@
             if (valid)
             {
                 Snackbar.Add("Backup code accepted", Severity.Success);
-                Navigation.NavigateTo("/");
+                Navigation.NavigateTo("/api/Auth/mfa-complete", forceLoad: true);
                 return;
             }
         }
@@ -175,7 +175,7 @@
         {
             if (MfaService.ValidateCode(_userSecret, _verificationCode))
             {
-                Navigation.NavigateTo("/");
+                Navigation.NavigateTo("/api/Auth/mfa-complete", forceLoad: true);
                 return;
             }
         }

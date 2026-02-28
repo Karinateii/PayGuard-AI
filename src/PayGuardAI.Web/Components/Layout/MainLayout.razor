@@ -21,6 +21,17 @@
 
 <AuthorizeView>
     <Authorized>
+        @if (_mfaPending)
+        {
+            <!-- Minimal layout during MFA verification — no nav, no sidebar -->
+            <MudLayout>
+                <MudMainContent>
+                    @Body
+                </MudMainContent>
+            </MudLayout>
+        }
+        else
+        {
         <MudLayout>
             <MudAppBar Elevation="1" Dense="true">
                 <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@ToggleDrawer" />
@@ -134,6 +145,7 @@
                 </div>
             </nav>
         </MudLayout>
+        }
     </Authorized>
     <NotAuthorized>
         <MudLayout>
@@ -152,6 +164,7 @@
     private string? _organizationName;
     private string? _homeTenantId;
     private bool _isSuperAdmin;
+    private bool _mfaPending;
     private bool _isImpersonating => _isSuperAdmin
         && !string.IsNullOrEmpty(_homeTenantId)
         && !string.IsNullOrEmpty(TenantContext.TenantId)
@@ -162,6 +175,18 @@
     {
         NavigationManager.LocationChanged += OnLocationChanged;
         await LoadHomeTenant();
+
+        // MFA gate: if MFA verification is pending, redirect to /mfa/verify
+        if (_mfaPending)
+        {
+            var currentUri = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+            if (!currentUri.StartsWith("mfa/", StringComparison.OrdinalIgnoreCase))
+            {
+                NavigationManager.NavigateTo("/mfa/verify", forceLoad: true);
+                return;
+            }
+        }
+
         await LoadOrganizationName();
         await LoadPendingReviewCount();
         await SetupSignalRConnection();
@@ -219,11 +244,13 @@
             var user = authState.User;
             _homeTenantId = user?.FindFirst("tenant_id")?.Value;
             _isSuperAdmin = user?.IsInRole("SuperAdmin") ?? false;
+            _mfaPending = user?.HasClaim(c => c.Type == "mfa_pending" && c.Value == "true") ?? false;
         }
         catch
         {
             _homeTenantId = null;
             _isSuperAdmin = false;
+            _mfaPending = false;
         }
     }
 

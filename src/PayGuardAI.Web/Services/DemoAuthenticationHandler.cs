@@ -93,19 +93,27 @@ public class DemoAuthenticationHandler : AuthenticationHandler<AuthenticationSch
                 Logger.LogInformation("[AUTH] Auto-created SuperAdmin TeamMember for {User}", userName);
             }
 
-            // Record login time (once per session)
-            if (Context.Session.GetString("LoginRecorded") != "true")
+            // Look up member for MFA check and login recording
+            var ownerMember = await _db.TeamMembers
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(t => t.Email.ToLower() == userName.ToLower()
+                                    && t.TenantId == defaultTenantId);
+            if (ownerMember != null)
             {
-                var ownerMember = await _db.TeamMembers
-                    .IgnoreQueryFilters()
-                    .FirstOrDefaultAsync(t => t.Email.ToLower() == userName.ToLower()
-                                        && t.TenantId == defaultTenantId);
-                if (ownerMember != null)
+                // MFA gate: require verification if MFA is enabled
+                if (ownerMember.MfaEnabled && Context.Session.GetString("MfaVerified") != "true")
+                {
+                    claims.Add(new Claim("mfa_pending", "true"));
+                    Logger.LogInformation("[AUTH] MFA pending for platform owner {User}", userName);
+                }
+
+                // Record login time (once per session)
+                if (Context.Session.GetString("LoginRecorded") != "true")
                 {
                     ownerMember.LastLoginAt = DateTime.UtcNow;
                     await _db.SaveChangesAsync();
+                    Context.Session.SetString("LoginRecorded", "true");
                 }
-                Context.Session.SetString("LoginRecorded", "true");
             }
         }
         else
@@ -124,6 +132,13 @@ public class DemoAuthenticationHandler : AuthenticationHandler<AuthenticationSch
                 claims.Add(new Claim(ClaimTypes.Role, teamMember.Role));
                 Logger.LogInformation("[AUTH] Mapped {User} to tenant {Tenant} role {Role}",
                     userName, teamMember.TenantId, teamMember.Role);
+
+                // MFA gate: require verification if MFA is enabled
+                if (teamMember.MfaEnabled && Context.Session.GetString("MfaVerified") != "true")
+                {
+                    claims.Add(new Claim("mfa_pending", "true"));
+                    Logger.LogInformation("[AUTH] MFA pending for {User}", userName);
+                }
 
                 // Record login time (once per session)
                 if (Context.Session.GetString("LoginRecorded") != "true")
