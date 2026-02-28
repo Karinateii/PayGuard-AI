@@ -61,6 +61,12 @@ public class TenantResolutionMiddleware
             await context.Response.WriteAsJsonAsync(new { error = "Missing tenant context. Provide X-Tenant-Id header or authenticate." });
             return;
         }
+        else if (IsWebhookPath(context.Request.Path))
+        {
+            // Try to extract tenant from webhook URL: /api/webhooks/{provider}/{tenantId}
+            var webhookTenant = ExtractTenantFromWebhookPath(context.Request.Path);
+            tenantContext.TenantId = webhookTenant ?? defaultTenant;
+        }
         else
         {
             tenantContext.TenantId = defaultTenant;
@@ -82,6 +88,32 @@ public class TenantResolutionMiddleware
         }
 
         await _next(context);
+    }
+
+    /// <summary>
+    /// Extracts tenantId from webhook URLs like:
+    ///   /api/webhooks/afriex/{tenantId}
+    ///   /api/v1/webhooks/afriex/{tenantId}
+    /// Returns null if no tenantId segment is present.
+    /// </summary>
+    private static string? ExtractTenantFromWebhookPath(PathString path)
+    {
+        if (!path.HasValue) return null;
+        var segments = path.Value!.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        // Expected: ["api", "webhooks", "afriex", "tenantId"]
+        //       or: ["api", "v1", "webhooks", "afriex", "tenantId"]
+        var webhooksIdx = Array.FindIndex(segments, s => s.Equals("webhooks", StringComparison.OrdinalIgnoreCase));
+        if (webhooksIdx >= 0 && webhooksIdx + 2 < segments.Length)
+        {
+            var candidate = segments[webhooksIdx + 2];
+            // Skip known non-tenant segments
+            if (!candidate.Equals("health", StringComparison.OrdinalIgnoreCase)
+                && !candidate.Equals("simulate", StringComparison.OrdinalIgnoreCase))
+            {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     /// <summary>

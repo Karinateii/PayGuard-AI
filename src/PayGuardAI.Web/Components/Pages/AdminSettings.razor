@@ -111,6 +111,25 @@ else if (_settings != null)
 
             <MudPaper Class="pa-6 mt-4" Elevation="2">
                 <MudText Typo="Typo.h6" Class="mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Webhook" Class="mr-1" />
+                    Inbound Webhook URL
+                </MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                    Configure this URL in your payment provider's webhook settings
+                    (Afriex Dashboard → Developers → Webhooks).
+                </MudText>
+                <MudTextField Value="@_webhookUrl" Label="Your Webhook Endpoint"
+                              Variant="Variant.Outlined" ReadOnly="true"
+                              Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy"
+                              OnAdornmentClick="CopyWebhookUrl" />
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+                    This URL is unique to your organization. All transactions sent here
+                    will appear in your dashboard.
+                </MudAlert>
+            </MudPaper>
+
+            <MudPaper Class="pa-6 mt-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-2">
                     <MudIcon Icon="@Icons.Custom.Brands.GitHub" Class="mr-1" />
                     Slack Alerts
                 </MudText>
@@ -165,17 +184,23 @@ else if (!_loading && _settings == null)
     </MudAlert>
 }
 
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
 @code {
     private PayGuardAI.Core.Entities.OrganizationSettings? _settings;
     private bool _loading = true;
     private bool _saving;
     private string _error = string.Empty;
+    private string _webhookUrl = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
             _settings = await AdminService.GetOrCreateSettingsAsync(TenantContext.TenantId);
+            var baseUrl = Navigation.BaseUri.TrimEnd('/');
+            _webhookUrl = $"{baseUrl}/api/webhooks/afriex/{TenantContext.TenantId}";
         }
         catch (Exception ex)
         {
@@ -205,6 +230,19 @@ else if (!_loading && _settings == null)
         finally
         {
             _saving = false;
+        }
+    }
+
+    private async Task CopyWebhookUrl()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _webhookUrl);
+            Snackbar.Add("Webhook URL copied to clipboard!", Severity.Success);
+        }
+        catch
+        {
+            Snackbar.Add("Copy failed — please select and copy manually.", Severity.Warning);
         }
     }
 

@@ -79,13 +79,14 @@ public class WebhooksController : ControllerBase
     /// <response code="400">Malformed payload or processing error</response>
     /// <response code="429">Rate limit exceeded</response>
     [HttpPost("afriex")]
+    [HttpPost("afriex/{tenantId}")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
-    public async Task<IActionResult> ReceiveAfriexWebhook(CancellationToken cancellationToken)
+    public async Task<IActionResult> ReceiveAfriexWebhook(CancellationToken cancellationToken, [FromRoute] string? tenantId = null)
     {
-        return await ProcessWebhook("afriex", cancellationToken);
+        return await ProcessWebhook("afriex", cancellationToken, tenantId);
     }
 
     /// <summary>
@@ -99,12 +100,13 @@ public class WebhooksController : ControllerBase
     /// <response code="401">Missing or invalid signature</response>
     /// <response code="400">Processing error</response>
     [HttpPost("flutterwave")]
+    [HttpPost("flutterwave/{tenantId}")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> ReceiveFlutterwaveWebhook(CancellationToken cancellationToken)
+    public async Task<IActionResult> ReceiveFlutterwaveWebhook(CancellationToken cancellationToken, [FromRoute] string? tenantId = null)
     {
-        return await ProcessWebhook("flutterwave", cancellationToken);
+        return await ProcessWebhook("flutterwave", cancellationToken, tenantId);
     }
 
     /// <summary>
@@ -119,12 +121,13 @@ public class WebhooksController : ControllerBase
     /// <response code="401">Missing or invalid signature</response>
     /// <response code="400">Processing error</response>
     [HttpPost("wise")]
+    [HttpPost("wise/{tenantId}")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> ReceiveWiseWebhook(CancellationToken cancellationToken)
+    public async Task<IActionResult> ReceiveWiseWebhook(CancellationToken cancellationToken, [FromRoute] string? tenantId = null)
     {
-        return await ProcessWebhook("wise", cancellationToken);
+        return await ProcessWebhook("wise", cancellationToken, tenantId);
     }
 
     /// <summary>
@@ -133,22 +136,37 @@ public class WebhooksController : ControllerBase
     /// Endpoint: POST /api/webhooks/transaction
     /// </summary>
     [HttpPost("transaction")]
-    public async Task<IActionResult> ReceiveTransaction(CancellationToken cancellationToken)
+    [HttpPost("transaction/{tenantId}")]
+    public async Task<IActionResult> ReceiveTransaction(CancellationToken cancellationToken, [FromRoute] string? tenantId = null)
     {
         // Default to Afriex for backward compatibility
-        return await ProcessWebhook("afriex", cancellationToken);
+        return await ProcessWebhook("afriex", cancellationToken, tenantId);
     }
 
-    private async Task<IActionResult> ProcessWebhook(string providerName, CancellationToken cancellationToken)
+    private async Task<IActionResult> ProcessWebhook(string providerName, CancellationToken cancellationToken, string? tenantId = null)
     {
         try
         {
+            // If a tenant-scoped URL was used (e.g. /api/webhooks/afriex/my-tenant),
+            // override the tenant context so the transaction lands in the right tenant.
+            if (!string.IsNullOrWhiteSpace(tenantId))
+            {
+                _tenantContext.TenantId = tenantId;
+                _logger.LogInformation("[{Provider}] Tenant resolved from webhook URL: {TenantId}", providerName, tenantId);
+            }
+
             // Get the appropriate provider
             var provider = _providerFactory.GetProviderByName(providerName);
 
             // Read raw payload
             using var reader = new StreamReader(Request.Body);
             var payload = await reader.ReadToEndAsync(cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(payload))
+            {
+                _logger.LogWarning("[{Provider}] Webhook rejected — empty payload", providerName);
+                return BadRequest(new { success = false, error = "Empty webhook payload" });
+            }
 
             _metrics.RecordWebhookReceived(providerName);
             _logger.LogInformation("[{Provider}] Received webhook ({PayloadLength} bytes)",
@@ -172,6 +190,27 @@ public class WebhooksController : ControllerBase
                 return Unauthorized(new { success = false, error = "Invalid signature" });
             }
             _logger.LogInformation("[{Provider}] Webhook signature verified successfully", providerName);
+
+            // ── Detect event type — only process transaction events ──
+            // Afriex also sends customer.created, customer.updated, customer.deleted,
+            // PAYMENT_METHOD.CREATED, etc.  Acknowledge them with 200 but skip risk scoring.
+            string? eventType = null;
+            try
+            {
+                using var eventDoc = System.Text.Json.JsonDocument.Parse(payload);
+                if (eventDoc.RootElement.TryGetProperty("event", out var evtProp))
+                    eventType = evtProp.GetString();
+            }
+            catch { /* if JSON parse fails, let ProcessWebhookAsync handle the error */ }
+
+            if (!string.IsNullOrEmpty(eventType)
+                && !eventType.Contains("TRANSACTION", StringComparison.OrdinalIgnoreCase)
+                && !eventType.Contains("transaction", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogInformation("[{Provider}] Non-transaction event '{EventType}' acknowledged (no processing needed)",
+                    providerName, eventType);
+                return Ok(new { success = true, provider = providerName, eventType, action = "acknowledged" });
+            }
 
             // Normalize the webhook to unified format
             var normalizedTransaction = await provider.NormalizeWebhookAsync(payload);

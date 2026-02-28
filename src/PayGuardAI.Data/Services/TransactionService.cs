@@ -67,13 +67,27 @@ public class TransactionService : ITransactionService
         var transaction = ParseWebhookPayload(payload);
         transaction.TenantId = _tenantContext.TenantId;
         
-        // Check for duplicate
+        // Check for duplicate — Afriex may send TRANSACTION.CREATED then TRANSACTION.UPDATED
         var existing = await _context.Transactions
+            .Include(t => t.RiskAnalysis)
+                .ThenInclude(r => r!.RiskFactors)
             .FirstOrDefaultAsync(t => t.ExternalId == transaction.ExternalId, cancellationToken);
 
         if (existing != null)
         {
-            _logger.LogWarning("Duplicate transaction received: {ExternalId}", transaction.ExternalId);
+            // If the incoming status is different (e.g. PENDING → COMPLETED), update it
+            if (!string.Equals(existing.Status, transaction.Status, StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrEmpty(transaction.Status))
+            {
+                _logger.LogInformation("Updating transaction {ExternalId} status: {OldStatus} → {NewStatus}",
+                    transaction.ExternalId, existing.Status, transaction.Status);
+                existing.Status = transaction.Status;
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            else
+            {
+                _logger.LogInformation("Duplicate transaction received (no status change): {ExternalId}", transaction.ExternalId);
+            }
             return existing;
         }
 
