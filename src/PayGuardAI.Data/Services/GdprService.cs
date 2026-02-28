@@ -121,8 +121,19 @@ public class GdprService : IGdprService
         }).ToList();
 
         // 4. Audit entries mentioning this subject
+        //    Reviews log the RiskAnalysis GUID as EntityId, not the sender ID,
+        //    so we must also search for audit entries linked to analysis IDs
+        //    and transaction IDs associated with this subject.
+        var analysisIds = analyses.Select(a => a.Id.ToString()).ToHashSet();
+        var txIdStrings = txIds.Select(id => id.ToString()).ToHashSet();
+
+        // Combine all IDs that could appear as EntityId for this subject
+        var allEntityIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { subjectId };
+        foreach (var id in analysisIds) allEntityIds.Add(id);
+        foreach (var id in txIdStrings) allEntityIds.Add(id);
+
         var auditEntries = await _db.AuditLogs
-            .Where(a => a.TenantId == tenantId && a.EntityId == subjectId)
+            .Where(a => a.TenantId == tenantId && allEntityIds.Contains(a.EntityId))
             .OrderByDescending(a => a.CreatedAt)
             .Take(500)
             .ToListAsync(ct);
