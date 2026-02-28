@@ -591,22 +591,26 @@ public class PaystackBillingService : IBillingService
     }
 
     /// <summary>
-    /// Look up a customer's subscription code from Paystack's subscriptions list API.
-    /// Returns the first active subscription matching the customer (and optionally the plan).
+    /// Look up a customer's subscription code via Paystack's customer fetch API.
+    /// GET /customer/{customer_code} returns subscriptions embedded in the customer object.
+    /// The subscription list API requires a numeric ID, but the customer API accepts the code.
     /// </summary>
     private async Task<string?> LookupSubscriptionCodeAsync(
         string customerCode, string planCode, CancellationToken ct)
     {
         try
         {
-            // Paystack GET /subscription?customer={id}&plan={id} — filter by customer
-            var path = $"/subscription?customer={Uri.EscapeDataString(customerCode)}&perPage=10";
+            // Paystack GET /customer/{customer_code} — returns full customer with subscriptions array
+            var path = $"/customer/{Uri.EscapeDataString(customerCode)}";
             var response = await _http.GetAsync(path, ct);
             var body = await response.Content.ReadAsStringAsync(ct);
 
+            _logger.LogInformation("Paystack customer lookup for {Code}: HTTP {Status}, body length={Len}",
+                customerCode, (int)response.StatusCode, body.Length);
+
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("Paystack subscription lookup failed ({StatusCode}): {Body}",
+                _logger.LogWarning("Paystack customer lookup failed ({StatusCode}): {Body}",
                     response.StatusCode, body);
                 return null;
             }
@@ -614,32 +618,55 @@ public class PaystackBillingService : IBillingService
             using var doc = JsonDocument.Parse(body);
             var root = doc.RootElement;
 
-            if (!root.TryGetProperty("data", out var dataArr) || dataArr.ValueKind != JsonValueKind.Array)
+            if (!root.TryGetProperty("data", out var data))
                 return null;
+
+            // Customer object has "subscriptions" array
+            if (!data.TryGetProperty("subscriptions", out var subsArr) || subsArr.ValueKind != JsonValueKind.Array)
+            {
+                _logger.LogInformation("Customer {Code} has no subscriptions array", customerCode);
+                return null;
+            }
+
+            _logger.LogInformation("Customer {Code} has {Count} subscription(s)", customerCode, subsArr.GetArrayLength());
 
             // Find an active subscription, prefer one matching the plan code
             string? bestMatch = null;
-            foreach (var item in dataArr.EnumerateArray())
+            foreach (var item in subsArr.EnumerateArray())
             {
                 var status = item.TryGetProperty("status", out var st) ? st.GetString() : null;
+                var subCode = item.TryGetProperty("subscription_code", out var sc) ? sc.GetString() : null;
+
+                _logger.LogInformation("  Subscription {SubCode}: status={Status}", subCode ?? "(null)", status ?? "(null)");
+
                 if (!string.Equals(status, "active", StringComparison.OrdinalIgnoreCase) &&
                     !string.Equals(status, "non-renewing", StringComparison.OrdinalIgnoreCase) &&
-                    !string.Equals(status, "attention", StringComparison.OrdinalIgnoreCase))
+                    !string.Equals(status, "attention", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(status, "complete", StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                var subCode = item.TryGetProperty("subscription_code", out var sc) ? sc.GetString() : null;
                 if (string.IsNullOrEmpty(subCode)) continue;
 
                 // If plan matches, return immediately
                 if (!string.IsNullOrEmpty(planCode) && item.TryGetProperty("plan", out var planObj))
                 {
-                    var pc = planObj.TryGetProperty("plan_code", out var pcVal) ? pcVal.GetString() : null;
+                    var pc = planObj.ValueKind == JsonValueKind.Object
+                        ? (planObj.TryGetProperty("plan_code", out var pcVal) ? pcVal.GetString() : null)
+                        : null;
                     if (string.Equals(pc, planCode, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _logger.LogInformation("  → Matched by plan code: {SubCode}", subCode);
                         return subCode;
+                    }
                 }
 
                 bestMatch ??= subCode; // fallback to first active subscription
             }
+
+            if (bestMatch != null)
+                _logger.LogInformation("  → Best match (no plan match): {SubCode}", bestMatch);
+            else
+                _logger.LogInformation("  → No active subscriptions found");
 
             return bestMatch;
         }
