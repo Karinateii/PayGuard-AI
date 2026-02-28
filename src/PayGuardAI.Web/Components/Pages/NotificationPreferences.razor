@@ -9,6 +9,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject IConfiguration Configuration
+@inject IEmailNotificationService EmailService
 
 <PageTitle>Notification Preferences — PayGuard AI</PageTitle>
 
@@ -298,6 +299,42 @@ else
 
     private async Task SendTestEmail(NotificationPreference pref)
     {
-        Snackbar.Add($"Test email would be sent to {pref.Email}", Severity.Info);
+        try
+        {
+            var subject = "✅ PayGuard AI — Test Notification";
+            var html = $@"
+<!DOCTYPE html>
+<html>
+<head><meta charset='utf-8'/></head>
+<body style='font-family:Segoe UI,Roboto,Arial,sans-serif;margin:0;padding:0;background:#f5f5f5;'>
+  <div style='max-width:600px;margin:20px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1);'>
+    <div style='background:#388E3C;padding:20px 24px;'>
+      <h1 style='color:#fff;margin:0;font-size:20px;'>✅ Test Notification</h1>
+    </div>
+    <div style='padding:24px;'>
+      <p style='color:#333;'>Hi {pref.DisplayName},</p>
+      <p style='color:#555;'>This is a test notification from PayGuard AI to confirm your email preferences are working correctly.</p>
+      <table style='width:100%;border-collapse:collapse;margin:16px 0;'>
+        <tr><td style='padding:8px 0;color:#666;'>Risk Alerts</td><td style='padding:8px 0;font-weight:600;'>{(pref.RiskAlertsEnabled ? "✅ Enabled" : "❌ Disabled")}</td></tr>
+        <tr><td style='padding:8px 0;color:#666;'>Daily Summary</td><td style='padding:8px 0;font-weight:600;'>{(pref.DailySummaryEnabled ? "✅ Enabled" : "❌ Disabled")}</td></tr>
+        <tr><td style='padding:8px 0;color:#666;'>Review Assignments</td><td style='padding:8px 0;font-weight:600;'>{(pref.ReviewAssignmentsEnabled ? "✅ Enabled" : "❌ Disabled")}</td></tr>
+        <tr><td style='padding:8px 0;color:#666;'>Team Invites</td><td style='padding:8px 0;font-weight:600;'>{(pref.TeamInvitesEnabled ? "✅ Enabled" : "❌ Disabled")}</td></tr>
+        <tr><td style='padding:8px 0;color:#666;'>Min Risk Score</td><td style='padding:8px 0;font-weight:600;'>{pref.MinimumRiskScoreForAlert}</td></tr>
+      </table>
+    </div>
+    <div style='padding:16px 24px;background:#fafafa;border-top:1px solid #eee;font-size:12px;color:#999;text-align:center;'>
+      PayGuard AI — Compliance Transaction Monitoring
+    </div>
+  </div>
+</body>
+</html>";
+
+            await EmailService.SendNotificationEmailAsync(pref.Email, pref.DisplayName, subject, html);
+            Snackbar.Add($"Test email sent to {pref.Email}", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to send test email: {ex.Message}", Severity.Error);
+        }
     }
 }

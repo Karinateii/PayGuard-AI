@@ -26,8 +26,8 @@ public class RiskScoringService : IRiskScoringService
     private const int MediumRiskThreshold = 50;
     private const int HighRiskThreshold = 75;
 
-    // Auto-approve threshold (low risk transactions bypass HITL)
-    private const int AutoApproveThreshold = 25;
+    // Fallback auto-approve threshold when tenant settings are unavailable
+    private const int DefaultAutoApproveThreshold = 25;
 
     public RiskScoringService(
         ApplicationDbContext context,
@@ -274,8 +274,21 @@ public class RiskScoringService : IRiskScoringService
             _ => RiskLevel.Critical
         };
 
-        // Determine review status (HITL logic)
-        var reviewStatus = totalScore <= AutoApproveThreshold 
+        // Determine review status (HITL logic) — use tenant-configured threshold
+        var autoApproveThreshold = DefaultAutoApproveThreshold;
+        try
+        {
+            var settings = await _context.OrganizationSettings
+                .FirstOrDefaultAsync(s => s.TenantId == _tenantContext.TenantId, cancellationToken);
+            if (settings != null)
+                autoApproveThreshold = settings.AutoApproveThreshold;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to load tenant auto-approve threshold, using default {Default}", DefaultAutoApproveThreshold);
+        }
+
+        var reviewStatus = totalScore <= autoApproveThreshold 
             ? ReviewStatus.AutoApproved 
             : ReviewStatus.Pending;
 

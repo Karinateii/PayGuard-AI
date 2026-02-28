@@ -98,7 +98,7 @@ PayGuard AI automates the first line of defense while keeping humans in control 
 - 👆 **Swipe-to-Review** — Swipe right to approve, left to reject on mobile review queue
 - 🔄 **Pull-to-Refresh** — Touch-native refresh gesture on review and transaction lists
 - 📐 **Responsive Layout** — Auto-closing drawer on mobile, compact cards, 48px touch targets
-- 🔔 **Web Push Notifications** — Service worker push support for real-time alerts
+- 🔔 **Real-time Alerts** — SignalR-powered instant notifications and toast alerts for new transactions
 
 ## Tech Stack
 

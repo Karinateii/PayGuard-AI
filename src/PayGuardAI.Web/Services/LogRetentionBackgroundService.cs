@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PayGuardAI.Core.Entities;
 using PayGuardAI.Core.Services;
 using PayGuardAI.Data;
 
@@ -77,15 +78,9 @@ public class LogRetentionBackgroundService : BackgroundService
 
     private async Task SendDailySummaryIfDueAsync(CancellationToken ct)
     {
-        var enabled = _config.GetValue("LogRetention:DailySummaryEnabled", false);
-        if (!enabled) return;
-
-        var recipients = _config.GetValue<string>("LogRetention:DailySummaryRecipients");
-        if (string.IsNullOrWhiteSpace(recipients)) return;
-
-        // Only run the summary once per day (check if we've already sent today)
+        // Only run the summary once per day (between 6-8 AM UTC)
         var now = DateTime.UtcNow;
-        if (now.Hour < 6 || now.Hour > 8) return; // Only try between 6-8 AM UTC
+        if (now.Hour < 6 || now.Hour > 8) return;
 
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -93,82 +88,50 @@ public class LogRetentionBackgroundService : BackgroundService
 
         var since = now.AddHours(-24);
 
-        // Gather stats
-        var logs = await db.SystemLogs
-            .IgnoreQueryFilters()
-            .Where(l => l.CreatedAt >= since)
-            .ToListAsync(ct);
-
-        var errorCount = logs.Count(l => l.Level == "Error" || l.Level == "Fatal");
-        var warningCount = logs.Count(l => l.Level == "Warning");
-        var totalCount = logs.Count;
-
-        // Transaction stats
-        var txnCount = await db.Transactions
+        // Get all tenants that have activity
+        var tenantIds = await db.Transactions
             .IgnoreQueryFilters()
             .Where(t => t.CreatedAt >= since)
-            .CountAsync(ct);
+            .Select(t => t.TenantId)
+            .Distinct()
+            .ToListAsync(ct);
 
-        var highRiskCount = await db.RiskAnalyses
-            .IgnoreQueryFilters()
-            .Where(r => r.AnalyzedAt >= since && r.RiskScore >= 70)
-            .CountAsync(ct);
-
-        var html = $"""
-            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
-                <div style="background:#1a237e;color:white;padding:20px;border-radius:8px 8px 0 0;">
-                    <h2 style="margin:0;">📊 PayGuard AI — Daily Summary</h2>
-                    <p style="margin:8px 0 0;opacity:0.9;">{now:yyyy-MM-dd}</p>
-                </div>
-                <div style="padding:20px;border:1px solid #e0e0e0;border-top:none;">
-                    <h3>System Health</h3>
-                    <table style="width:100%;border-collapse:collapse;">
-                        <tr>
-                            <td style="padding:8px;border-bottom:1px solid #eee;"><strong>🔴 Errors</strong></td>
-                            <td style="padding:8px;border-bottom:1px solid #eee;color:{(errorCount > 0 ? "#D32F2F" : "#4CAF50")};">{errorCount}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding:8px;border-bottom:1px solid #eee;"><strong>🟡 Warnings</strong></td>
-                            <td style="padding:8px;border-bottom:1px solid #eee;">{warningCount}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding:8px;border-bottom:1px solid #eee;"><strong>📝 Total Log Events</strong></td>
-                            <td style="padding:8px;border-bottom:1px solid #eee;">{totalCount}</td>
-                        </tr>
-                    </table>
-
-                    <h3 style="margin-top:20px;">Business Metrics (24h)</h3>
-                    <table style="width:100%;border-collapse:collapse;">
-                        <tr>
-                            <td style="padding:8px;border-bottom:1px solid #eee;"><strong>💸 Transactions Processed</strong></td>
-                            <td style="padding:8px;border-bottom:1px solid #eee;">{txnCount}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding:8px;border-bottom:1px solid #eee;"><strong>🚨 High-Risk Flags</strong></td>
-                            <td style="padding:8px;border-bottom:1px solid #eee;color:{(highRiskCount > 0 ? "#F57C00" : "#4CAF50")};">{highRiskCount}</td>
-                        </tr>
-                    </table>
-
-                    {(errorCount > 5 ? "<div style='margin-top:16px;padding:12px;background:#FFEBEE;border-left:4px solid #D32F2F;border-radius:4px;'><strong>⚠️ Alert:</strong> High error count detected. Check the System Logs page for details.</div>" : "")}
-                </div>
-                <div style="padding:12px;background:#f5f5f5;border-radius:0 0 8px 8px;border:1px solid #e0e0e0;border-top:none;">
-                    <p style="margin:0;color:#666;font-size:12px;">Automated daily summary from PayGuard AI. Manage at Admin → System Logs.</p>
-                </div>
-            </div>
-            """;
-
-        foreach (var email in recipients.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach (var tenantId in tenantIds)
         {
             try
             {
-                await emailService.SendNotificationEmailAsync(
-                    email, email.Split('@')[0],
-                    $"[PayGuard AI] Daily Summary — {errorCount} errors, {txnCount} transactions",
-                    html, ct);
+                // Gather per-tenant stats
+                var transactions = await db.Transactions
+                    .IgnoreQueryFilters()
+                    .Where(t => t.TenantId == tenantId && t.CreatedAt >= since)
+                    .ToListAsync(ct);
+
+                var analyses = await db.RiskAnalyses
+                    .IgnoreQueryFilters()
+                    .Where(r => r.TenantId == tenantId && r.AnalyzedAt >= since)
+                    .ToListAsync(ct);
+
+                var summary = new DailySummaryData
+                {
+                    ReportDate = now.Date,
+                    TotalTransactions = transactions.Count,
+                    ApprovedTransactions = analyses.Count(a => a.ReviewStatus == ReviewStatus.AutoApproved || a.ReviewStatus == ReviewStatus.Approved),
+                    FlaggedTransactions = analyses.Count(a => a.RiskScore >= 50),
+                    RejectedTransactions = analyses.Count(a => a.ReviewStatus == ReviewStatus.Rejected),
+                    PendingReview = analyses.Count(a => a.ReviewStatus == ReviewStatus.Pending || a.ReviewStatus == ReviewStatus.Escalated),
+                    ReviewsCompleted = analyses.Count(a => a.ReviewStatus == ReviewStatus.Approved || a.ReviewStatus == ReviewStatus.Rejected),
+                    TotalVolume = transactions.Sum(t => t.Amount),
+                    Currency = transactions.FirstOrDefault()?.SourceCurrency ?? "USD",
+                    CriticalAlerts = analyses.Count(a => a.RiskLevel == RiskLevel.Critical),
+                    HighRiskAlerts = analyses.Count(a => a.RiskLevel == RiskLevel.High),
+                    AverageRiskScore = analyses.Count > 0 ? analyses.Average(a => a.RiskScore) : 0
+                };
+
+                await emailService.SendDailySummaryEmailAsync(tenantId, summary, ct);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to send daily summary to {Email}", email);
+                _logger.LogWarning(ex, "Failed to send daily summary for tenant {TenantId}", tenantId);
             }
         }
     }

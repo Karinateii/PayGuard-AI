@@ -21,9 +21,6 @@ public class NotificationPreference
     // Threshold — only alert if risk score >= this value
     public int MinimumRiskScoreForAlert { get; set; } = 50;
 
-    // Digest preference: "instant", "hourly", "daily"
-    public string DigestFrequency { get; set; } = "instant";
-
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
