@@ -74,13 +74,15 @@ public class PaystackBillingService : IBillingService
             throw new InvalidOperationException($"No Paystack plan code configured for plan {plan}. Set Paystack:{plan}PlanCode in config.");
 
         // Paystack uses "initialize transaction" with a plan code to start a subscription.
-        // Amount is required by the API even with a plan (plan overrides it).
+        // Amount must be non-zero (kobo) — the plan overrides it, but amount=0 breaks the redirect.
+        var amountKobo = GetPlanAmountKobo(plan);
         var payload = new
         {
             email,
-            amount = 0,
+            amount = amountKobo,
             plan = planCode,
             callback_url = callbackUrl,
+            channels = new[] { "card", "bank", "bank_transfer" },
             metadata = new { tenantId, plan = plan.ToString() }
         };
 
@@ -451,6 +453,19 @@ public class PaystackBillingService : IBillingService
         BillingPlan.Pro        => _config["Paystack:ProPlanCode"] ?? string.Empty,
         BillingPlan.Enterprise => _config["Paystack:EnterprisePlanCode"] ?? string.Empty,
         _ => string.Empty
+    };
+
+    /// <summary>
+    /// Plan amounts in kobo (100 kobo = ₦1). These match the Paystack dashboard plan amounts.
+    /// The plan code overrides the amount, but Paystack requires a non-zero amount for
+    /// proper redirect behavior after checkout.
+    /// </summary>
+    private static long GetPlanAmountKobo(BillingPlan plan) => plan switch
+    {
+        BillingPlan.Starter    => 15_000_000,   // ₦150,000
+        BillingPlan.Pro        => 80_000_000,   // ₦800,000
+        BillingPlan.Enterprise => 320_000_000,  // ₦3,200,000
+        _ => 15_000_000
     };
 
     private BillingPlan MapPlanCodeToPlan(string? planCode)

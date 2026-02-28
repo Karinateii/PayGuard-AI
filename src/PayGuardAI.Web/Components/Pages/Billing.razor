@@ -220,10 +220,19 @@ else
     [SupplyParameterFromQuery(Name = "success")]
     public bool SuccessParam { get; set; }
 
+    /// <summary>Paystack appends trxref after successful checkout redirect.</summary>
+    [SupplyParameterFromQuery(Name = "trxref")]
+    public string? TrxRef { get; set; }
+
+    /// <summary>Paystack appends reference after successful checkout redirect.</summary>
+    [SupplyParameterFromQuery(Name = "reference")]
+    public string? Reference { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
         _billingEnabled = bool.TryParse(Config["FeatureFlags:BillingEnabled"], out var b) && b;
-        _success = SuccessParam;
+        // Detect success from our own param OR Paystack's redirect params (trxref/reference)
+        _success = SuccessParam || !string.IsNullOrEmpty(TrxRef) || !string.IsNullOrEmpty(Reference);
 
         if (_billingEnabled)
         {

@@ -241,7 +241,8 @@
         try
         {
             var billingService = BillingFactory.GetDefault();
-            var baseUrl = Config["AppUrl"] ?? Nav.BaseUri.TrimEnd('/');
+            // Use the actual browser URL (not AppUrl config) so redirect works in any environment
+            var baseUrl = Nav.BaseUri.TrimEnd('/');
             var callbackUrl = $"{baseUrl}/billing?success=true";
 
             var checkoutUrl = await billingService.CreateCheckoutSessionAsync(
