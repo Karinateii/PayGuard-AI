@@ -100,9 +100,14 @@ else
                                     <MudNumericField T="int" Value="@context.MinimumRiskScoreForAlert"
                                                      ValueChanged="@(async (int v) => await UpdateMinScore(context, v))"
                                                      Min="0" Max="100" Margin="Margin.Dense"
-                                                     Variant="Variant.Outlined" Style="max-width:80px;" />
+                                                     Variant="Variant.Outlined" Style="min-width:100px;" />
                                 </MudTd>
                                 <MudTd DataLabel="Actions">
+                                    <MudTooltip Text="Send test email">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Send"
+                                                       Color="Color.Primary" Size="Size.Small"
+                                                       OnClick="@(() => SendTestEmail(context))" />
+                                    </MudTooltip>
                                     <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                                    Color="Color.Error" Size="Size.Small"
                                                    OnClick="@(() => RemoveRecipient(context))" />
