@@ -123,7 +123,6 @@ public class DatabaseMigrationService : IDatabaseMigrationService
             ("TenantSubscriptions",     "PaystackSubscriptionCode", ""),
             ("TenantSubscriptions",     "BillingEmail", ""),
             ("TenantSubscriptions",     "Provider", "paystack"),
-            ("TenantSubscriptions",     "PendingPlan", ""),
             ("TenantSubscriptions",     "PendingPlanCode", ""),
 
             // ── NotificationPreference extras ──
@@ -224,6 +223,10 @@ public class DatabaseMigrationService : IDatabaseMigrationService
 
         // ── MFA: nullable timestamp on TeamMembers ──
         await AddNullableTimestampColumnIfMissing(dbType, "TeamMembers", "MfaEnabledAt");
+
+        // ── Enum columns: must be INTEGER, not TEXT ──
+        // PendingPlan is BillingPlan? (nullable enum) — stored as INTEGER NULL
+        await AddNullableIntColumnIfMissing(dbType, "TenantSubscriptions", "PendingPlan");
     }
 
     /// <summary>
@@ -348,6 +351,78 @@ public class DatabaseMigrationService : IDatabaseMigrationService
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Skipping timestamp column migration for {Table}.{Column}", table, column);
+        }
+    }
+
+    /// <summary>
+    /// Adds a nullable integer column (for enums stored as int).
+    /// PostgreSQL: INTEGER NULL.  SQLite: INTEGER NULL.
+    /// If the column already exists as TEXT (from a previous buggy migration), drops and re-creates it.
+    /// </summary>
+    private async Task AddNullableIntColumnIfMissing(string dbType, string table, string column)
+    {
+        try
+        {
+            bool exists = false;
+
+            if (dbType == "PostgreSQL")
+            {
+                var checkSql = $"SELECT COUNT(*) FROM information_schema.columns WHERE table_name = '{table}' AND column_name = '{column}'";
+                await using var cmd = _context.Database.GetDbConnection().CreateCommand();
+                await _context.Database.OpenConnectionAsync();
+                cmd.CommandText = checkSql;
+                exists = Convert.ToInt64(await cmd.ExecuteScalarAsync()) > 0;
+
+                if (!exists)
+                {
+                    await _context.Database.ExecuteSqlRawAsync(
+                        $"""ALTER TABLE "{table}" ADD COLUMN "{column}" INTEGER NULL""");
+                    _logger.LogInformation("Added nullable int column {Column} to {Table}", column, table);
+                }
+                else
+                {
+                    // Column might exist as wrong type (TEXT) from a previous migration — fix it
+                    var typeSql = $"SELECT data_type FROM information_schema.columns WHERE table_name = '{table}' AND column_name = '{column}'";
+                    cmd.CommandText = typeSql;
+                    var dataType = (await cmd.ExecuteScalarAsync())?.ToString();
+                    if (dataType == "text")
+                    {
+                        // Drop the TEXT column and re-add with correct INTEGER type
+                        await _context.Database.ExecuteSqlRawAsync(
+                            $"""ALTER TABLE "{table}" DROP COLUMN "{column}" """);
+                        await _context.Database.ExecuteSqlRawAsync(
+                            $"""ALTER TABLE "{table}" ADD COLUMN "{column}" INTEGER NULL""");
+                        _logger.LogInformation("Fixed column type for {Column} in {Table}: TEXT → INTEGER (nullable)", column, table);
+                    }
+                }
+            }
+            else
+            {
+                // SQLite
+                await using var cmd = _context.Database.GetDbConnection().CreateCommand();
+                await _context.Database.OpenConnectionAsync();
+                cmd.CommandText = $"PRAGMA table_info({table})";
+                await using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    if (reader.GetString(1).Equals(column, StringComparison.OrdinalIgnoreCase))
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+
+                if (!exists)
+                {
+                    await _context.Database.ExecuteSqlRawAsync(
+                        $"ALTER TABLE {table} ADD COLUMN {column} INTEGER NULL");
+                    _logger.LogInformation("Added nullable int column {Column} to {Table}", column, table);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipping nullable int column migration for {Table}.{Column}", table, column);
         }
     }
 
