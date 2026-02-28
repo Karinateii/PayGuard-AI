@@ -66,15 +66,14 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor 
         | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
-    options.KnownNetworks.Clear();
+    options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
 });
 
-// Configure DataProtection to persist keys (prevents session cookie errors on restart)
-var keysDir = Path.Combine(builder.Environment.ContentRootPath, "keys");
-Directory.CreateDirectory(keysDir);
+// Configure DataProtection to persist keys in the database
+// This survives Railway container redeploys — users stay logged in across deployments.
 builder.Services.AddDataProtection()
-    .PersistKeysToFileSystem(new DirectoryInfo(keysDir))
+    .PersistKeysToDbContext<ApplicationDbContext>()
     .SetApplicationName("PayGuardAI");
 
 // Add session for demo authentication state
@@ -144,8 +143,9 @@ builder.Services.AddRateLimiter(options =>
     });
 });
 
-// Add basic monitoring (logging handled by Serilog)
-builder.Services.AddHealthChecks();
+// Add health checks — basic liveness + database connectivity
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<ApplicationDbContext>("database", tags: ["ready"]);
 
 // Add Entity Framework with feature flag-based database selection
 var usePostgres = builder.Configuration.IsPostgresEnabled();
@@ -486,7 +486,16 @@ app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
-app.MapHealthChecks("/health").RequireAuthorization();
+
+// Health endpoints:
+// /health      — unauthenticated (for Docker HEALTHCHECK, Railway, uptime monitors)
+// /health/ready — unauthenticated, includes DB connectivity check
+// /metrics     — admin-only Prometheus scrape endpoint
+app.MapHealthChecks("/health");
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready")
+});
 app.MapMetrics("/metrics").RequireAuthorization("RequireAdmin");  // Prometheus scrape endpoint
 app.MapControllers(); // Map API controllers
 app.MapHub<TransactionHub>("/hubs/transactions"); // SignalR hub

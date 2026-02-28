@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PayGuardAI.Core.Entities;
@@ -9,7 +10,7 @@ namespace PayGuardAI.Data;
 /// Application database context for PayGuard AI.
 /// Applies tenant-scoped global query filters on all entities with TenantId.
 /// </summary>
-public class ApplicationDbContext : DbContext
+public class ApplicationDbContext : DbContext, IDataProtectionKeyContext
 {
     private readonly ITenantContext? _tenantContext;
 
@@ -68,6 +69,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<WatchlistEntry> WatchlistEntries => Set<WatchlistEntry>();
     public DbSet<SystemLog> SystemLogs => Set<SystemLog>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<DataProtectionKey> DataProtectionKeys { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -1,3 +1,7 @@
+// EF1002: All SQL in this file is hardcoded DDL (CREATE TABLE, ALTER TABLE) — not user input.
+// Suppressing the "use ExecuteSqlAsync" warning because DDL cannot use parameterized queries.
+#pragma warning disable EF1002
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -66,6 +70,9 @@ public class DatabaseMigrationService : IDatabaseMigrationService
 
             // Create Watchlists + WatchlistEntries tables (blocklists / allowlists)
             await CreateWatchlistTablesAsync(dbType);
+
+            // Create DataProtectionKeys table (session key persistence across deploys)
+            await CreateDataProtectionKeysTableAsync(dbType);
 
             // Mark existing tenants as onboarded so they aren't redirected
             await MarkExistingTenantsOnboardedAsync(dbType);
@@ -1505,6 +1512,42 @@ public class DatabaseMigrationService : IDatabaseMigrationService
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Skipping Invoices table creation");
+        }
+    }
+
+    /// <summary>
+    /// Creates the DataProtectionKeys table used by ASP.NET Core DataProtection.
+    /// This stores encryption keys in the database so sessions survive container redeploys.
+    /// </summary>
+    private async Task CreateDataProtectionKeysTableAsync(string dbType)
+    {
+        try
+        {
+            if (dbType == "PostgreSQL")
+            {
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS "DataProtectionKeys" (
+                        "Id" SERIAL PRIMARY KEY,
+                        "FriendlyName" TEXT NULL,
+                        "Xml" TEXT NULL
+                    )
+                    """);
+            }
+            else
+            {
+                await _context.Database.ExecuteSqlRawAsync("""
+                    CREATE TABLE IF NOT EXISTS DataProtectionKeys (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        FriendlyName TEXT NULL,
+                        Xml TEXT NULL
+                    )
+                    """);
+            }
+            _logger.LogDebug("DataProtectionKeys table ensured");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipping DataProtectionKeys table creation");
         }
     }
 }

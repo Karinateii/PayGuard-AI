@@ -196,7 +196,7 @@ public class AfriexApiService : IAfriexApiService
         try
         {
             var cacheKey = $"{_tenantContext.TenantId}:rate:{fromCurrency}:{toCurrency}:{amount}";
-            if (_cache.TryGetValue(cacheKey, out ExchangeRateResponse cached))
+            if (_cache.TryGetValue(cacheKey, out ExchangeRateResponse? cached))
             {
                 return cached;
             }

@@ -110,7 +110,26 @@
             <MudMainContent Class="pt-16 px-4">
                 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-4">
                     <CascadingValue Value="@((Func<Task>)ReloadPendingReviewCount)" Name="OnReviewCompleted">
-                        @Body
+                        <ErrorBoundary @ref="_errorBoundary">
+                            <ChildContent>
+                                @Body
+                            </ChildContent>
+                            <ErrorContent Context="ex">
+                                <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="my-4">
+                                    <MudText Typo="Typo.h6">Something went wrong</MudText>
+                                    <MudText Typo="Typo.body2" Class="mt-2">
+                                        An unexpected error occurred while rendering this page.
+                                        Your data is safe — try refreshing or navigating to another page.
+                                    </MudText>
+                                    <MudButton Variant="Variant.Outlined"
+                                               Color="Color.Inherit"
+                                               Class="mt-3"
+                                               OnClick="RecoverFromError">
+                                        Try Again
+                                    </MudButton>
+                                </MudAlert>
+                            </ErrorContent>
+                        </ErrorBoundary>
                     </CascadingValue>
                 </MudContainer>
             </MudMainContent>
@@ -165,6 +184,7 @@
     private string? _homeTenantId;
     private bool _isSuperAdmin;
     private bool _mfaPending;
+    private ErrorBoundary? _errorBoundary;
     private bool _isImpersonating => _isSuperAdmin
         && !string.IsNullOrEmpty(_homeTenantId)
         && !string.IsNullOrEmpty(TenantContext.TenantId)
@@ -363,6 +383,11 @@
     private void ToggleTheme()
     {
         _isDarkMode = !_isDarkMode;
+    }
+
+    private void RecoverFromError()
+    {
+        _errorBoundary?.Recover();
     }
     
     public async ValueTask DisposeAsync()

@@ -133,7 +133,7 @@ public class TransactionService : ITransactionService
         CancellationToken cancellationToken = default)
     {
         var cacheKey = GetCacheKey($"{TransactionsCacheKey}:{pageNumber}:{pageSize}:{riskLevel}:{reviewStatus}");
-        if (_cache.TryGetValue(cacheKey, out IEnumerable<Transaction> cached))
+        if (_cache.TryGetValue(cacheKey, out IEnumerable<Transaction>? cached) && cached != null)
         {
             return cached;
         }
@@ -178,7 +178,7 @@ public class TransactionService : ITransactionService
     public async Task<DashboardStats> GetDashboardStatsAsync(CancellationToken cancellationToken = default)
     {
         var cacheKey = GetCacheKey(DashboardCacheKey);
-        if (_cache.TryGetValue(cacheKey, out DashboardStats cached))
+        if (_cache.TryGetValue(cacheKey, out DashboardStats? cached) && cached != null)
         {
             return cached;
         }
