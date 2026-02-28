@@ -265,6 +265,7 @@ public class RbacService : IRbacService
 
     private static List<Permission>? GetBuiltInPermissions(string roleName) => roleName switch
     {
+        "SuperAdmin" => [.. CustomRole.AdminPermissions],
         "Admin" => [.. CustomRole.AdminPermissions],
         "Manager" => [.. CustomRole.ManagerPermissions],
         "Reviewer" => [.. CustomRole.ReviewerPermissions],
