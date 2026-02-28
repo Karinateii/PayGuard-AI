@@ -119,47 +119,103 @@ public class PaystackBillingService : IBillingService
     public async Task<TenantSubscription?> VerifyCheckoutAsync(
         string tenantId, string reference, CancellationToken ct = default)
     {
-        // Call Paystack's verify endpoint to confirm the transaction was successful
-        var response = await GetAsync<PaystackVerifyResponse>($"/transaction/verify/{reference}", ct);
+        // Call Paystack's verify endpoint using raw JSON to avoid DTO deserialization issues
+        var httpResponse = await _http.GetAsync($"/transaction/verify/{reference}", ct);
+        var body = await httpResponse.Content.ReadAsStringAsync(ct);
 
-        if (response?.Status != true || response.Data == null)
+        if (!httpResponse.IsSuccessStatusCode)
         {
-            _logger.LogWarning("Paystack verify failed for reference {Reference}: {Message}",
-                reference, response?.Message ?? "null response");
+            _logger.LogWarning("Paystack verify HTTP {StatusCode} for {Reference}: {Body}",
+                httpResponse.StatusCode, reference, body);
             return null;
         }
 
-        var data = response.Data;
-        if (!string.Equals(data.Status, "success", StringComparison.OrdinalIgnoreCase))
+        _logger.LogInformation("Paystack verify raw response for {Reference}: {Body}", reference, body);
+
+        // Parse with JsonDocument for maximum resilience
+        using var doc = JsonDocument.Parse(body);
+        var root = doc.RootElement;
+
+        // Check top-level status
+        if (!root.TryGetProperty("status", out var statusProp) || !statusProp.GetBoolean())
         {
-            _logger.LogWarning("Transaction {Reference} status is {Status}, not success",
-                reference, data.Status);
+            _logger.LogWarning("Paystack verify status=false for {Reference}", reference);
             return null;
+        }
+
+        if (!root.TryGetProperty("data", out var data))
+        {
+            _logger.LogWarning("Paystack verify no data for {Reference}", reference);
+            return null;
+        }
+
+        // Check transaction status
+        var txStatus = data.TryGetProperty("status", out var s) ? s.GetString() : null;
+        if (!string.Equals(txStatus, "success", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning("Transaction {Reference} status={Status}", reference, txStatus);
+            return null;
+        }
+
+        // Extract customer info
+        var customerEmail = "";
+        var customerCode = "";
+        if (data.TryGetProperty("customer", out var customer))
+        {
+            customerEmail = customer.TryGetProperty("email", out var e) ? e.GetString() ?? "" : "";
+            customerCode = customer.TryGetProperty("customer_code", out var c) ? c.GetString() ?? "" : "";
+        }
+
+        // Extract plan code (may be in data.plan.plan_code)
+        var planCode = "";
+        if (data.TryGetProperty("plan", out var planObj) && planObj.ValueKind == JsonValueKind.Object)
+        {
+            planCode = planObj.TryGetProperty("plan_code", out var pc) ? pc.GetString() ?? "" : "";
+        }
+
+        // Extract plan from metadata (fallback)
+        var metadataPlanStr = "";
+        if (data.TryGetProperty("metadata", out var metadata) && metadata.ValueKind == JsonValueKind.Object)
+        {
+            // Paystack may nest under "custom_fields" or return flat
+            if (metadata.TryGetProperty("plan", out var mp))
+                metadataPlanStr = mp.GetString() ?? "";
+        }
+
+        // Determine the billing plan
+        BillingPlan plan;
+        if (!string.IsNullOrEmpty(planCode))
+        {
+            plan = MapPlanCodeToPlan(planCode);
+        }
+        else if (Enum.TryParse<BillingPlan>(metadataPlanStr, ignoreCase: true, out var parsed))
+        {
+            plan = parsed;
+        }
+        else
+        {
+            _logger.LogWarning("Could not determine plan from verify response. planCode={PlanCode}, metadata={Meta}",
+                planCode, metadataPlanStr);
+            plan = BillingPlan.Starter; // safe fallback
         }
 
         // Find or create subscription
         var sub = await _db.TenantSubscriptions
-            .FirstOrDefaultAsync(s => s.TenantId == tenantId, ct);
+            .FirstOrDefaultAsync(s2 => s2.TenantId == tenantId, ct);
 
         if (sub == null)
         {
             sub = new TenantSubscription
             {
                 TenantId = tenantId,
-                BillingEmail = data.Customer?.Email ?? string.Empty,
+                BillingEmail = customerEmail,
                 Provider = "paystack"
             };
             _db.TenantSubscriptions.Add(sub);
         }
 
-        // Determine the plan from the plan code or metadata
-        var planCode = data.Plan?.PlanCode ?? string.Empty;
-        var plan = !string.IsNullOrEmpty(planCode)
-            ? MapPlanCodeToPlan(planCode)
-            : MapMetadataToPlan(data.Metadata);
-
-        sub.BillingEmail = data.Customer?.Email ?? sub.BillingEmail;
-        sub.ProviderCustomerId = data.Customer?.CustomerCode ?? sub.ProviderCustomerId;
+        sub.BillingEmail = !string.IsNullOrEmpty(customerEmail) ? customerEmail : sub.BillingEmail;
+        sub.ProviderCustomerId = !string.IsNullOrEmpty(customerCode) ? customerCode : sub.ProviderCustomerId;
         sub.ProviderPlanCode = planCode;
         sub.Provider = "paystack";
         sub.Plan = plan;
@@ -173,8 +229,8 @@ public class PaystackBillingService : IBillingService
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation(
-            "Checkout verified for tenant {TenantId}: Plan={Plan}, Reference={Reference}",
-            tenantId, plan, reference);
+            "Checkout verified for tenant {TenantId}: Plan={Plan}, Reference={Reference}, Email={Email}",
+            tenantId, plan, reference, customerEmail);
 
         return sub;
     }

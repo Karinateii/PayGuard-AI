@@ -33,7 +33,14 @@ else
     @if (_success)
     {
         <MudAlert Severity="Severity.Success" Class="mb-4" ShowCloseIcon="true" CloseIconClicked="@(() => _success = false)">
-            🎉 Subscription activated! Welcome to PayGuard AI @_subscription?.Plan.
+            🎉 Subscription activated! Welcome to PayGuard AI @(_subscription?.Plan.ToString() ?? "Pro").
+        </MudAlert>
+    }
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-4" ShowCloseIcon="true" CloseIconClicked="@(() => _error = null)">
+            @_error
         </MudAlert>
     }
 
@@ -217,6 +224,8 @@ else
     private int _maxApiKeys;
     private int _maxWebhooks;
 
+    private string? _error;
+
     [SupplyParameterFromQuery(Name = "success")]
     public bool SuccessParam { get; set; }
 
@@ -234,14 +243,13 @@ else
 
         if (_billingEnabled)
         {
-            try
-            {
-                _activeBillingService = BillingFactory.GetDefault();
+            _activeBillingService = BillingFactory.GetDefault();
 
-                // If redirected back from Paystack with a transaction reference, verify the payment
-                // and activate the subscription before loading the page.
-                var reference = Reference ?? TrxRef;
-                if (!string.IsNullOrEmpty(reference))
+            // Step 1: If redirected from Paystack, verify the payment and activate subscription
+            var reference = Reference ?? TrxRef;
+            if (!string.IsNullOrEmpty(reference))
+            {
+                try
                 {
                     var verified = await _activeBillingService.VerifyCheckoutAsync(
                         TenantContext.TenantId, reference);
@@ -250,20 +258,37 @@ else
                         _subscription = verified;
                         _success = true;
                     }
+                    else
+                    {
+                        _error = "Payment verification returned no active subscription. " +
+                                 "Your payment was received — the subscription will activate shortly via webhook.";
+                    }
                 }
-
-                // Load subscription (may have been set by verify above)
-                _subscription ??= await _activeBillingService.GetSubscriptionAsync(TenantContext.TenantId);
-
-                // If the subscription has a specific provider, use that provider's service
-                if (_subscription != null && !string.IsNullOrWhiteSpace(_subscription.Provider))
+                catch (Exception ex)
                 {
-                    _activeBillingService = BillingFactory.GetProvider(_subscription.Provider);
+                    _error = $"Payment verification error: {ex.Message}. " +
+                             "Your payment was received — the subscription will activate shortly via webhook.";
                 }
             }
-            catch { /* no subscription yet is fine */ }
 
-            // Fallback: detect success from query param even if verify didn't run
+            // Step 2: Load subscription from DB (may already be set from verify above)
+            if (_subscription == null)
+            {
+                try
+                {
+                    _subscription = await _activeBillingService.GetSubscriptionAsync(TenantContext.TenantId);
+                }
+                catch { /* no subscription yet is fine */ }
+            }
+
+            // Step 3: If subscription uses a specific provider, switch to that service
+            if (_subscription != null && !string.IsNullOrWhiteSpace(_subscription.Provider))
+            {
+                try { _activeBillingService = BillingFactory.GetProvider(_subscription.Provider); }
+                catch { /* keep default */ }
+            }
+
+            // Fallback: detect success from query param
             if (!_success)
                 _success = SuccessParam;
 

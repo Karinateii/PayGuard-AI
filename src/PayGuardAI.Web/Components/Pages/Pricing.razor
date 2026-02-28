@@ -241,9 +241,10 @@
         try
         {
             var billingService = BillingFactory.GetDefault();
-            // Use the actual browser URL (not AppUrl config) so redirect works in any environment
+            // Do NOT add query params here — Paystack appends ?trxref=xxx&reference=xxx
+            // and a double ? would break param parsing
             var baseUrl = Nav.BaseUri.TrimEnd('/');
-            var callbackUrl = $"{baseUrl}/billing?success=true";
+            var callbackUrl = $"{baseUrl}/billing";
 
             var checkoutUrl = await billingService.CreateCheckoutSessionAsync(
                 tenantId: TenantContext.TenantId,
