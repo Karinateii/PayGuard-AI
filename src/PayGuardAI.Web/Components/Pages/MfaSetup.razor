@@ -1,9 +1,13 @@
 @page "/mfa/setup"
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
 @using PayGuardAI.Web.Services
 @inject IMfaService MfaService
+@inject IDbContextFactory<PayGuardAI.Data.ApplicationDbContext> DbFactory
+@inject ITenantContext TenantContext
 @inject NavigationManager Navigation
+@inject ISnackbar Snackbar
 @attribute [Authorize]
 
 <PageTitle>Setup Two-Factor Authentication - PayGuard AI</PageTitle>
@@ -15,7 +19,20 @@
             Setup Two-Factor Authentication
         </MudText>
 
-        @if (!_setupComplete)
+        @if (_alreadyEnabled)
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-2" />
+                Two-factor authentication is already enabled for your account.
+            </MudAlert>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                If you want to reconfigure MFA, disable it first from your Profile page, then set it up again.
+            </MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/profile">
+                Back to Profile
+            </MudButton>
+        }
+        else if (!_setupComplete)
         {
             @if (_step == 1)
             {
@@ -73,8 +90,9 @@
                     <MudButton Variant="Variant.Filled" 
                                Color="Color.Primary" 
                                OnClick="VerifyCode"
-                               Disabled="@(_verificationCode?.Length != 6)">
-                        Verify
+                               Disabled="@(_verificationCode?.Length != 6 || _isSaving)">
+                        @if (_isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                        Verify &amp; Enable
                     </MudButton>
                 </MudStack>
             }
@@ -83,27 +101,24 @@
                 <MudAlert Severity="Severity.Warning" Class="mb-4">
                     <strong>Important:</strong> Save these backup codes in a secure location. 
                     You can use them to access your account if you lose your authenticator device.
+                    Each code can only be used once.
                 </MudAlert>
 
                 <MudPaper Elevation="1" Class="pa-4 mb-4" Style="background-color: #f5f5f5;">
-                    @foreach (var backupCode in _backupCodes)
-                    {
-                        <MudText Typo="Typo.body1" Style="font-family: monospace;">@backupCode</MudText>
-                    }
+                    <MudGrid>
+                        @foreach (var backupCode in _backupCodes)
+                        {
+                            <MudItem xs="6" sm="4">
+                                <MudText Typo="Typo.body1" Style="font-family: monospace; font-size: 1.1rem;">@backupCode</MudText>
+                            </MudItem>
+                        }
+                    </MudGrid>
                 </MudPaper>
-
-                <MudButton Variant="Variant.Filled" 
-                           Color="Color.Success" 
-                           StartIcon="@Icons.Material.Filled.Download"
-                           OnClick="DownloadBackupCodes"
-                           Class="mr-2">
-                    Download Codes
-                </MudButton>
 
                 <MudButton Variant="Variant.Filled" 
                            Color="Color.Primary" 
                            OnClick="CompleteSetup">
-                    Complete Setup
+                    I've saved my codes — Complete Setup
                 </MudButton>
             }
         }
@@ -114,8 +129,8 @@
                 Two-factor authentication has been successfully enabled for your account.
             </MudAlert>
 
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/">
-                Return to Dashboard
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/profile">
+                Return to Profile
             </MudButton>
         }
     </MudPaper>
@@ -131,60 +146,74 @@
     private string _verificationCode = string.Empty;
     private string[] _backupCodes = Array.Empty<string>();
     private string _errorMessage = string.Empty;
-    private bool _setupComplete = false;
+    private bool _setupComplete;
+    private bool _alreadyEnabled;
+    private bool _isSaving;
     private string _userEmail = string.Empty;
+    private Guid _memberId;
 
     protected override async Task OnInitializedAsync()
     {
         if (AuthState != null)
         {
             var authState = await AuthState;
-            _userEmail = authState.User.Identity?.Name ?? "user@payguard.ai";
+            _userEmail = authState.User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
+                      ?? authState.User.FindFirst("email")?.Value
+                      ?? authState.User.Identity?.Name ?? "";
+
+            // Resolve TeamMember ID
+            var homeTenant = authState.User.FindFirst("tenant_id")?.Value ?? TenantContext.TenantId;
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenantId(homeTenant);
+            var member = await db.TeamMembers
+                .FirstOrDefaultAsync(m => m.Email.ToLower() == _userEmail.ToLower());
+
+            if (member != null)
+            {
+                _memberId = member.Id;
+                _alreadyEnabled = member.MfaEnabled;
+            }
         }
 
-        // Generate secret and QR code
-        _secret = MfaService.GenerateSecret();
-        _qrCodeUri = MfaService.GenerateQrCodeUri(_userEmail, _secret);
+        if (!_alreadyEnabled)
+        {
+            _secret = MfaService.GenerateSecret();
+            _qrCodeUri = MfaService.GenerateQrCodeUri(_userEmail, _secret);
+        }
     }
 
-    private void NextStep()
-    {
-        _step++;
-    }
+    private void NextStep() => _step++;
+    private void PreviousStep() => _step--;
 
-    private void PreviousStep()
-    {
-        _step--;
-    }
-
-    private void VerifyCode()
+    private async Task VerifyCode()
     {
         _errorMessage = string.Empty;
+        _isSaving = true;
 
-        if (MfaService.ValidateCode(_secret, _verificationCode))
+        try
         {
-            // Generate backup codes
+            if (!MfaService.ValidateCode(_secret, _verificationCode))
+            {
+                _errorMessage = "Invalid verification code. Please try again.";
+                return;
+            }
+
+            // Code is valid — generate backup codes and persist everything
             _backupCodes = MfaService.GenerateBackupCodes();
-            
-            // TODO: Store secret and backup codes in database associated with user
-            // For now, we'll just proceed to the next step
-            
+            await MfaService.EnableMfaAsync(_memberId, _secret, _backupCodes);
+
+            Snackbar.Add("MFA enabled successfully!", Severity.Success);
             _step++;
         }
-        else
+        catch (Exception ex)
         {
-            _errorMessage = "Invalid verification code. Please try again.";
+            _errorMessage = "An error occurred while enabling MFA. Please try again.";
+            _ = ex; // logged by service
         }
-    }
-
-    private void DownloadBackupCodes()
-    {
-        var content = string.Join("\n", _backupCodes);
-        var bytes = System.Text.Encoding.UTF8.GetBytes(content);
-        var base64 = Convert.ToBase64String(bytes);
-        
-        // This would ideally trigger a download, but for now we'll just show a message
-        _errorMessage = "Download functionality requires JavaScript interop. Please copy the codes manually.";
+        finally
+        {
+            _isSaving = false;
+        }
     }
 
     private void CompleteSetup()

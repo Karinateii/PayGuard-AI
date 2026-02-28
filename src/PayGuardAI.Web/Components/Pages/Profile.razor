@@ -8,6 +8,8 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject ISnackbar Snackbar
 @inject ILogger<Profile> Logger
+@inject PayGuardAI.Web.Services.IMfaService MfaService
+@inject IDialogService DialogService
 
 <PageTitle>My Profile - PayGuard AI</PageTitle>
 
@@ -126,19 +128,51 @@
                 Security
             </MudText>
 
-            <MudList T="string" Dense="true">
-                <MudListItem Icon="@Icons.Material.Filled.VpnKey" Href="/mfa/setup">
-                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Style="width: 100%;">
-                        <div>
-                            <MudText Typo="Typo.body1" Style="font-weight: 600;">Two-Factor Authentication</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                Add an extra layer of security with an authenticator app
-                            </MudText>
-                        </div>
-                        <MudIcon Icon="@Icons.Material.Filled.ChevronRight" />
-                    </MudStack>
-                </MudListItem>
-            </MudList>
+            <MudStack Spacing="3">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <div>
+                        <MudText Typo="Typo.body1" Style="font-weight: 600;">Two-Factor Authentication</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @if (_member!.MfaEnabled)
+                            {
+                                <text>Enabled since @(_member.MfaEnabledAt?.ToString("MMM dd, yyyy") ?? "unknown")</text>
+                            }
+                            else
+                            {
+                                <text>Add an extra layer of security with an authenticator app</text>
+                            }
+                        </MudText>
+                    </div>
+
+                    @if (_member.MfaEnabled)
+                    {
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">
+                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Class="mr-1" />
+                                Enabled
+                            </MudChip>
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Error"
+                                       Size="Size.Small"
+                                       OnClick="DisableMfa"
+                                       Disabled="_isDisablingMfa">
+                                @if (_isDisablingMfa) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" /> }
+                                Disable
+                            </MudButton>
+                        </MudStack>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   Href="/mfa/setup"
+                                   StartIcon="@Icons.Material.Filled.VpnKey">
+                            Setup MFA
+                        </MudButton>
+                    }
+                </MudStack>
+            </MudStack>
         </MudPaper>
     }
 </MudContainer>
@@ -151,6 +185,7 @@
     private string _homeTenantId = string.Empty;
     private bool _isLoading = true;
     private bool _isSaving;
+    private bool _isDisablingMfa;
 
     protected override async Task OnInitializedAsync()
     {
@@ -244,6 +279,34 @@
         finally
         {
             _isSaving = false;
+        }
+    }
+
+    private async Task DisableMfa()
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Disable MFA",
+            "Are you sure you want to disable two-factor authentication? This will remove the extra security layer from your account.",
+            yesText: "Disable MFA", cancelText: "Cancel");
+
+        if (confirmed != true || _member == null) return;
+
+        _isDisablingMfa = true;
+        try
+        {
+            await MfaService.DisableMfaAsync(_member.Id);
+            _member.MfaEnabled = false;
+            _member.MfaEnabledAt = null;
+            Snackbar.Add("Two-factor authentication has been disabled.", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error disabling MFA");
+            Snackbar.Add("Failed to disable MFA.", Severity.Error);
+        }
+        finally
+        {
+            _isDisablingMfa = false;
         }
     }
 

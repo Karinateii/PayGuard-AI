@@ -115,6 +115,8 @@ public class DatabaseMigrationService : IDatabaseMigrationService
             // ── TeamMember extras ──
             ("TeamMembers",             "DisplayName", ""),
             ("TeamMembers",             "Status", "active"),
+            ("TeamMembers",             "MfaSecret", ""),
+            ("TeamMembers",             "BackupCodeHashes", ""),
 
             // ── TenantSubscription extras ──
             ("TenantSubscriptions",     "PaystackPlanCode", ""),
@@ -214,6 +216,12 @@ public class DatabaseMigrationService : IDatabaseMigrationService
         // ── Shadow mode: IsShadow flag on RiskFactors ──
         await AddBooleanColumnIfMissing(dbType, "RiskFactors", "IsShadow");
         await AddBooleanColumnIfMissing(dbType, "RiskFactors", "IsShadow");
+
+        // ── MFA: boolean flag on TeamMembers ──
+        await AddBooleanColumnIfMissing(dbType, "TeamMembers", "MfaEnabled");
+
+        // ── MFA: nullable timestamp on TeamMembers ──
+        await AddNullableTimestampColumnIfMissing(dbType, "TeamMembers", "MfaEnabledAt");
     }
 
     /// <summary>
@@ -284,6 +292,60 @@ public class DatabaseMigrationService : IDatabaseMigrationService
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Skipping boolean column migration for {Table}.{Column}", table, column);
+        }
+    }
+
+    /// <summary>
+    /// Adds a nullable timestamp column (no default).
+    /// PostgreSQL: timestamp with time zone NULL. SQLite: TEXT NULL.
+    /// </summary>
+    private async Task AddNullableTimestampColumnIfMissing(string dbType, string table, string column)
+    {
+        try
+        {
+            bool exists = false;
+
+            if (dbType == "PostgreSQL")
+            {
+                var checkSql = $"SELECT COUNT(*) FROM information_schema.columns WHERE table_name = '{table}' AND column_name = '{column}'";
+                await using var cmd = _context.Database.GetDbConnection().CreateCommand();
+                await _context.Database.OpenConnectionAsync();
+                cmd.CommandText = checkSql;
+                exists = Convert.ToInt64(await cmd.ExecuteScalarAsync()) > 0;
+
+                if (!exists)
+                {
+                    await _context.Database.ExecuteSqlRawAsync(
+                        $"""ALTER TABLE "{table}" ADD COLUMN "{column}" timestamp with time zone NULL""");
+                    _logger.LogInformation("Added nullable timestamp column {Column} to {Table}", column, table);
+                }
+            }
+            else
+            {
+                await using var cmd = _context.Database.GetDbConnection().CreateCommand();
+                await _context.Database.OpenConnectionAsync();
+                cmd.CommandText = $"PRAGMA table_info({table})";
+                await using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    if (reader.GetString(1).Equals(column, StringComparison.OrdinalIgnoreCase))
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+
+                if (!exists)
+                {
+                    await _context.Database.ExecuteSqlRawAsync(
+                        $"ALTER TABLE {table} ADD COLUMN {column} TEXT NULL");
+                    _logger.LogInformation("Added nullable timestamp column {Column} to {Table}", column, table);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipping timestamp column migration for {Table}.{Column}", table, column);
         }
     }
 

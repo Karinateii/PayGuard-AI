@@ -1,117 +1,85 @@
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using OtpNet;
+using PayGuardAI.Data;
 using PayGuardAI.Web.Models;
 
 namespace PayGuardAI.Web.Services;
 
 /// <summary>
-/// TOTP-based Multi-Factor Authentication service
-/// Uses RFC 6238 Time-Based One-Time Password algorithm
+/// TOTP-based Multi-Factor Authentication service with database persistence.
+/// Uses RFC 6238 Time-Based One-Time Password algorithm.
 /// </summary>
 public class TotpMfaService : IMfaService
 {
     private readonly MfaSettings _settings;
     private readonly ILogger<TotpMfaService> _logger;
+    private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
 
     public TotpMfaService(
         IOptions<MfaSettings> settings,
-        ILogger<TotpMfaService> logger)
+        ILogger<TotpMfaService> logger,
+        IDbContextFactory<ApplicationDbContext> dbFactory)
     {
         _settings = settings.Value;
         _logger = logger;
+        _dbFactory = dbFactory;
     }
 
-    /// <summary>
-    /// Generate a new cryptographically secure TOTP secret
-    /// </summary>
+    // ═══════════════════════════════════════════════════════════════
+    // Pure TOTP operations (no DB)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <inheritdoc />
     public string GenerateSecret()
     {
-        // Generate 20 random bytes (160 bits) for RFC 6238 compliance
         var key = KeyGeneration.GenerateRandomKey(20);
         var secret = Base32Encoding.ToString(key);
-        
         _logger.LogInformation("Generated new TOTP secret");
         return secret;
     }
 
-    /// <summary>
-    /// Generate otpauth:// URI for QR code generation
-    /// Compatible with Google Authenticator, Microsoft Authenticator, Authy, etc.
-    /// </summary>
+    /// <inheritdoc />
     public string GenerateQrCodeUri(string userEmail, string secret)
     {
         if (string.IsNullOrWhiteSpace(userEmail))
             throw new ArgumentException("User email is required", nameof(userEmail));
-        
         if (string.IsNullOrWhiteSpace(secret))
             throw new ArgumentException("Secret is required", nameof(secret));
 
-        // Encode for URI (RFC 3986)
         var encodedIssuer = Uri.EscapeDataString(_settings.Issuer);
         var encodedAccount = Uri.EscapeDataString(userEmail);
         var encodedSecret = Uri.EscapeDataString(secret);
 
-        var uri = $"otpauth://totp/{encodedIssuer}:{encodedAccount}?" +
-                  $"secret={encodedSecret}&" +
-                  $"issuer={encodedIssuer}&" +
-                  $"algorithm=SHA1&" +
-                  $"digits=6&" +
-                  $"period={_settings.CodeValiditySeconds}";
-
-        _logger.LogDebug("Generated QR code URI for user {UserEmail}", userEmail);
-        return uri;
+        return $"otpauth://totp/{encodedIssuer}:{encodedAccount}?" +
+               $"secret={encodedSecret}&" +
+               $"issuer={encodedIssuer}&" +
+               $"algorithm=SHA1&" +
+               $"digits=6&" +
+               $"period={_settings.CodeValiditySeconds}";
     }
 
-    /// <summary>
-    /// Validate a TOTP code with time window tolerance
-    /// Accepts codes from previous, current, and next time windows (±30s tolerance)
-    /// </summary>
+    /// <inheritdoc />
     public bool ValidateCode(string secret, string code)
     {
-        if (string.IsNullOrWhiteSpace(secret))
-        {
-            _logger.LogWarning("Validation attempted with empty secret");
+        if (string.IsNullOrWhiteSpace(secret) || string.IsNullOrWhiteSpace(code) || code.Length != 6)
             return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(code) || code.Length != 6)
-        {
-            _logger.LogWarning("Invalid code format: {CodeLength} characters", code?.Length ?? 0);
-            return false;
-        }
 
         try
         {
             var secretBytes = Base32Encoding.ToBytes(secret);
             var totp = new Totp(secretBytes, step: _settings.CodeValiditySeconds);
 
-            // Check current time window
-            var currentCode = totp.ComputeTotp();
-            if (currentCode == code)
-            {
-                _logger.LogInformation("TOTP code validated successfully (current window)");
+            // Check current, previous, and next time window (±30 s tolerance)
+            if (totp.ComputeTotp() == code)
                 return true;
-            }
-
-            // Check previous time window (tolerance for clock skew)
-            var previousCode = totp.ComputeTotp(DateTime.UtcNow.AddSeconds(-_settings.CodeValiditySeconds));
-            if (previousCode == code)
-            {
-                _logger.LogInformation("TOTP code validated successfully (previous window)");
+            if (totp.ComputeTotp(DateTime.UtcNow.AddSeconds(-_settings.CodeValiditySeconds)) == code)
                 return true;
-            }
-
-            // Check next time window (tolerance for clock skew)
-            var nextCode = totp.ComputeTotp(DateTime.UtcNow.AddSeconds(_settings.CodeValiditySeconds));
-            if (nextCode == code)
-            {
-                _logger.LogInformation("TOTP code validated successfully (next window)");
+            if (totp.ComputeTotp(DateTime.UtcNow.AddSeconds(_settings.CodeValiditySeconds)) == code)
                 return true;
-            }
 
-            _logger.LogWarning("TOTP code validation failed");
             return false;
         }
         catch (Exception ex)
@@ -121,71 +89,134 @@ public class TotpMfaService : IMfaService
         }
     }
 
-    /// <summary>
-    /// Generate cryptographically secure backup codes
-    /// Format: XXXX-XXXX for 8-character codes
-    /// </summary>
+    /// <inheritdoc />
     public string[] GenerateBackupCodes(int count = 10)
     {
         var codeCount = count > 0 ? count : _settings.BackupCodeCount;
         var codeLength = _settings.BackupCodeLength;
         var codes = new string[codeCount];
-
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        
+
         for (int i = 0; i < codeCount; i++)
         {
-            var code = new StringBuilder();
+            var sb = new StringBuilder();
             var randomBytes = RandomNumberGenerator.GetBytes(codeLength);
-            
             foreach (var b in randomBytes)
-            {
-                code.Append(chars[b % chars.Length]);
-            }
+                sb.Append(chars[b % chars.Length]);
 
-            // Format: XXXX-XXXX for readability
-            var formatted = code.ToString();
-            if (formatted.Length == 8)
-            {
-                formatted = $"{formatted.Substring(0, 4)}-{formatted.Substring(4, 4)}";
-            }
-
-            codes[i] = formatted;
+            var formatted = sb.ToString();
+            codes[i] = formatted.Length == 8
+                ? $"{formatted[..4]}-{formatted[4..]}"
+                : formatted;
         }
 
         _logger.LogInformation("Generated {Count} backup codes", codeCount);
         return codes;
     }
 
-    /// <summary>
-    /// Determine if MFA is required based on user roles and settings
-    /// </summary>
+    /// <inheritdoc />
     public bool IsMfaRequiredForUser(string[] userRoles)
     {
         if (_settings.EnforceMfaForAll)
-        {
-            _logger.LogDebug("MFA required: EnforceMfaForAll is enabled");
             return true;
-        }
-
-        if (userRoles == null || userRoles.Length == 0)
-        {
-            _logger.LogDebug("MFA not required: No roles assigned");
+        if (userRoles is null || userRoles.Length == 0)
             return false;
-        }
+        return userRoles.Any(r => _settings.RequiredMfaRoles.Contains(r, StringComparer.OrdinalIgnoreCase));
+    }
 
-        var requiresMfa = userRoles.Any(role => 
-            _settings.RequiredMfaRoles.Contains(role, StringComparer.OrdinalIgnoreCase));
+    // ═══════════════════════════════════════════════════════════════
+    // Persistence methods
+    // ═══════════════════════════════════════════════════════════════
 
-        if (requiresMfa)
+    /// <inheritdoc />
+    public async Task EnableMfaAsync(Guid memberId, string secret, string[] backupCodes, CancellationToken ct = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var member = await db.TeamMembers.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(m => m.Id == memberId, ct);
+
+        if (member is null)
         {
-            _logger.LogDebug("MFA required: User has role requiring MFA");
-        }
-        else
-        {
-            _logger.LogDebug("MFA not required: User roles do not require MFA");
+            _logger.LogWarning("EnableMfa: TeamMember {Id} not found", memberId);
+            return;
         }
 
-        return requiresMfa;
+        member.MfaEnabled = true;
+        member.MfaSecret = secret;
+        member.MfaEnabledAt = DateTime.UtcNow;
+        member.BackupCodeHashes = string.Join(",", backupCodes.Select(HashCode));
+
+        await db.SaveChangesAsync(ct);
+        _logger.LogInformation("MFA enabled for {Email} ({Id})", member.Email, memberId);
+    }
+
+    /// <inheritdoc />
+    public async Task DisableMfaAsync(Guid memberId, CancellationToken ct = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var member = await db.TeamMembers.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(m => m.Id == memberId, ct);
+
+        if (member is null) return;
+
+        member.MfaEnabled = false;
+        member.MfaSecret = string.Empty;
+        member.BackupCodeHashes = string.Empty;
+        member.MfaEnabledAt = null;
+
+        await db.SaveChangesAsync(ct);
+        _logger.LogInformation("MFA disabled for {Email} ({Id})", member.Email, memberId);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> IsMfaEnabledAsync(Guid memberId, CancellationToken ct = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var member = await db.TeamMembers.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(m => m.Id == memberId, ct);
+        return member?.MfaEnabled ?? false;
+    }
+
+    /// <inheritdoc />
+    public async Task<string> GetMfaSecretAsync(Guid memberId, CancellationToken ct = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var member = await db.TeamMembers.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(m => m.Id == memberId, ct);
+        return member?.MfaSecret ?? string.Empty;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> ValidateBackupCodeAsync(Guid memberId, string code, CancellationToken ct = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        var member = await db.TeamMembers.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(m => m.Id == memberId, ct);
+
+        if (member is null || string.IsNullOrEmpty(member.BackupCodeHashes))
+            return false;
+
+        var hashed = HashCode(code.Trim().ToUpperInvariant());
+        var storedHashes = member.BackupCodeHashes.Split(',').ToList();
+
+        if (!storedHashes.Contains(hashed))
+            return false;
+
+        // Remove the used code
+        storedHashes.Remove(hashed);
+        member.BackupCodeHashes = string.Join(",", storedHashes);
+        await db.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Backup code used for {Email} — {Remaining} codes remaining",
+            member.Email, storedHashes.Count);
+        return true;
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────
+
+    private static string HashCode(string code)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(code.Trim().ToUpperInvariant()));
+        return Convert.ToHexStringLower(bytes);
     }
 }
