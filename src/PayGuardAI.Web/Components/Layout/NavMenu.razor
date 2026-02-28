@@ -17,8 +17,8 @@
         Compliance Reports
     </MudNavLink>
 
-    @* ── Manager+ only ────────────────────────────────────────────── *@
-    <AuthorizeView Roles="Manager,Admin,SuperAdmin">
+    @* ── Permission-gated items (Manager / Custom roles) ──────── *@
+    <AuthorizeView Policy="CanManageRules">
         <Authorized>
             <MudNavLink Href="/rules" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Rule">
                 Risk Rules
@@ -26,56 +26,100 @@
             <MudNavLink Href="/watchlists" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.PlaylistAddCheck">
                 Watchlists
             </MudNavLink>
-            <MudNavLink Href="/network" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Hub">
-                Network Analysis
-            </MudNavLink>
             <MudNavLink Href="/rules/marketplace" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Store">
                 Rule Marketplace
             </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+    <AuthorizeView Policy="CanViewTransactions">
+        <Authorized>
+            <MudNavLink Href="/network" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Hub">
+                Network Analysis
+            </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+    <AuthorizeView Policy="CanManageBilling">
+        <Authorized>
             <MudNavLink Href="/billing" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CreditCard">
                 Billing
             </MudNavLink>
             <MudNavLink Href="/billing/invoices" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ReceiptLong">
                 Invoices
             </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+    <AuthorizeView Policy="CanViewAuditLog">
+        <Authorized>
             <MudNavLink Href="/audit" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.History">
                 Audit Log
             </MudNavLink>
         </Authorized>
     </AuthorizeView>
 
-    @* ── Admin+ only ──────────────────────────────────────────────── *@
-    <AuthorizeView Roles="Admin,SuperAdmin">
+    @* ── Admin-level items (permission-gated) ────────────────────── *@
+    <AuthorizeView Policy="CanManageBilling">
         <Authorized>
             <MudDivider Class="my-2" />
             <MudText Typo="Typo.overline" Class="ml-4 mt-1" Color="Color.Secondary">Admin</MudText>
             <MudNavLink Href="/pricing" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Paid">
                 Pricing
             </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+    <AuthorizeView Policy="CanManageSettings">
+        <Authorized>
             <MudNavLink Href="/admin/settings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Settings">
                 Organization
             </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+    <AuthorizeView Policy="CanManageTeam">
+        <Authorized>
             <MudNavLink Href="/admin/team" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Group">
                 Team
             </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+    <AuthorizeView Policy="CanManageRoles">
+        <Authorized>
             <MudNavLink Href="/admin/roles" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AdminPanelSettings">
                 Roles &amp; Permissions
             </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+    <AuthorizeView Policy="CanManageApiKeys">
+        <Authorized>
             <MudNavLink Href="/admin/api-keys" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Key">
                 API Keys
             </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+    <AuthorizeView Policy="CanManageWebhooks">
+        <Authorized>
             <MudNavLink Href="/admin/webhooks" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Webhook">
                 Webhooks
             </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+    <AuthorizeView Policy="CanViewReports">
+        <Authorized>
             <MudNavLink Href="/admin/analytics" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Analytics">
                 Analytics
             </MudNavLink>
             <MudNavLink Href="/admin/reports" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Assessment">
                 Advanced Reports
             </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+    <AuthorizeView Policy="CanManageNotifications">
+        <Authorized>
             <MudNavLink Href="/admin/notifications" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.NotificationsActive">
                 Notifications
             </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+    <AuthorizeView Policy="CanManageSettings">
+        <Authorized>
             <MudNavLink Href="/admin/ml-models" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Psychology">
                 ML Risk Models
             </MudNavLink>

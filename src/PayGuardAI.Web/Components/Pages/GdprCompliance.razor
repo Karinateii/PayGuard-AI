@@ -1,6 +1,6 @@
 @page "/admin/gdpr"
 @using Microsoft.AspNetCore.Authorization
-@attribute [Authorize(Roles = "Admin,SuperAdmin,Manager")]
+@attribute [Authorize(Policy = "CanManageSettings")]
 @inject PayGuardAI.Core.Services.IGdprService GdprService
 @inject PayGuardAI.Core.Services.ITenantContext TenantContext
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser

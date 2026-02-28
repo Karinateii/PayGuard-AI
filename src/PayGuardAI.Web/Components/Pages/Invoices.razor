@@ -3,7 +3,7 @@
 @using PayGuardAI.Core.Entities
 @using PayGuardAI.Core.Services
 @using PayGuardAI.Data.Services
-@attribute [Authorize(Policy = "RequireManager")]
+@attribute [Authorize(Policy = "CanManageBilling")]
 @inject InvoiceService InvoiceService
 @inject BillingServiceFactory BillingFactory
 @inject ITenantContext TenantContext

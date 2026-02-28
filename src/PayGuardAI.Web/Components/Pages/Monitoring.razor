@@ -2,7 +2,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using PayGuardAI.Core.Services
 @using PayGuardAI.Data.Services
-@attribute [Authorize(Policy = "RequireAdmin")]
+@attribute [Authorize(Policy = "CanManageSettings")]
 @inject MonitoringService MonitoringService
 @inject ITenantContext TenantContext
 @inject ISnackbar Snackbar

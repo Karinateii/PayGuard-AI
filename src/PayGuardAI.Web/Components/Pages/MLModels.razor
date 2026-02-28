@@ -2,7 +2,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using PayGuardAI.Core.Services
 @using PayGuardAI.Core.Entities
-@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+@attribute [Authorize(Policy = "CanManageSettings")]
 @inject IMLTrainingService MLTraining
 @inject IMLScoringService MLScoring
 @inject ITenantContext TenantContext

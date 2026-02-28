@@ -1,7 +1,7 @@
 @page "/super-admin/tenants"
 @using Microsoft.AspNetCore.Authorization
 @using PayGuardAI.Core.Services
-@attribute [Authorize(Roles = "SuperAdmin")]
+@attribute [Authorize(Policy = "RequireSuperAdmin")]
 @inject ITenantOnboardingService OnboardingService
 @inject ITenantContext TenantContext
 @inject NavigationManager NavigationManager

@@ -1,6 +1,6 @@
 @page "/rules"
 @using Microsoft.AspNetCore.Authorization
-@attribute [Authorize(Policy = "RequireManager")]
+@attribute [Authorize(Policy = "CanManageRules")]
 @inject IDbContextFactory<PayGuardAI.Data.ApplicationDbContext> DbFactory
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService

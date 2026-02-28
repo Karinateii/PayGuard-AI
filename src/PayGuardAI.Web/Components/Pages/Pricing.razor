@@ -4,7 +4,7 @@
 @using PayGuardAI.Core.Entities
 @using PayGuardAI.Core.Services
 @using PayGuardAI.Data.Services
-@attribute [Authorize(Policy = "RequireAdmin")]
+@attribute [Authorize(Policy = "CanManageBilling")]
 @inject BillingServiceFactory BillingFactory
 @inject NavigationManager Nav
 @inject IConfiguration Config

@@ -2,7 +2,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using PayGuardAI.Core.Entities
 @using PayGuardAI.Core.Services
-@attribute [Authorize(Policy = "RequireManager")]
+@attribute [Authorize(Policy = "CanManageRoles")]
 @inject IRbacService RbacService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService

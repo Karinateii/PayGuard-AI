@@ -1,7 +1,7 @@
 @page "/watchlists"
 @using Microsoft.AspNetCore.Authorization
 @using PayGuardAI.Core.Entities
-@attribute [Authorize(Roles = "Manager,Admin,SuperAdmin")]
+@attribute [Authorize(Policy = "CanManageRules")]
 @inject PayGuardAI.Core.Services.IWatchlistService WatchlistService
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
 @inject ISnackbar Snackbar

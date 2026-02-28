@@ -3,7 +3,7 @@
 @using Microsoft.EntityFrameworkCore
 @using PayGuardAI.Core.Entities
 @using PayGuardAI.Core.Services
-@attribute [Authorize(Policy = "RequireManager")]
+@attribute [Authorize(Policy = "CanManageNotifications")]
 @inject IDbContextFactory<PayGuardAI.Data.ApplicationDbContext> DbFactory
 @inject ITenantContext TenantContext
 @inject ISnackbar Snackbar

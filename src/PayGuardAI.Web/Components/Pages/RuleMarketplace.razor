@@ -1,7 +1,7 @@
 @page "/rules/marketplace"
 @using Microsoft.AspNetCore.Authorization
 @using PayGuardAI.Core.Services
-@attribute [Authorize(Policy = "RequireManager")]
+@attribute [Authorize(Policy = "CanManageRules")]
 @inject IRuleMarketplaceService MarketplaceService
 @inject PayGuardAI.Core.Services.ITenantContext TenantContext
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser

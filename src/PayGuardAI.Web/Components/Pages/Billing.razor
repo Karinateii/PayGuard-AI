@@ -2,7 +2,7 @@
 @using PayGuardAI.Core.Entities
 @using PayGuardAI.Core.Services
 @using PayGuardAI.Data.Services
-@attribute [Microsoft.AspNetCore.Authorization.Authorize(Policy = "RequireManager")]
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Policy = "CanManageBilling")]
 @inject BillingServiceFactory BillingFactory
 @inject NavigationManager Nav
 @inject IConfiguration Config

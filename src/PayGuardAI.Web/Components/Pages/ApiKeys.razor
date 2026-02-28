@@ -1,7 +1,7 @@
 @page "/admin/api-keys"
 @using Microsoft.AspNetCore.Authorization
 @using PayGuardAI.Core.Entities
-@attribute [Authorize(Policy = "RequireManager")]
+@attribute [Authorize(Policy = "CanManageApiKeys")]
 @inject PayGuardAI.Core.Services.IAdminService AdminService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService

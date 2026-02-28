@@ -1,6 +1,6 @@
 @page "/admin/settings"
 @using Microsoft.AspNetCore.Authorization
-@attribute [Authorize(Policy = "RequireManager")]
+@attribute [Authorize(Policy = "CanManageSettings")]
 @inject PayGuardAI.Core.Services.IAdminService AdminService
 @inject ISnackbar Snackbar
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser

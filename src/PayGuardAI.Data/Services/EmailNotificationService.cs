@@ -59,7 +59,15 @@ public class EmailNotificationService : IEmailNotificationService
         }
 
         var appUrl = _config["AppUrl"] ?? "https://payguard-ai-production.up.railway.app";
-        var reviewUrl = $"{appUrl}/reviews";
+
+        // Deep-link to the specific transaction (look up GUID from ExternalId)
+        var txGuid = await _context.Transactions
+            .Where(t => t.TenantId == tenantId && t.ExternalId == externalId)
+            .Select(t => t.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        var reviewUrl = txGuid != Guid.Empty
+            ? $"{appUrl}/transactions/{txGuid}"
+            : $"{appUrl}/reviews";
 
         var (emoji, colour) = riskLevel.ToUpperInvariant() switch
         {
@@ -187,7 +195,15 @@ public class EmailNotificationService : IEmailNotificationService
         }
 
         var appUrl = _config["AppUrl"] ?? "https://payguard-ai-production.up.railway.app";
-        var reviewUrl = $"{appUrl}/reviews";
+
+        // Deep-link to the specific transaction (look up GUID from ExternalId)
+        var txGuid = await _context.Transactions
+            .Where(t => t.TenantId == tenantId && t.ExternalId == transactionId)
+            .Select(t => t.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        var reviewUrl = txGuid != Guid.Empty
+            ? $"{appUrl}/transactions/{txGuid}"
+            : $"{appUrl}/reviews";
 
         var subject = $"📋 PayGuard AI — Transaction Assigned for Your Review";
         var html = $@"
@@ -233,6 +249,16 @@ public class EmailNotificationService : IEmailNotificationService
         CancellationToken cancellationToken = default)
     {
         if (!IsEnabled()) return;
+
+        // Check if this invitee has team invite notifications enabled
+        var pref = await _context.NotificationPreferences
+            .FirstOrDefaultAsync(p => p.TenantId == tenantId && p.Email.ToLower() == inviteeEmail.ToLower(), cancellationToken);
+
+        if (pref != null && !pref.TeamInvitesEnabled)
+        {
+            _logger.LogInformation("Invitee {Email} has team invite emails disabled", inviteeEmail);
+            return;
+        }
 
         var appUrl = _config["AppUrl"] ?? "https://payguard-ai-production.up.railway.app";
 

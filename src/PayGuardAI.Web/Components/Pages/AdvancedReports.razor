@@ -2,7 +2,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @using PayGuardAI.Core.Services
-@attribute [Authorize(Policy = "RequireManager")]
+@attribute [Authorize(Policy = "CanViewReports")]
 @inject IAdvancedAnalyticsService AnalyticsService
 @inject ITenantContext TenantContext
 @inject IDialogService DialogService

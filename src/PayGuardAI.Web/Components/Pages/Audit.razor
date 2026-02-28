@@ -1,6 +1,6 @@
 @page "/audit"
 @using Microsoft.AspNetCore.Authorization
-@attribute [Authorize(Policy = "RequireManager")]
+@attribute [Authorize(Policy = "CanViewAuditLog")]
 @inject IDbContextFactory<PayGuardAI.Data.ApplicationDbContext> DbFactory
 @inject PayGuardAI.Core.Services.ITenantContext TenantContext
 @using Microsoft.EntityFrameworkCore
