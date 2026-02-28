@@ -68,7 +68,4 @@ public enum PlanFeature
     // ── Enterprise ──
     GdprCompliance,
     UnlimitedTransactions,
-    CustomIntegrations,
-    DedicatedSupport,
-    SlaGuarantee,
 }

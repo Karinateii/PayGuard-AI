@@ -80,9 +80,6 @@ public class PlanFeatureService : IPlanFeatureService
         // Enterprise features
         [PlanFeature.GdprCompliance]        = BillingPlan.Enterprise,
         [PlanFeature.UnlimitedTransactions] = BillingPlan.Enterprise,
-        [PlanFeature.CustomIntegrations]    = BillingPlan.Enterprise,
-        [PlanFeature.DedicatedSupport]      = BillingPlan.Enterprise,
-        [PlanFeature.SlaGuarantee]          = BillingPlan.Enterprise,
     };
 
     public bool IsFeatureAvailable(BillingPlan plan, PlanFeature feature)
