@@ -114,6 +114,71 @@ public class PaystackBillingService : IBillingService
         return response.Data.AuthorizationUrl;
     }
 
+    // ── Verify Checkout (on redirect back from Paystack) ──────────────────────
+
+    public async Task<TenantSubscription?> VerifyCheckoutAsync(
+        string tenantId, string reference, CancellationToken ct = default)
+    {
+        // Call Paystack's verify endpoint to confirm the transaction was successful
+        var response = await GetAsync<PaystackVerifyResponse>($"/transaction/verify/{reference}", ct);
+
+        if (response?.Status != true || response.Data == null)
+        {
+            _logger.LogWarning("Paystack verify failed for reference {Reference}: {Message}",
+                reference, response?.Message ?? "null response");
+            return null;
+        }
+
+        var data = response.Data;
+        if (!string.Equals(data.Status, "success", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning("Transaction {Reference} status is {Status}, not success",
+                reference, data.Status);
+            return null;
+        }
+
+        // Find or create subscription
+        var sub = await _db.TenantSubscriptions
+            .FirstOrDefaultAsync(s => s.TenantId == tenantId, ct);
+
+        if (sub == null)
+        {
+            sub = new TenantSubscription
+            {
+                TenantId = tenantId,
+                BillingEmail = data.Customer?.Email ?? string.Empty,
+                Provider = "paystack"
+            };
+            _db.TenantSubscriptions.Add(sub);
+        }
+
+        // Determine the plan from the plan code or metadata
+        var planCode = data.Plan?.PlanCode ?? string.Empty;
+        var plan = !string.IsNullOrEmpty(planCode)
+            ? MapPlanCodeToPlan(planCode)
+            : MapMetadataToPlan(data.Metadata);
+
+        sub.BillingEmail = data.Customer?.Email ?? sub.BillingEmail;
+        sub.ProviderCustomerId = data.Customer?.CustomerCode ?? sub.ProviderCustomerId;
+        sub.ProviderPlanCode = planCode;
+        sub.Provider = "paystack";
+        sub.Plan = plan;
+        sub.Status = "active";
+        sub.IncludedTransactions = PlanLimits[plan];
+        sub.PeriodStart = DateTime.UtcNow;
+        sub.PeriodEnd = DateTime.UtcNow.AddMonths(1);
+        sub.TransactionsThisPeriod = 0;
+        sub.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation(
+            "Checkout verified for tenant {TenantId}: Plan={Plan}, Reference={Reference}",
+            tenantId, plan, reference);
+
+        return sub;
+    }
+
     // ── Manage Subscription (card update link) ────────────────────────────────
 
     public async Task<string> GetManageSubscriptionUrlAsync(string tenantId, CancellationToken ct = default)
@@ -476,6 +541,16 @@ public class PaystackBillingService : IBillingService
         return BillingPlan.Starter; // default
     }
 
+    /// <summary>
+    /// Fall back to extracting the plan from transaction metadata when plan_code is unavailable.
+    /// </summary>
+    private static BillingPlan MapMetadataToPlan(PaystackMetadata? metadata)
+    {
+        var planStr = metadata?.Plan;
+        if (string.IsNullOrEmpty(planStr)) return BillingPlan.Starter;
+        return Enum.TryParse<BillingPlan>(planStr, ignoreCase: true, out var plan) ? plan : BillingPlan.Starter;
+    }
+
     // ── JSON Options ──────────────────────────────────────────────────────────
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -513,6 +588,31 @@ public class PaystackBillingService : IBillingService
     private class PaystackManageLinkData
     {
         public string Link { get; set; } = string.Empty;
+    }
+
+    private class PaystackVerifyResponse
+    {
+        public bool Status { get; set; }
+        public string? Message { get; set; }
+        public PaystackVerifyData? Data { get; set; }
+    }
+
+    private class PaystackVerifyData
+    {
+        public string Status { get; set; } = string.Empty;
+        public string? Reference { get; set; }
+        public long Amount { get; set; }
+        public PaystackCustomer? Customer { get; set; }
+        public PaystackPlan? Plan { get; set; }
+        public PaystackMetadata? Metadata { get; set; }
+    }
+
+    private class PaystackMetadata
+    {
+        [JsonPropertyName("tenantId")]
+        public string? TenantId { get; set; }
+        [JsonPropertyName("plan")]
+        public string? Plan { get; set; }
     }
 
     private class PaystackWebhookEvent

@@ -130,6 +130,23 @@ public class FlutterwaveBillingService : IBillingService
         return response.Data.Link;
     }
 
+    // ── Verify Checkout (on redirect back from Flutterwave) ──────────────────
+
+    public async Task<TenantSubscription?> VerifyCheckoutAsync(
+        string tenantId, string reference, CancellationToken ct = default)
+    {
+        // Flutterwave: verify via GET /transactions/:id/verify or by tx_ref
+        // For now, look up the pending subscription and activate it
+        // Full verification can be added when Flutterwave is enabled
+        _logger.LogInformation("Flutterwave checkout verify requested for tenant {TenantId}, ref {Reference}",
+            tenantId, reference);
+
+        var sub = await _db.TenantSubscriptions
+            .FirstOrDefaultAsync(s => s.TenantId == tenantId, ct);
+
+        return sub; // Return current state — webhook will handle activation
+    }
+
     // ── Manage Subscription ───────────────────────────────────────────────────
 
     public async Task<string> GetManageSubscriptionUrlAsync(string tenantId, CancellationToken ct = default)

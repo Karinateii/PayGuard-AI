@@ -231,16 +231,29 @@ else
     protected override async Task OnInitializedAsync()
     {
         _billingEnabled = bool.TryParse(Config["FeatureFlags:BillingEnabled"], out var b) && b;
-        // Detect success from our own param OR Paystack's redirect params (trxref/reference)
-        _success = SuccessParam || !string.IsNullOrEmpty(TrxRef) || !string.IsNullOrEmpty(Reference);
 
         if (_billingEnabled)
         {
             try
             {
-                // Get subscription using the default billing service first
                 _activeBillingService = BillingFactory.GetDefault();
-                _subscription = await _activeBillingService.GetSubscriptionAsync(TenantContext.TenantId);
+
+                // If redirected back from Paystack with a transaction reference, verify the payment
+                // and activate the subscription before loading the page.
+                var reference = Reference ?? TrxRef;
+                if (!string.IsNullOrEmpty(reference))
+                {
+                    var verified = await _activeBillingService.VerifyCheckoutAsync(
+                        TenantContext.TenantId, reference);
+                    if (verified != null && verified.Status == "active")
+                    {
+                        _subscription = verified;
+                        _success = true;
+                    }
+                }
+
+                // Load subscription (may have been set by verify above)
+                _subscription ??= await _activeBillingService.GetSubscriptionAsync(TenantContext.TenantId);
 
                 // If the subscription has a specific provider, use that provider's service
                 if (_subscription != null && !string.IsNullOrWhiteSpace(_subscription.Provider))
@@ -249,6 +262,10 @@ else
                 }
             }
             catch { /* no subscription yet is fine */ }
+
+            // Fallback: detect success from query param even if verify didn't run
+            if (!_success)
+                _success = SuccessParam;
 
             // Get plan limits
             var currentPlan = _subscription?.Plan ?? BillingPlan.Trial;

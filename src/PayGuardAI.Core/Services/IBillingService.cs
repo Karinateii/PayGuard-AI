@@ -45,6 +45,13 @@ public interface IBillingService
     Task HandleWebhookAsync(string payload, string signature, CancellationToken ct = default);
 
     /// <summary>
+    /// Verify a checkout transaction by its reference and activate the subscription.
+    /// Called when the user is redirected back from the payment gateway.
+    /// Returns the updated subscription, or null if verification failed.
+    /// </summary>
+    Task<TenantSubscription?> VerifyCheckoutAsync(string tenantId, string reference, CancellationToken ct = default);
+
+    /// <summary>
     /// Get pricing information for all plans.
     /// </summary>
     IReadOnlyList<PlanInfo> GetPlans();
