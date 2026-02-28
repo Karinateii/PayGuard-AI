@@ -557,7 +557,9 @@ public class PaystackBillingService : IBillingService
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        PropertyNameCaseInsensitive = true
+        PropertyNameCaseInsensitive = true,
+        // Paystack sends some numeric fields (e.g. plan.amount) as strings — allow both
+        NumberHandling = JsonNumberHandling.AllowReadingFromString
     };
 
     // ── Paystack Response DTOs ────────────────────────────────────────────────
