@@ -11,8 +11,8 @@ namespace PayGuardAI.Data.Services;
 ///
 /// Feature gates:
 ///   • Starter: Core fraud detection (built-in rules, HITL, basic reports, email alerts)
-///   • Pro:     Custom/compound rules, ML scoring, advanced reports, webhooks, Slack, custom roles
-///   • Enterprise: GDPR tools, unlimited everything, SLA, dedicated support
+///   • Pro:     Custom/compound rules, ML scoring, advanced reports, compliance reports, webhooks, Slack, custom roles
+///   • Enterprise: GDPR tools, network analysis, scheduled reports, unlimited everything
 /// </summary>
 public class PlanFeatureService : IPlanFeatureService
 {
@@ -69,8 +69,7 @@ public class PlanFeatureService : IPlanFeatureService
         [PlanFeature.RuleMarketplace]       = BillingPlan.Pro,
         [PlanFeature.MLRiskScoring]         = BillingPlan.Pro,
         [PlanFeature.AdvancedAnalytics]     = BillingPlan.Pro,
-        [PlanFeature.ScheduledReports]      = BillingPlan.Pro,
-        [PlanFeature.NetworkAnalysis]       = BillingPlan.Pro,
+        [PlanFeature.ComplianceReports]     = BillingPlan.Pro,
         [PlanFeature.OutboundWebhooks]      = BillingPlan.Pro,
         [PlanFeature.SlackAlerts]           = BillingPlan.Pro,
         [PlanFeature.WatchlistCsvImport]    = BillingPlan.Pro,
@@ -80,6 +79,8 @@ public class PlanFeatureService : IPlanFeatureService
         // Enterprise features
         [PlanFeature.GdprCompliance]        = BillingPlan.Enterprise,
         [PlanFeature.UnlimitedTransactions] = BillingPlan.Enterprise,
+        [PlanFeature.NetworkAnalysis]       = BillingPlan.Enterprise,
+        [PlanFeature.ScheduledReports]      = BillingPlan.Enterprise,
     };
 
     public bool IsFeatureAvailable(BillingPlan plan, PlanFeature feature)

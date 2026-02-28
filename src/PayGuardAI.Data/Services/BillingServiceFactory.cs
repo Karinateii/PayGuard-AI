@@ -28,11 +28,12 @@ public class BillingServiceFactory
     }
 
     /// <summary>
-    /// Get the default billing service based on feature flags.
+    /// Get the default billing service based on feature flags and configuration.
+    /// Falls back to Paystack if Flutterwave is not fully configured.
     /// </summary>
     public IBillingService GetDefault()
     {
-        if (IsFlutterwaveBillingEnabled())
+        if (IsFlutterwaveBillingAvailable())
             return GetFlutterwave();
 
         return GetPaystack();

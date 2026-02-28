@@ -57,8 +57,7 @@ public enum PlanFeature
     RuleMarketplace,
     MLRiskScoring,
     AdvancedAnalytics,
-    ScheduledReports,
-    NetworkAnalysis,
+    ComplianceReports,
     OutboundWebhooks,
     SlackAlerts,
     WatchlistCsvImport,
@@ -68,4 +67,6 @@ public enum PlanFeature
     // ── Enterprise ──
     GdprCompliance,
     UnlimitedTransactions,
+    NetworkAnalysis,
+    ScheduledReports,
 }
