@@ -27,6 +27,12 @@
         <MudAlert Severity="Severity.Info" Class="mb-4" Dense="true" Variant="Variant.Outlined">
             <MudText Typo="Typo.body2">
                 You're currently on the <strong>@PlanFeatures.GetPlanDisplayName(_currentPlan)</strong> plan.
+                @if (_pendingPlan.HasValue)
+                {
+                    <span class="ml-1" style="color: var(--mud-palette-warning);">
+                        Downgrade to <strong>@_pendingPlan.Value</strong> scheduled at end of billing period.
+                    </span>
+                }
                 @if (_currentPlan != BillingPlan.Enterprise)
                 {
                     <MudLink Href="/billing" Class="ml-1">Manage subscription →</MudLink>
@@ -103,21 +109,31 @@
                                     {
                                         <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
                                     }
-                                    @(_currentPlan == BillingPlan.Trial ? "Start Free Trial" : "Upgrade")
+                                    @(_currentPlan == BillingPlan.Trial ? "Get Started" : "Upgrade")
                                 </MudButton>
                             }
                             else
                             {
-                                <MudButton Variant="Variant.Outlined" Color="Color.Default"
-                                           FullWidth="true" Size="Size.Large"
-                                           OnClick="@(() => StartCheckout(plan.Plan))"
-                                           Disabled="@_loading">
-                                    @if (_loading && _checkingOutPlan == plan.Plan)
-                                    {
-                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
-                                    }
-                                    Downgrade
-                                </MudButton>
+                                @if (_pendingPlan == plan.Plan)
+                                {
+                                    <MudButton Variant="Variant.Outlined" Color="Color.Warning"
+                                               FullWidth="true" Size="Size.Large" Disabled="true">
+                                        Downgrade Scheduled
+                                    </MudButton>
+                                }
+                                else
+                                {
+                                    <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                                               FullWidth="true" Size="Size.Large"
+                                               OnClick="@(() => ScheduleDowngrade(plan.Plan))"
+                                               Disabled="@_loading">
+                                        @if (_loading && _checkingOutPlan == plan.Plan)
+                                        {
+                                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
+                                        }
+                                        Downgrade
+                                    </MudButton>
+                                }
                             }
                         </MudCardActions>
                     </MudCard>
@@ -171,8 +187,9 @@
                         </MudExpansionPanel>
                         <MudExpansionPanel Text="Can I change plans later?">
                             Yes — you can upgrade or downgrade at any time from the Pricing page.
-                            Your current subscription will be canceled and a new one created on the selected plan.
-                            Changes take effect immediately.
+                            <strong>Upgrades</strong> take effect immediately — your old subscription is canceled and you check out on the new plan.
+                            <strong>Downgrades</strong> are scheduled — you keep your current plan until the end of the paid billing period,
+                            then the lower plan takes effect. No double charges.
                         </MudExpansionPanel>
                         <MudExpansionPanel Text="What counts as a transaction?">
                             Each unique transaction received via your API webhook that PayGuard AI processes and assigns a risk score.
@@ -210,6 +227,7 @@
     private bool _loading;
     private BillingPlan? _checkingOutPlan;
     private BillingPlan _currentPlan = BillingPlan.Trial;
+    private BillingPlan? _pendingPlan;
     private string _error = string.Empty;
     private string _userEmail = "demo@payguard.ai";
 
@@ -228,13 +246,17 @@
         }
         catch { /* fallback to demo email */ }
 
-        // Get current plan
+        // Get current plan and check for pending downgrade
         _currentPlan = await PlanFeatures.GetCurrentPlanAsync(TenantContext.TenantId);
 
         if (_billingEnabled)
         {
             var billingService = BillingFactory.GetDefault();
             _plans = billingService.GetPlans();
+
+            // Check if there's a pending downgrade
+            var sub = await billingService.GetSubscriptionAsync(TenantContext.TenantId);
+            _pendingPlan = sub?.PendingPlan;
         }
     }
 
@@ -250,11 +272,14 @@
             var billingService = BillingFactory.GetDefault();
 
             // If tenant already has an active subscription, cancel it first
-            // so they don't end up with two Paystack subscriptions
+            // (only for upgrades — downgrades use ScheduleDowngrade)
             if (_currentPlan > BillingPlan.Trial)
             {
                 await billingService.CancelSubscriptionAsync(TenantContext.TenantId);
             }
+
+            // Clear any pending downgrade since they're upgrading instead
+            _pendingPlan = null;
 
             // Do NOT add query params here — Paystack appends ?trxref=xxx&reference=xxx
             // and a double ? would break param parsing
@@ -272,6 +297,29 @@
         catch (Exception ex)
         {
             _error = $"Checkout failed: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ScheduleDowngrade(BillingPlan plan)
+    {
+        _loading = true;
+        _checkingOutPlan = plan;
+        _error = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            var billingService = BillingFactory.GetDefault();
+            await billingService.ScheduleDowngradeAsync(TenantContext.TenantId, plan);
+            _pendingPlan = plan;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to schedule downgrade: {ex.Message}";
         }
         finally
         {

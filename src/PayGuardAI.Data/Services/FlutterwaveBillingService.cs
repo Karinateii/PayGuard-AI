@@ -166,6 +166,20 @@ public class FlutterwaveBillingService : IBillingService
 
     // ── Manage Subscription ───────────────────────────────────────────────────
 
+    public async Task ScheduleDowngradeAsync(string tenantId, BillingPlan newPlan, CancellationToken ct = default)
+    {
+        var sub = await _db.TenantSubscriptions.FirstOrDefaultAsync(s => s.TenantId == tenantId, ct);
+        if (sub == null) return;
+
+        sub.PendingPlan = newPlan;
+        sub.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation(
+            "Scheduled downgrade for tenant {TenantId}: {CurrentPlan} → {NewPlan} at {PeriodEnd:u}",
+            tenantId, sub.Plan, newPlan, sub.PeriodEnd);
+    }
+
     public async Task<string> GetManageSubscriptionUrlAsync(string tenantId, CancellationToken ct = default)
     {
         var sub = await _db.TenantSubscriptions.FirstOrDefaultAsync(s => s.TenantId == tenantId, ct)
@@ -198,6 +212,21 @@ public class FlutterwaveBillingService : IBillingService
         // Reset counter if we've entered a new billing period
         if (DateTime.UtcNow > sub.PeriodEnd)
         {
+            // Apply pending downgrade if scheduled
+            if (sub.PendingPlan.HasValue)
+            {
+                _logger.LogInformation(
+                    "Applying scheduled downgrade for tenant {TenantId}: {OldPlan} → {NewPlan}",
+                    tenantId, sub.Plan, sub.PendingPlan.Value);
+
+                sub.Plan = sub.PendingPlan.Value;
+                sub.IncludedTransactions = PlanLimits[sub.Plan];
+                sub.Status = "pending";
+                sub.ProviderSubscriptionId = null;
+                sub.PendingPlan = null;
+                sub.PendingPlanCode = null;
+            }
+
             sub.TransactionsThisPeriod = 0;
             sub.PeriodStart = sub.PeriodEnd;
             sub.PeriodEnd = sub.PeriodEnd.AddMonths(1);

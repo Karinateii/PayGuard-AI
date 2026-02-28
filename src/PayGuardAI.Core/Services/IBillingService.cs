@@ -53,9 +53,16 @@ public interface IBillingService
 
     /// <summary>
     /// Cancel the tenant's current Paystack/Flutterwave subscription.
-    /// Used before upgrading/downgrading to a different plan.
+    /// Used before upgrading to a different plan (immediate effect).
     /// </summary>
     Task CancelSubscriptionAsync(string tenantId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Schedule a downgrade: disable renewal on the current subscription so it won't charge again,
+    /// but keep the current plan active until PeriodEnd. At PeriodEnd, the tenant must subscribe
+    /// to the new (lower) plan.
+    /// </summary>
+    Task ScheduleDowngradeAsync(string tenantId, BillingPlan newPlan, CancellationToken ct = default);
 
     /// <summary>
     /// Get pricing information for all plans.

@@ -123,6 +123,8 @@ public class DatabaseMigrationService : IDatabaseMigrationService
             ("TenantSubscriptions",     "PaystackSubscriptionCode", ""),
             ("TenantSubscriptions",     "BillingEmail", ""),
             ("TenantSubscriptions",     "Provider", "paystack"),
+            ("TenantSubscriptions",     "PendingPlan", ""),
+            ("TenantSubscriptions",     "PendingPlanCode", ""),
 
             // ── NotificationPreference extras ──
             ("NotificationPreferences", "DisplayName", ""),

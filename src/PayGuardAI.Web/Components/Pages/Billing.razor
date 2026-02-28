@@ -79,6 +79,14 @@ else
                             @daysLeft day@(daysLeft == 1 ? "" : "s") left in trial
                         </MudAlert>
                     }
+                    @if (_subscription?.PendingPlan.HasValue == true)
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2">
+                            Downgrade to <strong>@_subscription.PendingPlan.Value</strong> scheduled for
+                            @_subscription.PeriodEnd.ToString("MMM d, yyyy").
+                            You keep full @_subscription.Plan access until then.
+                        </MudAlert>
+                    }
                     <MudText Typo="Typo.body2" Color="Color.Secondary">
                         Billing period: @(_subscription?.PeriodStart.ToString("MMM d") ?? "—") — 
                         @(_subscription?.PeriodEnd.ToString("MMM d, yyyy") ?? "—")

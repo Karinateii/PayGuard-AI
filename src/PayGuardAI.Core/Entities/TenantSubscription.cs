@@ -50,6 +50,15 @@ public class TenantSubscription
     /// <summary>Email address for billing notifications.</summary>
     public string BillingEmail { get; set; } = string.Empty;
 
+    /// <summary>
+    /// When set, the subscription will switch to this plan at PeriodEnd instead of renewing.
+    /// Used for downgrades — the tenant keeps their current plan until the paid period expires.
+    /// </summary>
+    public BillingPlan? PendingPlan { get; set; }
+
+    /// <summary>Provider plan code for the pending downgrade (e.g. Paystack PLN_xxx).</summary>
+    public string? PendingPlanCode { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

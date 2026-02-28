@@ -364,6 +364,71 @@ public class PaystackBillingService : IBillingService
     public async Task<TenantSubscription?> GetSubscriptionAsync(string tenantId, CancellationToken ct = default)
         => await _db.TenantSubscriptions.FirstOrDefaultAsync(s => s.TenantId == tenantId, ct);
 
+    // ── Schedule Downgrade ────────────────────────────────────────────────────
+
+    public async Task ScheduleDowngradeAsync(string tenantId, BillingPlan newPlan, CancellationToken ct = default)
+    {
+        var sub = await _db.TenantSubscriptions.FirstOrDefaultAsync(s => s.TenantId == tenantId, ct);
+        if (sub == null) return;
+
+        // Disable the Paystack subscription so it won't renew at the current (higher) price
+        if (!string.IsNullOrWhiteSpace(sub.ProviderSubscriptionId))
+        {
+            var emailToken = sub.ProviderEmailToken;
+            if (string.IsNullOrWhiteSpace(emailToken))
+            {
+                try
+                {
+                    var resp = await _http.GetAsync($"/subscription/{sub.ProviderSubscriptionId}", ct);
+                    var body = await resp.Content.ReadAsStringAsync(ct);
+                    if (resp.IsSuccessStatusCode)
+                    {
+                        using var doc = JsonDocument.Parse(body);
+                        if (doc.RootElement.TryGetProperty("data", out var data) &&
+                            data.TryGetProperty("email_token", out var et))
+                        {
+                            emailToken = et.GetString();
+                            sub.ProviderEmailToken = emailToken;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not fetch email_token for subscription {SubCode}", sub.ProviderSubscriptionId);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(emailToken))
+            {
+                try
+                {
+                    var disablePayload = new { code = sub.ProviderSubscriptionId, token = emailToken };
+                    var content = new StringContent(
+                        JsonSerializer.Serialize(disablePayload, JsonOptions),
+                        Encoding.UTF8, "application/json");
+                    var disableResponse = await _http.PostAsync("/subscription/disable", content, ct);
+                    var disableBody = await disableResponse.Content.ReadAsStringAsync(ct);
+                    _logger.LogInformation("Disabled Paystack subscription {SubCode} for downgrade: {Status} {Body}",
+                        sub.ProviderSubscriptionId, (int)disableResponse.StatusCode, disableBody);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to disable Paystack subscription for downgrade");
+                }
+            }
+        }
+
+        // Mark the pending downgrade — plan stays active until PeriodEnd
+        sub.PendingPlan = newPlan;
+        sub.PendingPlanCode = GetPlanCode(newPlan);
+        sub.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation(
+            "Scheduled downgrade for tenant {TenantId}: {CurrentPlan} → {NewPlan} at {PeriodEnd:u}",
+            tenantId, sub.Plan, newPlan, sub.PeriodEnd);
+    }
+
     // ── Usage Metering ────────────────────────────────────────────────────────
 
     public async Task<bool> RecordTransactionUsageAsync(string tenantId, CancellationToken ct = default)
@@ -374,6 +439,23 @@ public class PaystackBillingService : IBillingService
         // Reset counter if we've entered a new billing period
         if (DateTime.UtcNow > sub.PeriodEnd)
         {
+            // Apply pending downgrade if scheduled
+            if (sub.PendingPlan.HasValue)
+            {
+                _logger.LogInformation(
+                    "Applying scheduled downgrade for tenant {TenantId}: {OldPlan} → {NewPlan}",
+                    tenantId, sub.Plan, sub.PendingPlan.Value);
+
+                sub.Plan = sub.PendingPlan.Value;
+                sub.ProviderPlanCode = sub.PendingPlanCode;
+                sub.IncludedTransactions = PlanLimits[sub.Plan];
+                sub.Status = "pending"; // needs to re-subscribe at the new price
+                sub.ProviderSubscriptionId = null;
+                sub.ProviderEmailToken = null;
+                sub.PendingPlan = null;
+                sub.PendingPlanCode = null;
+            }
+
             sub.TransactionsThisPeriod = 0;
             sub.PeriodStart = sub.PeriodEnd;
             sub.PeriodEnd = sub.PeriodEnd.AddMonths(1);
