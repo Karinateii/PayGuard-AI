@@ -450,7 +450,7 @@ public class PaystackBillingService : IBillingService
     {
         var data = evt.Data;
         var customerEmail = data?.Customer?.Email ?? string.Empty;
-        var amount = (data?.Amount ?? 0) / 100m;
+        var amount = GetAmountFromElement(data?.Amount) / 100m;
 
         var sub = await _db.TenantSubscriptions
             .FirstOrDefaultAsync(s => s.BillingEmail == customerEmail, ct);
@@ -563,6 +563,8 @@ public class PaystackBillingService : IBillingService
     };
 
     // ── Paystack Response DTOs ────────────────────────────────────────────────
+    // NOTE: Paystack is inconsistent — some fields arrive as numbers in one event
+    // type and as strings in another. All numeric fields use JsonElement to handle both.
 
     private class PaystackInitResponse
     {
@@ -603,7 +605,7 @@ public class PaystackBillingService : IBillingService
     {
         public string Status { get; set; } = string.Empty;
         public string? Reference { get; set; }
-        public long Amount { get; set; }
+        public JsonElement? Amount { get; set; }
         public PaystackCustomer? Customer { get; set; }
         public PaystackPlan? Plan { get; set; }
         public PaystackMetadata? Metadata { get; set; }
@@ -625,7 +627,7 @@ public class PaystackBillingService : IBillingService
 
     private class PaystackEventData
     {
-        public long Amount { get; set; }
+        public JsonElement? Amount { get; set; }
         public string? Reference { get; set; }
         public string? Status { get; set; }
         [JsonPropertyName("subscription_code")]
@@ -648,6 +650,19 @@ public class PaystackBillingService : IBillingService
         [JsonPropertyName("plan_code")]
         public string PlanCode { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
-        public long Amount { get; set; }
+        public JsonElement? Amount { get; set; }
+    }
+
+    /// <summary>Safely extract a numeric value from a JsonElement that may be a number or a string.</summary>
+    private static long GetAmountFromElement(JsonElement? element)
+    {
+        if (element == null) return 0;
+        var el = element.Value;
+        return el.ValueKind switch
+        {
+            JsonValueKind.Number => el.GetInt64(),
+            JsonValueKind.String => long.TryParse(el.GetString(), out var v) ? v : 0,
+            _ => 0
+        };
     }
 }
