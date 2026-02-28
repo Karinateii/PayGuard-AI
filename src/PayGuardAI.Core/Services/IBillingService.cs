@@ -52,6 +52,12 @@ public interface IBillingService
     Task<TenantSubscription?> VerifyCheckoutAsync(string tenantId, string reference, CancellationToken ct = default);
 
     /// <summary>
+    /// Cancel the tenant's current Paystack/Flutterwave subscription.
+    /// Used before upgrading/downgrading to a different plan.
+    /// </summary>
+    Task CancelSubscriptionAsync(string tenantId, CancellationToken ct = default);
+
+    /// <summary>
     /// Get pricing information for all plans.
     /// </summary>
     IReadOnlyList<PlanInfo> GetPlans();

@@ -287,6 +287,78 @@ public class PaystackBillingService : IBillingService
         return response.Data.Link;
     }
 
+    // ── Cancel Subscription (for upgrade/downgrade) ──────────────────────────
+
+    public async Task CancelSubscriptionAsync(string tenantId, CancellationToken ct = default)
+    {
+        var sub = await _db.TenantSubscriptions.FirstOrDefaultAsync(s => s.TenantId == tenantId, ct);
+        if (sub == null) return; // nothing to cancel
+
+        // If we have a Paystack subscription code AND email token, disable it via the API
+        if (!string.IsNullOrWhiteSpace(sub.ProviderSubscriptionId))
+        {
+            // Look up email_token if we don't have it stored
+            var emailToken = sub.ProviderEmailToken;
+            if (string.IsNullOrWhiteSpace(emailToken))
+            {
+                // Fetch the subscription to get the email_token
+                try
+                {
+                    var resp = await _http.GetAsync($"/subscription/{sub.ProviderSubscriptionId}", ct);
+                    var body = await resp.Content.ReadAsStringAsync(ct);
+                    if (resp.IsSuccessStatusCode)
+                    {
+                        using var doc = JsonDocument.Parse(body);
+                        if (doc.RootElement.TryGetProperty("data", out var data) &&
+                            data.TryGetProperty("email_token", out var et))
+                        {
+                            emailToken = et.GetString();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not fetch email_token for subscription {SubCode}", sub.ProviderSubscriptionId);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(emailToken))
+            {
+                try
+                {
+                    var disablePayload = new { code = sub.ProviderSubscriptionId, token = emailToken };
+                    var content = new StringContent(
+                        JsonSerializer.Serialize(disablePayload, JsonOptions),
+                        Encoding.UTF8, "application/json");
+                    var disableResponse = await _http.PostAsync("/subscription/disable", content, ct);
+                    var disableBody = await disableResponse.Content.ReadAsStringAsync(ct);
+                    _logger.LogInformation("Disable subscription {SubCode} response: {Status} {Body}",
+                        sub.ProviderSubscriptionId, (int)disableResponse.StatusCode, disableBody);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to disable Paystack subscription {SubCode} — proceeding with upgrade anyway",
+                        sub.ProviderSubscriptionId);
+                }
+            }
+            else
+            {
+                _logger.LogWarning("No email_token available for subscription {SubCode} — cannot disable via API",
+                    sub.ProviderSubscriptionId);
+            }
+        }
+
+        // Clear provider subscription fields so the new checkout starts fresh
+        sub.ProviderSubscriptionId = null;
+        sub.ProviderEmailToken = null;
+        sub.ProviderPlanCode = null;
+        sub.Status = "pending";
+        sub.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Subscription record cleared for tenant {TenantId} (ready for new plan)", tenantId);
+    }
+
     // ── Subscription Query ────────────────────────────────────────────────────
 
     public async Task<TenantSubscription?> GetSubscriptionAsync(string tenantId, CancellationToken ct = default)

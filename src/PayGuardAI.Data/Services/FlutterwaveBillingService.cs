@@ -147,6 +147,23 @@ public class FlutterwaveBillingService : IBillingService
         return sub; // Return current state — webhook will handle activation
     }
 
+    // ── Cancel Subscription (for upgrade/downgrade) ──────────────────────────
+
+    public async Task CancelSubscriptionAsync(string tenantId, CancellationToken ct = default)
+    {
+        var sub = await _db.TenantSubscriptions.FirstOrDefaultAsync(s => s.TenantId == tenantId, ct);
+        if (sub == null) return;
+
+        // Clear provider fields so the new checkout starts fresh
+        sub.ProviderSubscriptionId = null;
+        sub.ProviderPlanCode = null;
+        sub.Status = "pending";
+        sub.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Subscription cleared for tenant {TenantId} (ready for plan change)", tenantId);
+    }
+
     // ── Manage Subscription ───────────────────────────────────────────────────
 
     public async Task<string> GetManageSubscriptionUrlAsync(string tenantId, CancellationToken ct = default)

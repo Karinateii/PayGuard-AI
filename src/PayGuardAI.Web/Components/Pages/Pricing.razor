@@ -109,8 +109,14 @@
                             else
                             {
                                 <MudButton Variant="Variant.Outlined" Color="Color.Default"
-                                           FullWidth="true" Size="Size.Large" Href="/billing">
-                                    Manage Plan
+                                           FullWidth="true" Size="Size.Large"
+                                           OnClick="@(() => StartCheckout(plan.Plan))"
+                                           Disabled="@_loading">
+                                    @if (_loading && _checkingOutPlan == plan.Plan)
+                                    {
+                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
+                                    }
+                                    Downgrade
                                 </MudButton>
                             }
                         </MudCardActions>
@@ -164,8 +170,9 @@
                             If you don't subscribe, access to advanced features will be restricted until you select a plan.
                         </MudExpansionPanel>
                         <MudExpansionPanel Text="Can I change plans later?">
-                            Yes — you can upgrade or downgrade at any time from the Billing page in your admin dashboard.
-                            Changes take effect immediately and billing is adjusted automatically.
+                            Yes — you can upgrade or downgrade at any time from the Pricing page.
+                            Your current subscription will be canceled and a new one created on the selected plan.
+                            Changes take effect immediately.
                         </MudExpansionPanel>
                         <MudExpansionPanel Text="What counts as a transaction?">
                             Each unique transaction received via your API webhook that PayGuard AI processes and assigns a risk score.
@@ -241,6 +248,14 @@
         try
         {
             var billingService = BillingFactory.GetDefault();
+
+            // If tenant already has an active subscription, cancel it first
+            // so they don't end up with two Paystack subscriptions
+            if (_currentPlan > BillingPlan.Trial)
+            {
+                await billingService.CancelSubscriptionAsync(TenantContext.TenantId);
+            }
+
             // Do NOT add query params here — Paystack appends ?trxref=xxx&reference=xxx
             // and a double ? would break param parsing
             var baseUrl = Nav.BaseUri.TrimEnd('/');
