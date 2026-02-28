@@ -463,12 +463,12 @@ Real-time operational health with 30-second auto-refresh:
 
 ### Subscription Tiers
 
-| Plan | Price | Transactions/mo |
-|------|-------|-----------------|
-| **Trial** | $0 | 100 |
-| **Starter** | $99/mo | 1,000 |
-| **Pro** | $499/mo | 10,000 |
-| **Enterprise** | $2,000/mo | Unlimited |
+| Plan | Price | Transactions/mo | Team Members | API Keys | Key Features |
+|------|-------|-----------------|:------------:|:--------:|-------------|
+| **Trial** | Free (14 days) | 100 | 2 | 1 | Core fraud detection |
+| **Starter** | $99/mo (₦150,000) | 1,000 | 5 | 2 | Built-in rules, HITL, email alerts |
+| **Pro** | $499/mo (₦800,000) | 10,000 | 25 | 10 | + Custom rules, ML scoring, webhooks, Slack, analytics |
+| **Enterprise** | $2,000/mo (₦3.2M) | Unlimited | ∞ | ∞ | + GDPR tools, SLA, dedicated support |
 
 ### Invoice PDF Generation
 

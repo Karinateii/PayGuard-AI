@@ -237,6 +237,9 @@ builder.Services.AddKeyedScoped<IBillingService, FlutterwaveBillingService>("flu
 // Factory to resolve the correct billing provider based on config/preference
 builder.Services.AddScoped<BillingServiceFactory>();
 
+// Plan feature gating service — defines what each subscription tier can access
+builder.Services.AddScoped<IPlanFeatureService, PlanFeatureService>();
+
 // Default IBillingService registration (for existing code that injects IBillingService directly)
 builder.Services.AddScoped<IBillingService>(sp =>
     sp.GetRequiredService<BillingServiceFactory>().GetDefault());

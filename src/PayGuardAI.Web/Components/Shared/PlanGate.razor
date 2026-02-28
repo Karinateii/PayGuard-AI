@@ -1,0 +1,104 @@
+@using PayGuardAI.Core.Entities
+@using PayGuardAI.Core.Services
+
+@* 
+    PlanGate — wraps content that requires a minimum subscription plan.
+    
+    Usage:
+        <PlanGate RequiredFeature="PlanFeature.CustomRules">
+            <Authorized>...Pro+ content...</Authorized>
+            <Upgrade>...optional custom upgrade prompt...</Upgrade>
+        </PlanGate>
+    
+    If the tenant's plan meets the requirement, <Authorized> renders.
+    Otherwise, a styled upgrade prompt is shown (default or custom <Upgrade> template).
+*@
+
+@inject IPlanFeatureService PlanFeatures
+@inject ITenantContext TenantContext
+@inject IConfiguration Config
+
+@if (!_billingEnabled || _hasAccess)
+{
+    @* Billing not enabled → full access. Or tenant plan qualifies → show content *@
+    @if (Authorized != null)
+    {
+        @Authorized
+    }
+    else
+    {
+        @ChildContent
+    }
+}
+else
+{
+    @* Tenant plan is below minimum — show upgrade prompt *@
+    @if (Upgrade != null)
+    {
+        @Upgrade
+    }
+    else
+    {
+        <MudPaper Elevation="0" Class="pa-8 d-flex flex-column align-center justify-center" 
+                  Style="min-height: 300px; background: var(--mud-palette-surface); border-radius: 16px; border: 2px dashed var(--mud-palette-lines-default);">
+            <MudIcon Icon="@Icons.Material.Filled.Lock" Color="Color.Warning" 
+                     Style="font-size: 3rem;" Class="mb-3" />
+            <MudText Typo="Typo.h5" Align="Align.Center" Style="font-weight: 700;" Class="mb-2">
+                Upgrade to @PlanFeatures.GetPlanDisplayName(_minimumPlan)
+            </MudText>
+            <MudText Typo="Typo.body1" Align="Align.Center" Color="Color.Secondary" Class="mb-4"
+                     Style="max-width: 480px;">
+                This feature requires the <strong>@PlanFeatures.GetPlanDisplayName(_minimumPlan)</strong> plan or higher.
+                @if (!string.IsNullOrWhiteSpace(FeatureDescription))
+                {
+                    <br/>@FeatureDescription
+                }
+            </MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                You're currently on the <strong>@PlanFeatures.GetPlanDisplayName(_currentPlan)</strong> plan.
+            </MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/pricing"
+                       StartIcon="@Icons.Material.Filled.ArrowUpward" Size="Size.Large">
+                View Plans & Upgrade
+            </MudButton>
+        </MudPaper>
+    }
+}
+
+@code {
+    /// <summary>The feature that must be available on the tenant's plan.</summary>
+    [Parameter] public PlanFeature RequiredFeature { get; set; }
+
+    /// <summary>Optional description of what the gated feature does.</summary>
+    [Parameter] public string? FeatureDescription { get; set; }
+
+    /// <summary>Content to show when the tenant has access (alternative to ChildContent).</summary>
+    [Parameter] public RenderFragment? Authorized { get; set; }
+
+    /// <summary>Custom upgrade prompt to show when gated (optional).</summary>
+    [Parameter] public RenderFragment? Upgrade { get; set; }
+
+    /// <summary>Fallback: content to show when Authorized is not set.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private bool _hasAccess;
+    private bool _billingEnabled;
+    private BillingPlan _currentPlan;
+    private BillingPlan _minimumPlan;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _billingEnabled = bool.TryParse(Config["FeatureFlags:BillingEnabled"], out var b) && b;
+        _minimumPlan = PlanFeatures.GetMinimumPlan(RequiredFeature);
+
+        if (_billingEnabled)
+        {
+            _currentPlan = await PlanFeatures.GetCurrentPlanAsync(TenantContext.TenantId);
+            _hasAccess = PlanFeatures.IsFeatureAvailable(_currentPlan, RequiredFeature);
+        }
+        else
+        {
+            _hasAccess = true; // Full access when billing is off
+        }
+    }
+}

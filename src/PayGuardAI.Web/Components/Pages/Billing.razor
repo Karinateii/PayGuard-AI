@@ -8,6 +8,7 @@
 @inject IConfiguration Config
 @inject ISnackbar Snackbar
 @inject PayGuardAI.Core.Services.ITenantContext TenantContext
+@inject IPlanFeatureService PlanFeatures
 
 <PageTitle>Billing — PayGuard AI</PageTitle>
 
@@ -165,6 +166,44 @@ else
             </MudItem>
         }
     </MudGrid>
+
+    <!-- Plan Limits -->
+    <MudText Typo="Typo.h6" Class="mb-3">Plan Limits</MudText>
+    <MudGrid Spacing="2" Class="mb-6">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="1" Class="pa-4 text-center">
+                <MudText Typo="Typo.overline" Color="Color.Secondary">TEAM MEMBERS</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight:700">
+                    @(_maxTeamMembers == int.MaxValue ? "∞" : _maxTeamMembers.ToString())
+                </MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="1" Class="pa-4 text-center">
+                <MudText Typo="Typo.overline" Color="Color.Secondary">API KEYS</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight:700">
+                    @(_maxApiKeys == int.MaxValue ? "∞" : _maxApiKeys.ToString())
+                </MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="1" Class="pa-4 text-center">
+                <MudText Typo="Typo.overline" Color="Color.Secondary">WEBHOOK ENDPOINTS</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight:700">
+                    @(_maxWebhooks == int.MaxValue ? "∞" : _maxWebhooks == 0 ? "—" : _maxWebhooks.ToString())
+                </MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="1" Class="pa-4 text-center">
+                <MudText Typo="Typo.overline" Color="Color.Secondary">TRANSACTIONS</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight:700">
+                    @GetIncludedLabel()
+                </MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">/month</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
 }
 
 @code {
@@ -174,6 +213,9 @@ else
     private bool _billingEnabled;
     private bool _success;
     private IBillingService? _activeBillingService;
+    private int _maxTeamMembers;
+    private int _maxApiKeys;
+    private int _maxWebhooks;
 
     [SupplyParameterFromQuery(Name = "success")]
     public bool SuccessParam { get; set; }
@@ -198,6 +240,12 @@ else
                 }
             }
             catch { /* no subscription yet is fine */ }
+
+            // Get plan limits
+            var currentPlan = _subscription?.Plan ?? BillingPlan.Trial;
+            _maxTeamMembers = PlanFeatures.GetMaxTeamMembers(currentPlan);
+            _maxApiKeys = PlanFeatures.GetMaxApiKeys(currentPlan);
+            _maxWebhooks = PlanFeatures.GetMaxWebhookEndpoints(currentPlan);
         }
 
         _loading = false;

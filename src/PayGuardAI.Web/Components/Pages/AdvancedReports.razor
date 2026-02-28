@@ -11,6 +11,8 @@
 
 <PageTitle>Advanced Reports — PayGuard AI</PageTitle>
 
+<PlanGate RequiredFeature="PlanFeature.AdvancedAnalytics" FeatureDescription="Access risk trend analytics, corridor heatmaps, team performance, and scheduled reports.">
+<Authorized>
 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
     <MudText Typo="Typo.h4">
         <MudIcon Icon="@Icons.Material.Filled.Assessment" Class="mr-2" />
@@ -509,6 +511,8 @@
         </MudStack>
     </MudTabPanel>
 </MudTabs>
+</Authorized>
+</PlanGate>
 
 @code {
     private bool _loading = true;

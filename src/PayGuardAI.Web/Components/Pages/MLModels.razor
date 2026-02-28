@@ -10,6 +10,8 @@
 
 <PageTitle>ML Risk Models — PayGuard AI</PageTitle>
 
+<PlanGate RequiredFeature="PlanFeature.MLRiskScoring" FeatureDescription="Train ML models from your team's review decisions for AI-powered risk scoring.">
+<Authorized>
 <MudText Typo="Typo.h4" Class="mb-2">
     <MudIcon Icon="@Icons.Material.Filled.Psychology" Class="mr-2" />
     ML Risk Models
@@ -307,6 +309,8 @@ else
         </MudExpansionPanel>
     </MudExpansionPanels>
 }
+</Authorized>
+</PlanGate>
 
 @code {
     private bool _loading = true;

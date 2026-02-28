@@ -15,17 +15,20 @@ public class AdminService : IAdminService
     private readonly ILogger<AdminService> _logger;
     private readonly IMagicLinkService _magicLink;
     private readonly IConfiguration _config;
+    private readonly IPlanFeatureService _planFeatures;
 
     public AdminService(
         ApplicationDbContext db,
         ILogger<AdminService> logger,
         IMagicLinkService magicLink,
-        IConfiguration config)
+        IConfiguration config,
+        IPlanFeatureService planFeatures)
     {
         _db = db;
         _logger = logger;
         _magicLink = magicLink;
         _config = config;
+        _planFeatures = planFeatures;
     }
 
     // ── Organization Settings ─────────────────────────────────────────────────
@@ -60,6 +63,22 @@ public class AdminService : IAdminService
     public async Task<(TeamMember member, bool emailSent)> InviteTeamMemberAsync(string tenantId, string email, string displayName, string role, CancellationToken ct = default)
     {
         email = email.Trim().ToLowerInvariant();
+
+        // Enforce plan-based team member limit
+        var billingEnabled = bool.TryParse(_config["FeatureFlags:BillingEnabled"], out var b) && b;
+        if (billingEnabled)
+        {
+            var currentPlan = await _planFeatures.GetCurrentPlanAsync(tenantId, ct);
+            var maxMembers = _planFeatures.GetMaxTeamMembers(currentPlan);
+            var currentCount = await _db.TeamMembers.CountAsync(m => m.TenantId == tenantId, ct);
+            if (currentCount >= maxMembers)
+            {
+                var planName = _planFeatures.GetPlanDisplayName(currentPlan);
+                throw new InvalidOperationException(
+                    $"Your {planName} plan allows up to {maxMembers} team members. " +
+                    $"Upgrade your plan to add more members.");
+            }
+        }
 
         var existing = await _db.TeamMembers.FirstOrDefaultAsync(m => m.TenantId == tenantId && m.Email.ToLower() == email, ct);
         if (existing != null)
@@ -180,6 +199,22 @@ public class AdminService : IAdminService
 
     public async Task<(ApiKey key, string rawKey)> GenerateApiKeyAsync(string tenantId, string name, string createdBy, CancellationToken ct = default)
     {
+        // Enforce plan-based API key limit
+        var billingEnabled = bool.TryParse(_config["FeatureFlags:BillingEnabled"], out var b) && b;
+        if (billingEnabled)
+        {
+            var currentPlan = await _planFeatures.GetCurrentPlanAsync(tenantId, ct);
+            var maxKeys = _planFeatures.GetMaxApiKeys(currentPlan);
+            var currentCount = await _db.ApiKeys.CountAsync(k => k.TenantId == tenantId && k.IsActive, ct);
+            if (currentCount >= maxKeys)
+            {
+                var planName = _planFeatures.GetPlanDisplayName(currentPlan);
+                throw new InvalidOperationException(
+                    $"Your {planName} plan allows up to {maxKeys} API keys. " +
+                    $"Upgrade your plan to generate more keys.");
+            }
+        }
+
         var (entity, rawKey) = ApiKey.Generate(tenantId, name, createdBy);
         _db.ApiKeys.Add(entity);
         await _db.SaveChangesAsync(ct);
@@ -203,6 +238,27 @@ public class AdminService : IAdminService
 
     public async Task<WebhookEndpoint> AddWebhookEndpointAsync(WebhookEndpoint endpoint, CancellationToken ct = default)
     {
+        // Enforce plan-based webhook endpoint limit
+        var billingEnabled = bool.TryParse(_config["FeatureFlags:BillingEnabled"], out var b) && b;
+        if (billingEnabled)
+        {
+            var currentPlan = await _planFeatures.GetCurrentPlanAsync(endpoint.TenantId, ct);
+            var maxEndpoints = _planFeatures.GetMaxWebhookEndpoints(currentPlan);
+            if (maxEndpoints <= 0)
+            {
+                throw new InvalidOperationException(
+                    "Outbound webhooks require a Pro plan or higher. Upgrade to add webhook endpoints.");
+            }
+            var currentCount = await _db.WebhookEndpoints.CountAsync(e => e.TenantId == endpoint.TenantId && e.IsActive, ct);
+            if (currentCount >= maxEndpoints)
+            {
+                var planName = _planFeatures.GetPlanDisplayName(currentPlan);
+                throw new InvalidOperationException(
+                    $"Your {planName} plan allows up to {maxEndpoints} webhook endpoints. " +
+                    $"Upgrade your plan to add more.");
+            }
+        }
+
         _db.WebhookEndpoints.Add(endpoint);
         await _db.SaveChangesAsync(ct);
         _logger.LogInformation("Added webhook endpoint {Url} for tenant {TenantId}", endpoint.Url, endpoint.TenantId);

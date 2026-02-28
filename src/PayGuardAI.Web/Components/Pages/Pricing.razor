@@ -10,6 +10,7 @@
 @inject IConfiguration Config
 @inject PayGuardAI.Core.Services.ITenantContext TenantContext
 @inject AuthenticationStateProvider AuthState
+@inject IPlanFeatureService PlanFeatures
 
 <PageTitle>Pricing — PayGuard AI</PageTitle>
 
@@ -17,45 +18,44 @@
     <MudText Typo="Typo.h3" Align="Align.Center" Class="mb-2" Style="font-weight:700">
         Simple, Transparent Pricing
     </MudText>
-    <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Secondary" Class="mb-8">
+    <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Secondary" Class="mb-2">
         Start free for 14 days. No credit card required.
     </MudText>
 
+    @if (_currentPlan != BillingPlan.Trial)
+    {
+        <MudAlert Severity="Severity.Info" Class="mb-4" Dense="true" Variant="Variant.Outlined">
+            <MudText Typo="Typo.body2">
+                You're currently on the <strong>@PlanFeatures.GetPlanDisplayName(_currentPlan)</strong> plan.
+                @if (_currentPlan != BillingPlan.Enterprise)
+                {
+                    <MudLink Href="/billing" Class="ml-1">Manage subscription →</MudLink>
+                }
+            </MudText>
+        </MudAlert>
+    }
+
     @if (_billingEnabled)
     {
-        @* Payment method selector — only show when both providers are available *@
-        @if (_dualProviderAvailable)
-        {
-            <MudPaper Elevation="0" Class="pa-4 mb-6 d-flex justify-center align-center gap-4"
-                      Style="background: var(--mud-palette-surface); border-radius: 12px;">
-                <MudText Typo="Typo.body1" Style="font-weight:600">Pay with:</MudText>
-                <MudToggleGroup T="string" @bind-Value="_selectedProvider" Color="Color.Primary"
-                                Style="border-radius:8px;">
-                    <MudToggleItem T="string" Value="@("paystack")">
-                        <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Class="mr-1" Size="Size.Small"/>
-                        Paystack
-                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-1">(Africa)</MudText>
-                    </MudToggleItem>
-                    <MudToggleItem T="string" Value="@("flutterwave")">
-                        <MudIcon Icon="@Icons.Material.Filled.Language" Class="mr-1" Size="Size.Small"/>
-                        Flutterwave
-                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-1">(International)</MudText>
-                    </MudToggleItem>
-                </MudToggleGroup>
-            </MudPaper>
-        }
-
-        <MudGrid Justify="Justify.Center" Spacing="4">
+        <MudGrid Justify="Justify.Center" Spacing="4" Class="mt-4">
             @foreach (var plan in _plans)
             {
+                var isCurrentPlan = plan.Plan == _currentPlan;
                 <MudItem xs="12" sm="6" md="4">
                     <MudCard Elevation="@(plan.IsPopular ? 8 : 2)" 
-                             Style="@(plan.IsPopular ? "border: 2px solid var(--mud-palette-primary); position:relative;" : "")">
-                        @if (plan.IsPopular)
+                             Style="@(plan.IsPopular ? "border: 2px solid var(--mud-palette-primary); position:relative;" : isCurrentPlan ? "border: 2px solid var(--mud-palette-success); position:relative;" : "")">
+                        @if (plan.IsPopular && !isCurrentPlan)
                         {
                             <MudChip T="string" Color="Color.Primary" Size="Size.Small"
                                      Style="position:absolute; top:-14px; left:50%; transform:translateX(-50%); font-weight:700;">
                                 MOST POPULAR
+                            </MudChip>
+                        }
+                        @if (isCurrentPlan)
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small"
+                                     Style="position:absolute; top:-14px; left:50%; transform:translateX(-50%); font-weight:700;">
+                                CURRENT PLAN
                             </MudChip>
                         }
                         <MudCardHeader>
@@ -80,30 +80,78 @@
                             @if (plan.Plan != BillingPlan.Enterprise)
                             {
                                 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
-                                    +$0.10 per 100 transactions over limit
+                                    Overage: $0.10 per additional transaction
                                 </MudText>
                             }
                         </MudCardContent>
                         <MudCardActions Class="px-4 pb-4">
-                            <MudButton Variant="Variant.Filled"
-                                       Color="@(plan.IsPopular ? Color.Primary : Color.Default)"
-                                       FullWidth="true"
-                                       Size="Size.Large"
-                                       OnClick="@(() => StartCheckout(plan.Plan))"
-                                       Disabled="@_loading">
-                                @if (_loading && _checkingOutPlan == plan.Plan)
-                                {
-                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
-                                }
-                                Start Free Trial
-                            </MudButton>
+                            @if (isCurrentPlan)
+                            {
+                                <MudButton Variant="Variant.Outlined" Color="Color.Success"
+                                           FullWidth="true" Size="Size.Large" Disabled="true">
+                                    Current Plan
+                                </MudButton>
+                            }
+                            else if (plan.Plan > _currentPlan)
+                            {
+                                <MudButton Variant="Variant.Filled"
+                                           Color="@(plan.IsPopular ? Color.Primary : Color.Default)"
+                                           FullWidth="true" Size="Size.Large"
+                                           OnClick="@(() => StartCheckout(plan.Plan))"
+                                           Disabled="@_loading">
+                                    @if (_loading && _checkingOutPlan == plan.Plan)
+                                    {
+                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2"/>
+                                    }
+                                    @(_currentPlan == BillingPlan.Trial ? "Start Free Trial" : "Upgrade")
+                                </MudButton>
+                            }
+                            else
+                            {
+                                <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                                           FullWidth="true" Size="Size.Large" Href="/billing">
+                                    Manage Plan
+                                </MudButton>
+                            }
                         </MudCardActions>
                     </MudCard>
                 </MudItem>
             }
         </MudGrid>
 
-        <MudPaper Elevation="0" Class="mt-10 pa-6" Style="background: var(--mud-palette-surface);">
+        @* Plan comparison summary *@
+        <MudPaper Elevation="0" Class="mt-8 pa-6" Style="background: var(--mud-palette-surface); border-radius: 12px;">
+            <MudText Typo="Typo.h6" Align="Align.Center" Class="mb-4" Style="font-weight:700">
+                Compare Plans
+            </MudText>
+            <MudSimpleTable Dense="true" Bordered="true" Striped="true" Style="max-width:800px; margin:auto;">
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th style="text-align:center">Starter</th>
+                        <th style="text-align:center">Pro</th>
+                        <th style="text-align:center">Enterprise</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>Monthly transactions</td><td style="text-align:center">1,000</td><td style="text-align:center">10,000</td><td style="text-align:center">Unlimited</td></tr>
+                    <tr><td>Team members</td><td style="text-align:center">5</td><td style="text-align:center">25</td><td style="text-align:center">Unlimited</td></tr>
+                    <tr><td>API keys</td><td style="text-align:center">2</td><td style="text-align:center">10</td><td style="text-align:center">Unlimited</td></tr>
+                    <tr><td>Risk scoring</td><td style="text-align:center">Built-in rules</td><td style="text-align:center">Built-in + ML AI</td><td style="text-align:center">Built-in + ML AI</td></tr>
+                    <tr><td>Custom rules</td><td style="text-align:center">—</td><td style="text-align:center">✓</td><td style="text-align:center">✓</td></tr>
+                    <tr><td>Rule marketplace</td><td style="text-align:center">—</td><td style="text-align:center">✓</td><td style="text-align:center">✓</td></tr>
+                    <tr><td>Network analysis</td><td style="text-align:center">—</td><td style="text-align:center">✓</td><td style="text-align:center">✓</td></tr>
+                    <tr><td>Outbound webhooks</td><td style="text-align:center">—</td><td style="text-align:center">✓</td><td style="text-align:center">✓</td></tr>
+                    <tr><td>Slack alerts</td><td style="text-align:center">—</td><td style="text-align:center">✓</td><td style="text-align:center">✓</td></tr>
+                    <tr><td>Advanced analytics</td><td style="text-align:center">—</td><td style="text-align:center">✓</td><td style="text-align:center">✓</td></tr>
+                    <tr><td>Custom roles</td><td style="text-align:center">—</td><td style="text-align:center">✓</td><td style="text-align:center">✓</td></tr>
+                    <tr><td>GDPR compliance</td><td style="text-align:center">—</td><td style="text-align:center">—</td><td style="text-align:center">✓</td></tr>
+                    <tr><td>SLA guarantee</td><td style="text-align:center">—</td><td style="text-align:center">—</td><td style="text-align:center">✓</td></tr>
+                </tbody>
+            </MudSimpleTable>
+        </MudPaper>
+
+        <MudPaper Elevation="0" Class="mt-8 pa-6" Style="background: var(--mud-palette-surface);">
             <MudGrid Justify="Justify.Center">
                 <MudItem xs="12" md="8">
                     <MudText Typo="Typo.h6" Align="Align.Center" Class="mb-4">
@@ -112,7 +160,7 @@
                     <MudExpansionPanels>
                         <MudExpansionPanel Text="What happens after the 14-day trial?">
                             Your organization continues to operate normally. You'll be prompted to choose a plan.
-                            If you don't subscribe, your account remains active but transaction processing will be paused until you select a plan.
+                            If you don't subscribe, access to advanced features will be restricted until you select a plan.
                         </MudExpansionPanel>
                         <MudExpansionPanel Text="Can I change plans later?">
                             Yes — you can upgrade or downgrade at any time from the Billing page in your admin dashboard.
@@ -122,9 +170,13 @@
                             Each unique transaction received via your API webhook that PayGuard AI processes and assigns a risk score.
                             Duplicate or replayed events and system health checks are not counted.
                         </MudExpansionPanel>
-                        <MudExpansionPanel Text="How does billing work?">
-                            Each plan includes a monthly transaction allowance. Usage beyond the included limit is billed at the overage rate shown on your plan.
-                            You can monitor your usage in real time from the Billing dashboard.
+                        <MudExpansionPanel Text="How does overage billing work?">
+                            Starter and Pro plans include a monthly transaction allowance. Each additional transaction beyond your limit
+                            is billed at $0.10. You'll see real-time usage on your Billing dashboard and receive alerts at 80% utilization.
+                        </MudExpansionPanel>
+                        <MudExpansionPanel Text="What payment methods do you accept?">
+                            We accept payments via Paystack — supporting cards, bank transfers, and mobile money across Africa.
+                            International payment options via Flutterwave coming soon.
                         </MudExpansionPanel>
                     </MudExpansionPanels>
                 </MudItem>
@@ -147,21 +199,15 @@
 @code {
     private IReadOnlyList<PlanInfo> _plans = [];
     private bool _billingEnabled;
-    private bool _dualProviderAvailable;
     private bool _loading;
     private BillingPlan? _checkingOutPlan;
+    private BillingPlan _currentPlan = BillingPlan.Trial;
     private string _error = string.Empty;
-    private string _selectedProvider = "paystack";
     private string _userEmail = "demo@payguard.ai";
 
     protected override async Task OnInitializedAsync()
     {
         _billingEnabled = bool.TryParse(Config["FeatureFlags:BillingEnabled"], out var b) && b;
-        _dualProviderAvailable = BillingFactory.IsDualProviderAvailable();
-
-        // Auto-select provider: if only Flutterwave is available, use it
-        if (!BillingFactory.IsPaystackBillingAvailable() && BillingFactory.IsFlutterwaveBillingAvailable())
-            _selectedProvider = "flutterwave";
 
         // Get current user's email for checkout
         try
@@ -174,9 +220,12 @@
         }
         catch { /* fallback to demo email */ }
 
+        // Get current plan
+        _currentPlan = await PlanFeatures.GetCurrentPlanAsync(TenantContext.TenantId);
+
         if (_billingEnabled)
         {
-            var billingService = BillingFactory.GetProvider(_selectedProvider);
+            var billingService = BillingFactory.GetDefault();
             _plans = billingService.GetPlans();
         }
     }
@@ -190,7 +239,7 @@
 
         try
         {
-            var billingService = BillingFactory.GetProvider(_selectedProvider);
+            var billingService = BillingFactory.GetDefault();
             var baseUrl = Config["AppUrl"] ?? Nav.BaseUri.TrimEnd('/');
             var callbackUrl = $"{baseUrl}/billing?success=true";
 

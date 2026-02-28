@@ -10,6 +10,8 @@
 
 <PageTitle>GDPR Compliance — PayGuard AI</PageTitle>
 
+<PlanGate RequiredFeature="PlanFeature.GdprCompliance" FeatureDescription="Access GDPR compliance tools including DSAR management, data erasure, and portability exports.">
+<Authorized>
 <MudText Typo="Typo.h4" Class="mb-2">
     <MudIcon Icon="@Icons.Material.Filled.Shield" Class="mr-2" />
     GDPR Compliance Center
@@ -331,6 +333,8 @@
         </MudPaper>
     </MudItem>
 </MudGrid>
+</Authorized>
+</PlanGate>
 
 @code {
     // ── State ──────────────────────────────────────────────────────────

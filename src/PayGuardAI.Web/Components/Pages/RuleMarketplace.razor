@@ -10,6 +10,8 @@
 
 <PageTitle>Rule Marketplace - PayGuard AI</PageTitle>
 
+<PlanGate RequiredFeature="PlanFeature.RuleMarketplace" FeatureDescription="Browse and import industry-specific fraud detection rule templates.">
+<Authorized>
 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4" Style="flex-wrap: wrap; gap: 12px;">
     <MudText Typo="Typo.h4">
         <MudIcon Icon="@Icons.Material.Filled.Store" Class="mr-2" />
@@ -235,6 +237,8 @@
         </MudPaper>
     </MudTabPanel>
 </MudTabs>
+</Authorized>
+</PlanGate>
 
 @code {
     private int _selectedTab;

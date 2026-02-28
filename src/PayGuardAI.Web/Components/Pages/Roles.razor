@@ -11,6 +11,8 @@
 
 <PageTitle>Role Management — PayGuard AI</PageTitle>
 
+<PlanGate RequiredFeature="PlanFeature.CustomRoles" FeatureDescription="Create custom roles with granular permissions for your team.">
+<Authorized>
 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4" Style="flex-wrap: wrap; gap: 12px;">
     <MudText Typo="Typo.h4">
         <MudIcon Icon="@Icons.Material.Filled.AdminPanelSettings" Class="mr-2" />
@@ -147,6 +149,8 @@ else
 {
     <MudAlert Severity="Severity.Error" Class="mt-4">@_error</MudAlert>
 }
+</Authorized>
+</PlanGate>
 
 @code {
     private List<CustomRole> _roles = [];
