@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server.Circuits;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
@@ -382,6 +383,11 @@ builder.Services.AddSwaggerGen(options =>
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// Override the default ServerAuthenticationStateProvider with our revalidating one.
+// This periodically checks the DB to confirm the user still exists & is active,
+// so that expired cookies are detected even when the SignalR circuit stays alive.
+builder.Services.AddScoped<AuthenticationStateProvider, PayGuardRevalidatingAuthStateProvider>();
 
 var app = builder.Build();
 

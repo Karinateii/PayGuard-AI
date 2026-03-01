@@ -194,6 +194,7 @@
     protected override async Task OnInitializedAsync()
     {
         NavigationManager.LocationChanged += OnLocationChanged;
+        AuthStateProvider.AuthenticationStateChanged += OnAuthStateChanged;
         await LoadHomeTenant();
 
         // MFA gate: if MFA verification is pending, redirect to /mfa/verify
@@ -227,6 +228,25 @@
                 }
             }
             catch { /* SSR fallback - keep drawer open */ }
+        }
+    }
+
+    private async void OnAuthStateChanged(Task<AuthenticationState> task)
+    {
+        try
+        {
+            var authState = await task;
+            if (authState.User.Identity?.IsAuthenticated != true)
+            {
+                // Session expired — force a full page reload to /login.
+                // forceLoad: true kills the stale circuit and clears cached auth state.
+                await InvokeAsync(() => NavigationManager.NavigateTo("/login", forceLoad: true));
+            }
+        }
+        catch
+        {
+            // If we can't resolve auth state, redirect to login as a safety measure
+            await InvokeAsync(() => NavigationManager.NavigateTo("/login", forceLoad: true));
         }
     }
 
@@ -393,6 +413,7 @@
     public async ValueTask DisposeAsync()
     {
         NavigationManager.LocationChanged -= OnLocationChanged;
+        AuthStateProvider.AuthenticationStateChanged -= OnAuthStateChanged;
         if (_hubConnection is not null)
         {
             await _hubConnection.DisposeAsync();
