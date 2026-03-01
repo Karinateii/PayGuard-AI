@@ -68,14 +68,22 @@ public partial class TenantOnboardingService : ITenantOnboardingService
         };
         _db.TeamMembers.Add(adminUser);
 
-        // 3. Trial subscription (30-day trial)
+        // 3. Trial subscription (30-day trial) — set ALL fields to avoid PostgreSQL NOT NULL violations
         var subscription = new TenantSubscription
         {
             TenantId = tenantId,
             Plan = BillingPlan.Trial,
             Status = "trialing",
             BillingEmail = adminEmail,
+            Provider = "paystack",
+            ProviderCustomerId = string.Empty,
+            ProviderSubscriptionId = null,
+            ProviderPlanCode = null,
+            ProviderEmailToken = null,
+            PendingPlan = null,
+            PendingPlanCode = string.Empty,  // Column is NOT NULL in PostgreSQL
             IncludedTransactions = 1000,
+            TransactionsThisPeriod = 0,
             PeriodStart = DateTime.UtcNow,
             PeriodEnd = DateTime.UtcNow.AddDays(30),
             TrialEndsAt = DateTime.UtcNow.AddDays(30)

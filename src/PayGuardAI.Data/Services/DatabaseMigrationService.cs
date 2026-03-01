@@ -76,6 +76,7 @@ public class DatabaseMigrationService : IDatabaseMigrationService
 
             // Fix NOT NULL columns without defaults — prevents insert failures for new tenants
             await SetColumnDefaultsAsync(dbType);
+            await DropNotNullFromNullableColumnsAsync(dbType);
 
             // Mark existing tenants as onboarded so they aren't redirected
             await MarkExistingTenantsOnboardedAsync(dbType);
@@ -1553,6 +1554,43 @@ public class DatabaseMigrationService : IDatabaseMigrationService
         {
             _logger.LogDebug(ex, "Skipping DataProtectionKeys table creation");
         }
+    }
+
+    /// <summary>
+    /// Fix columns that are string? (nullable) in C# but were created as NOT NULL by the
+    /// column migration. Drops the NOT NULL constraint so EF Core can send null values.
+    /// Safe to run repeatedly — DROP NOT NULL on a nullable column is a no-op.
+    /// </summary>
+    private async Task DropNotNullFromNullableColumnsAsync(string dbType)
+    {
+        if (dbType != "PostgreSQL") return;
+
+        // These columns are string? in their C# entities but the column migration
+        // added them as TEXT NOT NULL. EF Core sends explicit NULL on insert/update,
+        // which crashes with 23502. Fix: DROP NOT NULL.
+        var nullableColumns = new (string Table, string Column)[]
+        {
+            ("TenantSubscriptions",  "PendingPlanCode"),
+            ("TenantSubscriptions",  "PaystackPlanCode"),          // legacy column
+            ("TenantSubscriptions",  "PaystackSubscriptionCode"),  // legacy column
+            ("OrganizationSettings", "IpWhitelist"),
+            ("OrganizationSettings", "SlackWebhookUrl"),
+        };
+
+        foreach (var (table, column) in nullableColumns)
+        {
+            try
+            {
+                await _context.Database.ExecuteSqlRawAsync(
+                    $"ALTER TABLE \"{table}\" ALTER COLUMN \"{column}\" DROP NOT NULL");
+            }
+            catch (Exception ex)
+            {
+                // Column may not exist (e.g. legacy columns on fresh databases)
+                _logger.LogDebug(ex, "Skipping DROP NOT NULL for {Table}.{Column}", table, column);
+            }
+        }
+        _logger.LogDebug("Nullable column constraints fixed for PostgreSQL");
     }
 
     /// <summary>
