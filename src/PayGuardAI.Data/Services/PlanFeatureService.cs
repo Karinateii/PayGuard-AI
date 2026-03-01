@@ -11,8 +11,8 @@ namespace PayGuardAI.Data.Services;
 ///
 /// Feature gates:
 ///   • Starter: Core fraud detection (built-in rules, HITL, basic reports, email alerts)
-///   • Pro:     Custom/compound rules, ML scoring, advanced reports, compliance reports, webhooks, Slack, custom roles
-///   • Enterprise: GDPR tools, network analysis, scheduled reports, unlimited everything
+///   • Pro:     Custom/compound rules, advanced reports, compliance reports, webhooks, Slack, network analysis
+///   • Enterprise: ML scoring, AI rule suggestions, custom roles, GDPR tools, scheduled reports, unlimited everything
 /// </summary>
 public class PlanFeatureService : IPlanFeatureService
 {
@@ -67,19 +67,19 @@ public class PlanFeatureService : IPlanFeatureService
         [PlanFeature.CustomRules]           = BillingPlan.Pro,
         [PlanFeature.CompoundRules]         = BillingPlan.Pro,
         [PlanFeature.RuleMarketplace]       = BillingPlan.Pro,
-        [PlanFeature.MLRiskScoring]         = BillingPlan.Pro,
         [PlanFeature.AdvancedAnalytics]     = BillingPlan.Pro,
         [PlanFeature.ComplianceReports]     = BillingPlan.Pro,
         [PlanFeature.OutboundWebhooks]      = BillingPlan.Pro,
         [PlanFeature.SlackAlerts]           = BillingPlan.Pro,
         [PlanFeature.WatchlistCsvImport]    = BillingPlan.Pro,
-        [PlanFeature.CustomRoles]           = BillingPlan.Pro,
-        [PlanFeature.RuleSuggestions]       = BillingPlan.Pro,
+        [PlanFeature.NetworkAnalysis]       = BillingPlan.Pro,
 
         // Enterprise features
+        [PlanFeature.MLRiskScoring]         = BillingPlan.Enterprise,
+        [PlanFeature.RuleSuggestions]       = BillingPlan.Enterprise,
+        [PlanFeature.CustomRoles]           = BillingPlan.Enterprise,
         [PlanFeature.GdprCompliance]        = BillingPlan.Enterprise,
         [PlanFeature.UnlimitedTransactions] = BillingPlan.Enterprise,
-        [PlanFeature.NetworkAnalysis]       = BillingPlan.Enterprise,
         [PlanFeature.ScheduledReports]      = BillingPlan.Enterprise,
     };
 

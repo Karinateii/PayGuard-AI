@@ -55,18 +55,18 @@ public enum PlanFeature
     CustomRules,
     CompoundRules,
     RuleMarketplace,
-    MLRiskScoring,
     AdvancedAnalytics,
     ComplianceReports,
     OutboundWebhooks,
     SlackAlerts,
     WatchlistCsvImport,
-    CustomRoles,
-    RuleSuggestions,
+    NetworkAnalysis,
 
     // ── Enterprise ──
+    MLRiskScoring,
+    RuleSuggestions,
+    CustomRoles,
     GdprCompliance,
     UnlimitedTransactions,
-    NetworkAnalysis,
     ScheduledReports,
 }
