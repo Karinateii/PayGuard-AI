@@ -377,23 +377,55 @@ public class EmailNotificationService : IEmailNotificationService
         Func<NotificationPreference, bool> filter,
         CancellationToken cancellationToken)
     {
+        // IgnoreQueryFilters() is required here because this method is called from background
+        // services where ITenantContext.TenantId is empty "". The global query filter would
+        // combine with the explicit .Where() to produce: TenantId = 'x' AND TenantId = ''
+        // returning zero rows even though records exist, causing a spurious INSERT attempt
+        // that crashes with 23505 duplicate key on the unique index.
         var preferences = await _context.NotificationPreferences
+            .IgnoreQueryFilters()
             .Where(p => p.TenantId == tenantId)
             .ToListAsync(cancellationToken);
 
-        // If no preferences exist, create a default entry for the auth user
+        // If no preferences exist, create a default entry — but check again with
+        // IgnoreQueryFilters first to guard against concurrent inserts (23505).
         if (preferences.Count == 0)
         {
             var defaultEmail = _config["Auth:DefaultUser"] ?? "compliance_officer@payguard.ai";
-            var defaultPref = new NotificationPreference
+
+            // Re-check to avoid duplicate insert when two background tasks race
+            var existing = await _context.NotificationPreferences
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(p => p.TenantId == tenantId && p.Email == defaultEmail, cancellationToken);
+
+            if (existing != null)
             {
-                TenantId = tenantId,
-                Email = defaultEmail,
-                DisplayName = "Compliance Officer"
-            };
-            _context.NotificationPreferences.Add(defaultPref);
-            await _context.SaveChangesAsync(cancellationToken);
-            preferences = [defaultPref];
+                preferences = [existing];
+            }
+            else
+            {
+                var defaultPref = new NotificationPreference
+                {
+                    TenantId = tenantId,
+                    Email = defaultEmail,
+                    DisplayName = "Compliance Officer"
+                };
+                _context.NotificationPreferences.Add(defaultPref);
+                try
+                {
+                    await _context.SaveChangesAsync(cancellationToken);
+                    preferences = [defaultPref];
+                }
+                catch (DbUpdateException)
+                {
+                    // Another concurrent call already inserted — fetch the existing row
+                    _context.ChangeTracker.Clear();
+                    preferences = await _context.NotificationPreferences
+                        .IgnoreQueryFilters()
+                        .Where(p => p.TenantId == tenantId)
+                        .ToListAsync(cancellationToken);
+                }
+            }
         }
 
         return preferences.Where(filter).ToList();
