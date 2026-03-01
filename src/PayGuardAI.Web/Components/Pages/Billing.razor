@@ -9,6 +9,8 @@
 @inject ISnackbar Snackbar
 @inject PayGuardAI.Core.Services.ITenantContext TenantContext
 @inject IPlanFeatureService PlanFeatures
+@inject IDbContextFactory<PayGuardAI.Data.ApplicationDbContext> DbFactory
+@using Microsoft.EntityFrameworkCore
 
 <PageTitle>Billing — PayGuard AI</PageTitle>
 
@@ -189,24 +191,27 @@ else
             <MudPaper Elevation="1" Class="pa-4 text-center">
                 <MudText Typo="Typo.overline" Color="Color.Secondary">TEAM MEMBERS</MudText>
                 <MudText Typo="Typo.h5" Style="font-weight:700">
-                    @(_maxTeamMembers == int.MaxValue ? "∞" : _maxTeamMembers.ToString())
+                    @_actualTeamMembers <span style="font-weight:400;font-size:0.7em;color:var(--mud-palette-text-secondary)">/ @(_maxTeamMembers == int.MaxValue ? "∞" : _maxTeamMembers.ToString())</span>
                 </MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">used / limit</MudText>
             </MudPaper>
         </MudItem>
         <MudItem xs="12" sm="6" md="3">
             <MudPaper Elevation="1" Class="pa-4 text-center">
                 <MudText Typo="Typo.overline" Color="Color.Secondary">API KEYS</MudText>
                 <MudText Typo="Typo.h5" Style="font-weight:700">
-                    @(_maxApiKeys == int.MaxValue ? "∞" : _maxApiKeys.ToString())
+                    @_actualApiKeys <span style="font-weight:400;font-size:0.7em;color:var(--mud-palette-text-secondary)">/ @(_maxApiKeys == int.MaxValue ? "∞" : _maxApiKeys.ToString())</span>
                 </MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">used / limit</MudText>
             </MudPaper>
         </MudItem>
         <MudItem xs="12" sm="6" md="3">
             <MudPaper Elevation="1" Class="pa-4 text-center">
                 <MudText Typo="Typo.overline" Color="Color.Secondary">WEBHOOK ENDPOINTS</MudText>
                 <MudText Typo="Typo.h5" Style="font-weight:700">
-                    @(_maxWebhooks == int.MaxValue ? "∞" : _maxWebhooks == 0 ? "—" : _maxWebhooks.ToString())
+                    @_actualWebhooks <span style="font-weight:400;font-size:0.7em;color:var(--mud-palette-text-secondary)">/ @(_maxWebhooks == int.MaxValue ? "∞" : _maxWebhooks == 0 ? "—" : _maxWebhooks.ToString())</span>
                 </MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">used / limit</MudText>
             </MudPaper>
         </MudItem>
         <MudItem xs="12" sm="6" md="3">
@@ -231,6 +236,9 @@ else
     private int _maxTeamMembers;
     private int _maxApiKeys;
     private int _maxWebhooks;
+    private int _actualTeamMembers;
+    private int _actualApiKeys;
+    private int _actualWebhooks;
 
     private string? _error;
 
@@ -305,6 +313,17 @@ else
             _maxTeamMembers = PlanFeatures.GetMaxTeamMembers(currentPlan);
             _maxApiKeys = PlanFeatures.GetMaxApiKeys(currentPlan);
             _maxWebhooks = PlanFeatures.GetMaxWebhookEndpoints(currentPlan);
+
+            // Load actual usage counts
+            try
+            {
+                await using var db = await DbFactory.CreateDbContextAsync();
+                db.SetTenantId(TenantContext.TenantId);
+                _actualTeamMembers = await db.TeamMembers.CountAsync(t => t.Status == "active");
+                _actualApiKeys = await db.ApiKeys.CountAsync(k => k.IsActive);
+                _actualWebhooks = await db.WebhookEndpoints.CountAsync(w => w.IsActive);
+            }
+            catch { /* counts default to 0 */ }
         }
 
         _loading = false;
