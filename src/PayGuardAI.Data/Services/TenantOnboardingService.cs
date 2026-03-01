@@ -39,7 +39,7 @@ public partial class TenantOnboardingService : ITenantOnboardingService
 
         _logger.LogInformation("Provisioning new tenant: {TenantId} for {OrgName}", tenantId, organizationName);
 
-        // 1. Organization settings
+        // 1. Organization settings — set ALL fields to avoid PostgreSQL NOT NULL violations
         var settings = new OrganizationSettings
         {
             TenantId = tenantId,
@@ -48,7 +48,12 @@ public partial class TenantOnboardingService : ITenantOnboardingService
             Timezone = "UTC",
             DefaultCurrency = "USD",
             AutoApproveThreshold = 20,
-            AutoRejectThreshold = 80
+            AutoRejectThreshold = 80,
+            SlackWebhookUrl = "",
+            IpWhitelist = "",
+            HighRiskCountries = "IR,KP,SY,YE,VE,CU,MM,AF",
+            UpdatedBy = adminEmail,
+            OnboardingCompleted = false
         };
         _db.OrganizationSettings.Add(settings);
 

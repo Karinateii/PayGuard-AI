@@ -74,6 +74,9 @@ public class DatabaseMigrationService : IDatabaseMigrationService
             // Create DataProtectionKeys table (session key persistence across deploys)
             await CreateDataProtectionKeysTableAsync(dbType);
 
+            // Fix NOT NULL columns without defaults — prevents insert failures for new tenants
+            await SetColumnDefaultsAsync(dbType);
+
             // Mark existing tenants as onboarded so they aren't redirected
             await MarkExistingTenantsOnboardedAsync(dbType);
 
@@ -1550,5 +1553,52 @@ public class DatabaseMigrationService : IDatabaseMigrationService
         {
             _logger.LogDebug(ex, "Skipping DataProtectionKeys table creation");
         }
+    }
+
+    /// <summary>
+    /// Sets DEFAULT values on NOT NULL columns in PostgreSQL so that inserts from
+    /// code paths that don't explicitly set every field won't crash with 23502.
+    /// Safe to run repeatedly — ALTER COLUMN SET DEFAULT is idempotent.
+    /// </summary>
+    private async Task SetColumnDefaultsAsync(string dbType)
+    {
+        if (dbType != "PostgreSQL") return;
+
+        var defaults = new (string Table, string Column, string Default)[]
+        {
+            // OrganizationSettings
+            ("OrganizationSettings", "SlackWebhookUrl", "''"),
+            ("OrganizationSettings", "IpWhitelist", "''"),
+            ("OrganizationSettings", "UpdatedBy", "'system'"),
+            ("OrganizationSettings", "HighRiskCountries", "'IR,KP,SY,YE,VE,CU,MM,AF'"),
+            // TeamMembers
+            ("TeamMembers", "DisplayName", "''"),
+            ("TeamMembers", "Status", "'active'"),
+            ("TeamMembers", "MfaSecret", "''"),
+            ("TeamMembers", "BackupCodeHashes", "''"),
+            // TenantSubscriptions
+            ("TenantSubscriptions", "PaystackPlanCode", "''"),
+            ("TenantSubscriptions", "PaystackSubscriptionCode", "''"),
+            ("TenantSubscriptions", "BillingEmail", "''"),
+            ("TenantSubscriptions", "Provider", "'paystack'"),
+            ("TenantSubscriptions", "PendingPlanCode", "''"),
+            // NotificationPreferences
+            ("NotificationPreferences", "DisplayName", "''"),
+            ("NotificationPreferences", "DigestFrequency", "'Daily'"),
+        };
+
+        foreach (var (table, column, defaultValue) in defaults)
+        {
+            try
+            {
+                await _context.Database.ExecuteSqlRawAsync(
+                    $"ALTER TABLE \"{table}\" ALTER COLUMN \"{column}\" SET DEFAULT {defaultValue}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Skipping default for {Table}.{Column}", table, column);
+            }
+        }
+        _logger.LogDebug("Column defaults ensured for PostgreSQL");
     }
 }
