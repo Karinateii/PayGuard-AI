@@ -77,8 +77,8 @@ public class AuthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status302Found)]
     public IActionResult OAuthLogin()
     {
-        _logger.LogInformation("[AUTH-CONTROLLER] OAuth login requested - triggering OIDC challenge");
-        
+        _logger.LogInformation("[AUTH-CONTROLLER] OAuth login requested");
+
         var properties = new AuthenticationProperties
         {
             RedirectUri = "/",

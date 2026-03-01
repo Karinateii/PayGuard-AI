@@ -363,6 +363,10 @@
 
     private void GoToDashboard()
     {
-        Navigation.NavigateTo("/", forceLoad: true);
+        // Send the new user to the login page so they can authenticate with
+        // their own email via magic link. We must NOT trigger OAuth here because
+        // the browser's Google session belongs to whoever was last signed in
+        // (e.g. the SuperAdmin), not the new organization's admin.
+        Navigation.NavigateTo("/login", forceLoad: true);
     }
 }
