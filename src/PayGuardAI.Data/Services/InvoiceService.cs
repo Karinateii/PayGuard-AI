@@ -17,9 +17,9 @@ public class InvoiceService
     private static readonly Dictionary<BillingPlan, int> PlanPriceCents = new()
     {
         [BillingPlan.Trial] = 0,
-        [BillingPlan.Starter] = 9900,      // $99
-        [BillingPlan.Pro] = 49900,          // $499
-        [BillingPlan.Enterprise] = 200000   // $2,000
+        [BillingPlan.Starter] = 29900,     // $299
+        [BillingPlan.Pro] = 89900,          // $899
+        [BillingPlan.Enterprise] = 199900   // $1,999
     };
 
     private static readonly Dictionary<BillingPlan, int> PlanTransactions = new()

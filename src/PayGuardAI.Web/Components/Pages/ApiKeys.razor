@@ -1,6 +1,7 @@
 @page "/admin/api-keys"
 @using Microsoft.AspNetCore.Authorization
 @using PayGuardAI.Core.Entities
+@using PayGuardAI.Core.Services
 @attribute [Authorize(Policy = "CanManageApiKeys")]
 @inject PayGuardAI.Core.Services.IAdminService AdminService
 @inject ISnackbar Snackbar
@@ -8,6 +9,8 @@
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
 @inject IJSRuntime JS
 @inject PayGuardAI.Core.Services.ITenantContext TenantContext
+@inject IConfiguration Configuration
+@inject IPlanFeatureService PlanFeatures
 
 <PageTitle>API Keys — PayGuard AI</PageTitle>
 
@@ -102,8 +105,18 @@ else
     private List<ApiKey> _keys = [];
     private bool _loading = true;
     private string? _newlyGeneratedKey;
+    private int _maxApiKeys = int.MaxValue;
 
-    protected override async Task OnInitializedAsync() => await LoadKeys();
+    protected override async Task OnInitializedAsync()
+    {
+        var billingEnabled = Configuration.GetValue<bool>("FeatureFlags:BillingEnabled");
+        if (billingEnabled)
+        {
+            var plan = await PlanFeatures.GetCurrentPlanAsync(TenantContext.TenantId);
+            _maxApiKeys = PlanFeatures.GetMaxApiKeys(plan);
+        }
+        await LoadKeys();
+    }
 
     private async Task LoadKeys()
     {
@@ -115,6 +128,13 @@ else
 
     private async Task GenerateKey()
     {
+        if (_keys.Count >= _maxApiKeys)
+        {
+            Snackbar.Add(
+                $"You've reached the {_maxApiKeys} API key limit on your current plan. Upgrade to generate more keys.",
+                Severity.Warning);
+            return;
+        }
         var name = await DialogService.ShowMessageBox(
             "Generate API Key",
             (MarkupString)"<p>Enter a name for this API key (e.g. <b>Production</b>, <b>Staging</b>):</p>",

@@ -42,7 +42,7 @@ public class TenantSubscription
     public DateTime PeriodStart { get; set; } = DateTime.UtcNow;
 
     /// <summary>End of the current billing period (UTC).</summary>
-    public DateTime PeriodEnd { get; set; } = DateTime.UtcNow.AddDays(14); // 14-day trial default
+    public DateTime PeriodEnd { get; set; } = DateTime.UtcNow.AddDays(30); // 30-day trial default
 
     /// <summary>Trial ends at (UTC). Null if not on trial.</summary>
     public DateTime? TrialEndsAt { get; set; } = DateTime.UtcNow.AddDays(14);
@@ -65,8 +65,8 @@ public class TenantSubscription
 
 public enum BillingPlan
 {
-    Trial = 0,       // Free 14-day trial — 100 transactions
-    Starter = 1,     // $99/mo  (₦150,000/mo) — 1,000 transactions
-    Pro = 2,         // $499/mo (₦800,000/mo) — 10,000 transactions
-    Enterprise = 3   // $2,000/mo (₦3,200,000/mo) — unlimited
+    Trial = 0,       // Free 30-day trial — 100 transactions
+    Starter = 1,     // $299/mo  (₦450,000/mo) — 1,000 transactions
+    Pro = 2,         // $899/mo  (₦1,350,000/mo) — 10,000 transactions
+    Enterprise = 3   // $1,999/mo (₦3,000,000/mo) — unlimited
 }

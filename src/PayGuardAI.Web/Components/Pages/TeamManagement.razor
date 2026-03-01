@@ -10,6 +10,7 @@
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
 @inject PayGuardAI.Core.Services.ITenantContext TenantContext
 @inject IConfiguration Configuration
+@inject IPlanFeatureService PlanFeatures
 
 <PageTitle>Team Management — PayGuard AI</PageTitle>
 
@@ -102,11 +103,18 @@ else
     private bool _loading = true;
     private string _error = string.Empty;
     private bool _emailEnabled;
+    private int _maxTeamMembers = int.MaxValue;
 
     protected override async Task OnInitializedAsync()
     {
         var resendKey = Configuration["Email:ResendApiKey"] ?? Configuration["Email:SmtpPassword"] ?? "";
         _emailEnabled = !string.IsNullOrEmpty(resendKey) && resendKey.StartsWith("re_");
+        var billingEnabled = Configuration.GetValue<bool>("FeatureFlags:BillingEnabled");
+        if (billingEnabled)
+        {
+            var plan = await PlanFeatures.GetCurrentPlanAsync(TenantContext.TenantId);
+            _maxTeamMembers = PlanFeatures.GetMaxTeamMembers(plan);
+        }
         await LoadMembers();
     }
 
@@ -124,6 +132,13 @@ else
 
     private async Task OpenInviteDialog()
     {
+        if (_members.Count >= _maxTeamMembers)
+        {
+            Snackbar.Add(
+                $"You've reached the {_maxTeamMembers}-member limit on your current plan. Upgrade to add more team members.",
+                Severity.Warning);
+            return;
+        }
         var parameters = new DialogParameters<InviteMemberDialog>
         {
             { x => x.AvailableRoles, _availableRoles }

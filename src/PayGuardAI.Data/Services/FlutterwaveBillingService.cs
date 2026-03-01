@@ -298,7 +298,7 @@ public class FlutterwaveBillingService : IBillingService
     [
         new(BillingPlan.Starter,
             "Starter",
-            "$99/mo",
+            "$299/mo",
             "Essential fraud detection for small teams",
             1_000,
             ["Up to 1,000 transactions/month",
@@ -318,7 +318,7 @@ public class FlutterwaveBillingService : IBillingService
 
         new(BillingPlan.Pro,
             "Pro",
-            "$499/mo",
+            "$899/mo",
             "Advanced AI-powered protection for growing fintechs",
             10_000,
             ["Up to 10,000 transactions/month",
@@ -340,7 +340,7 @@ public class FlutterwaveBillingService : IBillingService
 
         new(BillingPlan.Enterprise,
             "Enterprise",
-            "$2,000/mo",
+            "$1,999/mo",
             "Unlimited protection with full compliance tools",
             int.MaxValue,
             ["Unlimited transactions",
@@ -502,9 +502,9 @@ public class FlutterwaveBillingService : IBillingService
 
     private static decimal GetPlanAmount(BillingPlan plan) => plan switch
     {
-        BillingPlan.Starter    => 99m,
-        BillingPlan.Pro        => 499m,
-        BillingPlan.Enterprise => 2000m,
+        BillingPlan.Starter    => 299m,
+        BillingPlan.Pro        => 899m,
+        BillingPlan.Enterprise => 1999m,
         _ => 0m
     };
 

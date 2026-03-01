@@ -1,5 +1,7 @@
 @page "/rules"
 @using Microsoft.AspNetCore.Authorization
+@using PayGuardAI.Core.Services
+@using PayGuardAI.Core.Entities
 @attribute [Authorize(Policy = "CanManageRules")]
 @inject IDbContextFactory<PayGuardAI.Data.ApplicationDbContext> DbFactory
 @inject ISnackbar Snackbar
@@ -8,6 +10,8 @@
 @inject PayGuardAI.Core.Services.IRuleVersioningService VersioningService
 @inject PayGuardAI.Core.Services.IRuleSuggestionService SuggestionService
 @inject PayGuardAI.Core.Services.ITenantContext TenantContext
+@inject IPlanFeatureService PlanFeatures
+@inject IConfiguration Configuration
 @using Microsoft.EntityFrameworkCore
 
 <PageTitle>Risk Rules - PayGuard AI</PageTitle>
@@ -17,16 +21,19 @@
         <MudIcon Icon="@Icons.Material.Filled.Rule" Class="mr-2" />
         Risk Rule Configuration
     </MudText>
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" 
-               StartIcon="@Icons.Material.Filled.Add"
-               OnClick="@OpenAddRuleDialog">
-        Add Custom Rule
-    </MudButton>
-    <MudButton Variant="Variant.Filled" Color="Color.Warning" 
-               StartIcon="@Icons.Material.Filled.AccountTree"
-               OnClick="@OpenAddCompoundRuleDialog">
-        Add Compound Rule
-    </MudButton>
+    @if (_canCustomRules)
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@OpenAddRuleDialog">
+            Add Custom Rule
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Warning" 
+                   StartIcon="@Icons.Material.Filled.AccountTree"
+                   OnClick="@OpenAddCompoundRuleDialog">
+            Add Compound Rule
+        </MudButton>
+    }
 </MudStack>
 
 <MudAlert Severity="Severity.Info" Class="mb-4">
@@ -554,6 +561,8 @@ else
     private const string RuleEntityType_RuleGroup = "RuleGroup";
 
     private bool _loading = true;
+    private bool _canCustomRules;
+    private bool _canRuleSuggestions;
     private List<RiskRule> _rules = new();
     private List<RiskRule> _expressionRules = new();
     private List<RuleGroup> _compoundRules = new();
@@ -567,9 +576,21 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        var billingEnabled = Configuration.GetValue<bool>("FeatureFlags:BillingEnabled");
+        if (billingEnabled)
+        {
+            var plan = await PlanFeatures.GetCurrentPlanAsync(TenantContext.TenantId);
+            _canCustomRules     = PlanFeatures.IsFeatureAvailable(plan, PlanFeature.CustomRules);
+            _canRuleSuggestions = PlanFeatures.IsFeatureAvailable(plan, PlanFeature.RuleSuggestions);
+        }
+        else
+        {
+            _canCustomRules = _canRuleSuggestions = true;
+        }
         await LoadRules();
-        // Load suggestions in background but stay on Blazor sync context
-        _ = InvokeAsync(LoadSuggestions);
+        // Only load AI suggestions for Pro+ tenants
+        if (_canRuleSuggestions)
+            _ = InvokeAsync(LoadSuggestions);
     }
 
     private async Task LoadSuggestions()

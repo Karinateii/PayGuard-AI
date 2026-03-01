@@ -362,6 +362,6 @@ else
         var billingService = _activeBillingService ?? BillingFactory.GetDefault();
         var plan = billingService.GetPlans()
             .FirstOrDefault(p => p.Plan == (_subscription?.Plan ?? BillingPlan.Trial));
-        return plan?.Features ?? ["Real-time risk scoring", "HITL review queue", "14-day free trial"];
+        return plan?.Features ?? ["Real-time risk scoring", "HITL review queue", "30-day free trial"];
     }
 }

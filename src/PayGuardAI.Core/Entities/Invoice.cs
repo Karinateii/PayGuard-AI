@@ -18,7 +18,7 @@ public class Invoice
     /// <summary>Invoice status: draft, issued, paid, overdue, void</summary>
     public string Status { get; set; } = "issued";
 
-    /// <summary>Amount in cents (e.g. 9900 = $99.00)</summary>
+    /// <summary>Amount in cents (e.g. 29900 = $299.00)</summary>
     public int AmountCents { get; set; }
 
     /// <summary>Currency code (USD, NGN, etc.)</summary>

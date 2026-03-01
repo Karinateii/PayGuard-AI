@@ -1,5 +1,6 @@
 @page "/reports"
 @using Microsoft.AspNetCore.Authorization
+@using PayGuardAI.Core.Services
 @attribute [Authorize]
 @inject IDbContextFactory<PayGuardAI.Data.ApplicationDbContext> DbFactory
 @inject PayGuardAI.Core.Services.ITenantContext TenantContext
@@ -16,8 +17,9 @@
     Compliance Reports
 </MudText>
 
+<PlanGate RequiredFeature="PlanFeature.ComplianceReports"
+          FeatureDescription="Generate transaction and fraud compliance reports with full CSV export.">
 <MudGrid>
-    <!-- Report Filters -->
     <MudItem xs="12">
         <MudPaper Class="pa-4" Elevation="2">
             <MudGrid>
@@ -329,6 +331,7 @@
         </MudItem>
     }
 </MudGrid>
+</PlanGate>
 
 @code {
     private DateTime? _fromDate = DateTime.UtcNow.Date.AddDays(-7);

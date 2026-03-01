@@ -537,7 +537,7 @@ public class PaystackBillingService : IBillingService
     [
         new(BillingPlan.Starter,
             "Starter",
-            "$99/mo",
+            "$299/mo",
             "Essential fraud detection for small teams",
             1_000,
             ["Up to 1,000 transactions/month",
@@ -557,7 +557,7 @@ public class PaystackBillingService : IBillingService
 
         new(BillingPlan.Pro,
             "Pro",
-            "$499/mo",
+            "$899/mo",
             "Advanced AI-powered protection for growing fintechs",
             10_000,
             ["Up to 10,000 transactions/month",
@@ -579,7 +579,7 @@ public class PaystackBillingService : IBillingService
 
         new(BillingPlan.Enterprise,
             "Enterprise",
-            "$2,000/mo",
+            "$1,999/mo",
             "Unlimited protection with full compliance tools",
             int.MaxValue,
             ["Unlimited transactions",
@@ -855,9 +855,9 @@ public class PaystackBillingService : IBillingService
     /// </summary>
     private static long GetPlanAmountKobo(BillingPlan plan) => plan switch
     {
-        BillingPlan.Starter    => 15_000_000,   // ₦150,000
-        BillingPlan.Pro        => 80_000_000,   // ₦800,000
-        BillingPlan.Enterprise => 320_000_000,  // ₦3,200,000
+        BillingPlan.Starter    => 45_000_000,   // ₦450,000
+        BillingPlan.Pro        => 135_000_000,  // ₦1,350,000
+        BillingPlan.Enterprise => 300_000_000,  // ₦3,000,000
         _ => 15_000_000
     };
 

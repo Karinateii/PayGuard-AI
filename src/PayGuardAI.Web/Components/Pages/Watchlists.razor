@@ -1,11 +1,15 @@
 @page "/watchlists"
 @using Microsoft.AspNetCore.Authorization
 @using PayGuardAI.Core.Entities
+@using PayGuardAI.Core.Services
 @attribute [Authorize(Policy = "CanManageRules")]
 @inject PayGuardAI.Core.Services.IWatchlistService WatchlistService
 @inject PayGuardAI.Web.Services.CurrentUserService CurrentUser
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject IPlanFeatureService PlanFeatures
+@inject PayGuardAI.Core.Services.ITenantContext TenantContext
+@inject IConfiguration Configuration
 
 <PageTitle>Watchlists — PayGuard AI</PageTitle>
 
@@ -118,10 +122,13 @@ else
                                              OnClick="@(() => OpenEditDialog(list))">
                                     Edit
                                 </MudMenuItem>
-                                <MudMenuItem Icon="@Icons.Material.Filled.UploadFile"
-                                             OnClick="@(() => OpenImportDialog(list))">
-                                    Bulk Import (CSV)
-                                </MudMenuItem>
+                                @if (_canCsvImport)
+                                {
+                                    <MudMenuItem Icon="@Icons.Material.Filled.UploadFile"
+                                                 OnClick="@(() => OpenImportDialog(list))">
+                                        Bulk Import (CSV)
+                                    </MudMenuItem>
+                                }
                                 <MudMenuItem Icon="@(list.IsEnabled ? Icons.Material.Filled.ToggleOff : Icons.Material.Filled.ToggleOn)"
                                              OnClick="@(() => ToggleEnabled(list))">
                                     @(list.IsEnabled ? "Disable" : "Enable")
@@ -362,8 +369,7 @@ else
 
 @code {
     // ── State ──────────────────────────────────────────────────────────
-    private bool _loading = true;
-    private List<Watchlist> _watchlists = [];
+    private bool _loading = true;    private bool _canCsvImport;    private List<Watchlist> _watchlists = [];
     private Watchlist? _selectedList;
 
     // List form
@@ -388,8 +394,16 @@ else
 
     // ── Lifecycle ──────────────────────────────────────────────────────
     protected override async Task OnInitializedAsync()
-    {
-        await LoadWatchlists();
+    {        var billingEnabled = Configuration.GetValue<bool>("FeatureFlags:BillingEnabled");
+        if (billingEnabled)
+        {
+            var plan = await PlanFeatures.GetCurrentPlanAsync(TenantContext.TenantId);
+            _canCsvImport = PlanFeatures.IsFeatureAvailable(plan, PlanFeature.WatchlistCsvImport);
+        }
+        else
+        {
+            _canCsvImport = true;
+        }        await LoadWatchlists();
     }
 
     private async Task LoadWatchlists()
