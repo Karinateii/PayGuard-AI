@@ -200,16 +200,13 @@ public class AuthController : ControllerBase
         // Always clear session data
         HttpContext.Session.Clear();
 
-        // If OAuth is enabled, sign out from both the cookie and OIDC schemes
-        var isOAuth = _configuration.IsOAuthEnabled();
-        if (isOAuth)
-        {
-            _logger.LogInformation("[AUTH-CONTROLLER] Clearing OAuth cookies");
-            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-            // Note: We do NOT sign out from the OIDC provider (Google) itself — that
-            // would log the user out of their Google account entirely. We only clear
-            // our application cookies so they must re-authenticate with PayGuard AI.
-        }
+        // Always sign out from the cookie auth scheme — clears the auth cookie
+        // so the Blazor circuit immediately loses the authenticated state.
+        // Without this, the old circuit can briefly show the navbar after logout.
+        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        // Note: We do NOT sign out from the OIDC provider (Google) itself — that
+        // would log the user out of their Google account entirely. We only clear
+        // our application cookies so they must re-authenticate with PayGuard AI.
 
         _logger.LogInformation("[AUTH-CONTROLLER] Session + cookies cleared, redirecting to /login");
         return Redirect("/login");

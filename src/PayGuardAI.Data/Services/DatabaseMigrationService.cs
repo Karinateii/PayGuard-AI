@@ -134,6 +134,7 @@ public class DatabaseMigrationService : IDatabaseMigrationService
 
             // ── NotificationPreference extras ──
             ("NotificationPreferences", "DisplayName", ""),
+            ("NotificationPreferences", "DigestFrequency", "Daily"),
 
             // ── RiskRule expression engine columns ──
             ("RiskRules",               "ExpressionField", ""),

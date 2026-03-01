@@ -91,7 +91,8 @@ public partial class TenantOnboardingService : ITenantOnboardingService
             ReviewAssignmentsEnabled = true,
             TeamInvitesEnabled = true,
             SystemAlertsEnabled = true,
-            MinimumRiskScoreForAlert = 50
+            MinimumRiskScoreForAlert = 50,
+            DigestFrequency = "Daily"
         };
         _db.Set<NotificationPreference>().Add(notificationPref);
 

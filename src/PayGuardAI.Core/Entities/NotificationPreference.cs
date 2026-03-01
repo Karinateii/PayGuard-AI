@@ -18,6 +18,9 @@ public class NotificationPreference
     public bool TeamInvitesEnabled { get; set; } = true;
     public bool SystemAlertsEnabled { get; set; } = true;
 
+    // Digest frequency: "Daily", "Weekly", "None"
+    public string DigestFrequency { get; set; } = "Daily";
+
     // Threshold — only alert if risk score >= this value
     public int MinimumRiskScoreForAlert { get; set; } = 50;
 
