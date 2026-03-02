@@ -310,14 +310,89 @@ public partial class TenantOnboardingService : ITenantOnboardingService
             .ToListAsync(ct);
         _db.TeamMembers.RemoveRange(teamMembers);
 
-        // 12. Subscription
+        // 12. Invoices
+        var invoices = await _db.Invoices
+            .IgnoreQueryFilters()
+            .Where(i => i.TenantId == tenantId)
+            .ToListAsync(ct);
+        _db.Invoices.RemoveRange(invoices);
+
+        // 13. Watchlist entries (child of watchlists)
+        var watchlistIds = await _db.Watchlists
+            .IgnoreQueryFilters()
+            .Where(w => w.TenantId == tenantId)
+            .Select(w => w.Id)
+            .ToListAsync(ct);
+        if (watchlistIds.Count > 0)
+        {
+            var watchlistEntries = await _db.WatchlistEntries
+                .IgnoreQueryFilters()
+                .Where(e => watchlistIds.Contains(e.WatchlistId))
+                .ToListAsync(ct);
+            _db.WatchlistEntries.RemoveRange(watchlistEntries);
+        }
+
+        // 14. Watchlists
+        var watchlists = await _db.Watchlists
+            .IgnoreQueryFilters()
+            .Where(w => w.TenantId == tenantId)
+            .ToListAsync(ct);
+        _db.Watchlists.RemoveRange(watchlists);
+
+        // 15. Rule group conditions (child of rule groups)
+        var ruleGroupIds = await _db.RuleGroups
+            .IgnoreQueryFilters()
+            .Where(g => g.TenantId == tenantId)
+            .Select(g => g.Id)
+            .ToListAsync(ct);
+        if (ruleGroupIds.Count > 0)
+        {
+            var conditions = await _db.RuleGroupConditions
+                .IgnoreQueryFilters()
+                .Where(c => ruleGroupIds.Contains(c.RuleGroupId))
+                .ToListAsync(ct);
+            _db.RuleGroupConditions.RemoveRange(conditions);
+        }
+
+        // 16. Rule groups
+        var ruleGroups = await _db.RuleGroups
+            .IgnoreQueryFilters()
+            .Where(g => g.TenantId == tenantId)
+            .ToListAsync(ct);
+        _db.RuleGroups.RemoveRange(ruleGroups);
+
+        // 17. Rule versions
+        var ruleVersions = await _db.RuleVersions
+            .IgnoreQueryFilters()
+            .Where(v => v.TenantId == tenantId)
+            .ToListAsync(ct);
+        _db.RuleVersions.RemoveRange(ruleVersions);
+
+        // 18. ML models
+        var mlModels = await _db.MLModels
+            .IgnoreQueryFilters()
+            .Where(m => m.TenantId == tenantId)
+            .ToListAsync(ct);
+        _db.MLModels.RemoveRange(mlModels);
+
+        // 19. System logs
+        var systemLogs = await _db.SystemLogs
+            .IgnoreQueryFilters()
+            .Where(l => l.TenantId == tenantId)
+            .ToListAsync(ct);
+        _db.SystemLogs.RemoveRange(systemLogs);
+
+        // 20. Magic link tokens (no TenantId — delete by admin email)
+        // These are tied to user emails, not tenants, so we skip them.
+
+        // 21. Subscription
         var subscription = await _db.TenantSubscriptions
             .IgnoreQueryFilters()
             .Where(s => s.TenantId == tenantId)
             .ToListAsync(ct);
         _db.TenantSubscriptions.RemoveRange(subscription);
 
-        // 13. Organization settings (last — the "parent" record)
+        // 22. Organization settings (last — the "parent" record)
         var settings = await _db.OrganizationSettings
             .IgnoreQueryFilters()
             .Where(s => s.TenantId == tenantId)
@@ -327,9 +402,10 @@ public partial class TenantOnboardingService : ITenantOnboardingService
         await _db.SaveChangesAsync(ct);
 
         _logger.LogWarning(
-            "Tenant {TenantId} fully deleted: {TxnCount} transactions, {TeamCount} team members, " +
-            "{RuleCount} rules, {LogCount} audit logs removed",
-            tenantId, transactions.Count, teamMembers.Count, riskRules.Count, auditLogs.Count);
+            "Tenant {TenantId} fully deleted: {TxnCount} txns, {TeamCount} members, " +
+            "{RuleCount} rules, {InvCount} invoices, {WlCount} watchlists, {LogCount} audit logs",
+            tenantId, transactions.Count, teamMembers.Count, riskRules.Count,
+            invoices.Count, watchlists.Count, auditLogs.Count);
     }
 
     public async Task UpdateOnboardingSettingsAsync(

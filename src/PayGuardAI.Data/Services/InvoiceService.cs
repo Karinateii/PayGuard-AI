@@ -75,6 +75,22 @@ public class InvoiceService
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
         db.SetTenantId(_tenantContext.TenantId);
 
+        // Guard: if an invoice already exists for this exact billing period, return it
+        var existing = await db.Invoices
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(i => i.TenantId == subscription.TenantId
+                                   && i.PeriodStart == subscription.PeriodStart
+                                   && i.PeriodEnd == subscription.PeriodEnd
+                                   && i.Status != "void", ct);
+
+        if (existing != null)
+        {
+            _logger.LogInformation(
+                "Invoice {InvoiceNumber} already exists for tenant {TenantId} period {Start:d}–{End:d}, skipping",
+                existing.InvoiceNumber, subscription.TenantId, subscription.PeriodStart, subscription.PeriodEnd);
+            return existing;
+        }
+
         // Get next sequence number for this tenant
         var existingCount = await db.Invoices
             .IgnoreQueryFilters()
