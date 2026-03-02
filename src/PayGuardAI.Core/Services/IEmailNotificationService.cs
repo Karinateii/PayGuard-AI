@@ -49,6 +49,17 @@ public interface IEmailNotificationService
         string subject,
         string htmlBody,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Send a system alert email to the platform owner (SuperAdmin).
+    /// Used for server errors, background job failures, and system health warnings.
+    /// Only sent to users with SystemAlertsEnabled = true.
+    /// </summary>
+    Task SendSystemAlertEmailAsync(
+        string title,
+        string details,
+        string severity,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>Data for the daily summary report email.</summary>

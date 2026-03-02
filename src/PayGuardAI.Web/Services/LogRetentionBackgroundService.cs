@@ -49,6 +49,19 @@ public class LogRetentionBackgroundService : BackgroundService
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogError(ex, "Error in log retention service");
+
+                // Send system alert email to SuperAdmin
+                try
+                {
+                    using var alertScope = _scopeFactory.CreateScope();
+                    var emailService = alertScope.ServiceProvider.GetRequiredService<IEmailNotificationService>();
+                    await emailService.SendSystemAlertEmailAsync(
+                        "Background Service Error",
+                        $"LogRetentionBackgroundService failed:\n\n{ex.GetType().Name}: {ex.Message}\n\n{ex.StackTrace?[..Math.Min(ex.StackTrace.Length, 500)]}",
+                        "ERROR",
+                        stoppingToken);
+                }
+                catch { /* Don't let alert sending crash the service loop */ }
             }
 
             // Check every 6 hours
@@ -113,7 +126,7 @@ public class LogRetentionBackgroundService : BackgroundService
 
                 var summary = new DailySummaryData
                 {
-                    ReportDate = now.Date,
+                    ReportDate = now.Date.AddDays(-1),  // Report covers the previous day
                     TotalTransactions = transactions.Count,
                     ApprovedTransactions = analyses.Count(a => a.ReviewStatus == ReviewStatus.AutoApproved || a.ReviewStatus == ReviewStatus.Approved),
                     FlaggedTransactions = analyses.Count(a => a.RiskScore >= 50),
@@ -132,6 +145,17 @@ public class LogRetentionBackgroundService : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to send daily summary for tenant {TenantId}", tenantId);
+
+                // Alert SuperAdmin about the failure
+                try
+                {
+                    await emailService.SendSystemAlertEmailAsync(
+                        $"Daily Summary Failed for {tenantId}",
+                        $"{ex.GetType().Name}: {ex.Message}",
+                        "WARNING",
+                        ct);
+                }
+                catch { /* Don't let alert sending mask the original error */ }
             }
         }
     }

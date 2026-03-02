@@ -250,20 +250,11 @@ public class EmailNotificationService : IEmailNotificationService
     {
         if (!IsEnabled()) return;
 
-        // Check if this invitee has team invite notifications enabled
-        var pref = await _context.NotificationPreferences
-            .FirstOrDefaultAsync(p => p.TenantId == tenantId && p.Email.ToLower() == inviteeEmail.ToLower(), cancellationToken);
-
-        if (pref != null && !pref.TeamInvitesEnabled)
-        {
-            _logger.LogInformation("Invitee {Email} has team invite emails disabled", inviteeEmail);
-            return;
-        }
-
         var appUrl = _config["AppUrl"] ?? "https://payguard-ai-production.up.railway.app";
 
-        var subject = $"🎉 You've been invited to PayGuard AI";
-        var html = $@"
+        // 1. Always send welcome email to the new invitee
+        var inviteeSubject = $"🎉 You've been invited to PayGuard AI";
+        var inviteeHtml = $@"
 <!DOCTYPE html>
 <html>
 <head><meta charset='utf-8'/></head>
@@ -287,8 +278,50 @@ public class EmailNotificationService : IEmailNotificationService
 </body>
 </html>";
 
-        await SendEmailAsync(inviteeEmail, inviteeName, subject, html, cancellationToken);
+        await SendEmailAsync(inviteeEmail, inviteeName, inviteeSubject, inviteeHtml, cancellationToken);
         _logger.LogInformation("Sent team invite email to {Email} invited by {Inviter}", inviteeEmail, inviterName);
+
+        // 2. Notify existing team members who have TeamInvitesEnabled (admins who want to know about new joins)
+        var recipients = await GetSubscribedRecipientsAsync(tenantId, p => p.TeamInvitesEnabled, cancellationToken);
+        // Don't notify the invitee about their own invite
+        recipients = recipients.Where(r => !string.Equals(r.Email, inviteeEmail, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        if (recipients.Count > 0)
+        {
+            var adminSubject = $"👥 New Team Member: {inviteeName} joined as {role}";
+            var adminHtml = $@"
+<!DOCTYPE html>
+<html>
+<head><meta charset='utf-8'/></head>
+<body style='font-family:Segoe UI,Roboto,Arial,sans-serif;margin:0;padding:0;background:#f5f5f5;'>
+  <div style='max-width:600px;margin:20px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1);'>
+    <div style='background:#1976D2;padding:20px 24px;'>
+      <h1 style='color:#fff;margin:0;font-size:20px;'>👥 New Team Member Added</h1>
+    </div>
+    <div style='padding:24px;'>
+      <p style='color:#555;'><strong>{inviterName}</strong> added a new team member:</p>
+      <table style='width:100%;border-collapse:collapse;margin:16px 0;'>
+        <tr><td style='padding:8px 0;color:#666;'>Name</td><td style='padding:8px 0;font-weight:600;'>{inviteeName}</td></tr>
+        <tr><td style='padding:8px 0;color:#666;'>Email</td><td style='padding:8px 0;font-weight:600;'>{inviteeEmail}</td></tr>
+        <tr><td style='padding:8px 0;color:#666;'>Role</td><td style='padding:8px 0;font-weight:600;'>{role}</td></tr>
+      </table>
+      <div style='margin-top:24px;text-align:center;'>
+        <a href='{appUrl}/team' style='display:inline-block;background:#1976D2;color:#fff;padding:12px 32px;border-radius:6px;text-decoration:none;font-weight:600;'>View Team</a>
+      </div>
+    </div>
+    <div style='padding:16px 24px;background:#fafafa;border-top:1px solid #eee;font-size:12px;color:#999;text-align:center;'>
+      PayGuard AI — Compliance Transaction Monitoring
+    </div>
+  </div>
+</body>
+</html>";
+
+            foreach (var recipient in recipients)
+            {
+                await SendEmailAsync(recipient.Email, recipient.DisplayName, adminSubject, adminHtml, cancellationToken);
+            }
+            _logger.LogInformation("Notified {Count} team members about new member {Email}", recipients.Count, inviteeEmail);
+        }
     }
 
     // ── Generic Notification ──────────────────────────────────────
@@ -305,6 +338,60 @@ public class EmailNotificationService : IEmailNotificationService
     }
 
     // ── Core email sender (Resend HTTP API) ─────────────────────
+
+    /// <summary>
+    /// Send a system alert email to the platform owner (SuperAdmin).
+    /// Not tenant-scoped — goes to Auth:DefaultUser (the SuperAdmin email).
+    /// </summary>
+    public async Task SendSystemAlertEmailAsync(
+        string title,
+        string details,
+        string severity,
+        CancellationToken cancellationToken = default)
+    {
+        if (!IsEnabled()) return;
+
+        var superAdminEmail = _config["Auth:DefaultUser"];
+        if (string.IsNullOrEmpty(superAdminEmail)) return;
+
+        var (emoji, colour) = severity.ToUpperInvariant() switch
+        {
+            "CRITICAL" => ("🚨", "#D32F2F"),
+            "ERROR"    => ("❌", "#E53935"),
+            "WARNING"  => ("⚠️", "#F57C00"),
+            _          => ("ℹ️", "#1976D2")
+        };
+
+        var appUrl = _config["AppUrl"] ?? "https://payguard-ai-production.up.railway.app";
+
+        var subject = $"{emoji} PayGuard AI System Alert — {title}";
+        var html = $@"
+<!DOCTYPE html>
+<html>
+<head><meta charset='utf-8'/></head>
+<body style='font-family:Segoe UI,Roboto,Arial,sans-serif;margin:0;padding:0;background:#f5f5f5;'>
+  <div style='max-width:600px;margin:20px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1);'>
+    <div style='background:{colour};padding:20px 24px;'>
+      <h1 style='color:#fff;margin:0;font-size:20px;'>{emoji} System Alert — {severity}</h1>
+    </div>
+    <div style='padding:24px;'>
+      <h2 style='margin:0 0 12px;font-size:16px;color:#333;'>{title}</h2>
+      <pre style='background:#f5f5f5;padding:16px;border-radius:4px;overflow-x:auto;font-size:13px;color:#333;white-space:pre-wrap;word-break:break-word;'>{details}</pre>
+      <p style='color:#999;font-size:12px;margin-top:16px;'>Timestamp: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC</p>
+      <div style='margin-top:20px;text-align:center;'>
+        <a href='{appUrl}/system-logs' style='display:inline-block;background:{colour};color:#fff;padding:12px 32px;border-radius:6px;text-decoration:none;font-weight:600;'>View System Logs</a>
+      </div>
+    </div>
+    <div style='padding:16px 24px;background:#fafafa;border-top:1px solid #eee;font-size:12px;color:#999;text-align:center;'>
+      PayGuard AI — Platform System Alert (SuperAdmin Only)
+    </div>
+  </div>
+</body>
+</html>";
+
+        await SendEmailAsync(superAdminEmail, "Platform Admin", subject, html, cancellationToken);
+        _logger.LogInformation("Sent system alert email to {Email}: {Title}", superAdminEmail, title);
+    }
 
     private async Task SendEmailAsync(
         string toEmail,
@@ -450,4 +537,5 @@ public class NoOpEmailNotificationService : IEmailNotificationService
     public Task SendReviewAssignmentEmailAsync(string tenantId, string reviewerEmail, string reviewerName, string transactionId, int riskScore, string riskLevel, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task SendTeamInviteEmailAsync(string tenantId, string inviteeEmail, string inviteeName, string inviterName, string role, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task SendNotificationEmailAsync(string toEmail, string toName, string subject, string htmlBody, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task SendSystemAlertEmailAsync(string title, string details, string severity, CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
