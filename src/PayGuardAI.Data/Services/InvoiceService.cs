@@ -89,7 +89,7 @@ public class InvoiceService
         var invoice = new Invoice
         {
             TenantId = subscription.TenantId,
-            InvoiceNumber = Invoice.GenerateInvoiceNumber(existingCount + 1),
+            InvoiceNumber = Invoice.GenerateInvoiceNumber(existingCount + 1, subscription.TenantId),
             Plan = subscription.Plan,
             Status = subscription.Status == "active" ? "paid" : "issued",
             AmountCents = priceCents,

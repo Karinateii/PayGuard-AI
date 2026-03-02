@@ -1502,9 +1502,14 @@ public class DatabaseMigrationService : IDatabaseMigrationService
                 ON "Invoices" ("TenantId")
                 """);
 
+            // Drop the old global unique index — invoice numbers are only unique per tenant
             await _context.Database.ExecuteSqlRawAsync("""
-                CREATE UNIQUE INDEX IF NOT EXISTS IX_Invoices_InvoiceNumber
-                ON "Invoices" ("InvoiceNumber")
+                DROP INDEX IF EXISTS "IX_Invoices_InvoiceNumber"
+                """);
+
+            await _context.Database.ExecuteSqlRawAsync("""
+                CREATE UNIQUE INDEX IF NOT EXISTS IX_Invoices_TenantId_InvoiceNumber
+                ON "Invoices" ("TenantId", "InvoiceNumber")
                 """);
 
             await _context.Database.ExecuteSqlRawAsync("""

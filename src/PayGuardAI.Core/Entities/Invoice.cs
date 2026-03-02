@@ -84,8 +84,15 @@ public class Invoice
     public decimal Total => TotalCents / 100m;
 
     /// <summary>
-    /// Generate a unique invoice number based on date and sequence.
+    /// Generate a unique invoice number based on date, tenant, and sequence.
+    /// The tenantId prefix ensures uniqueness across tenants.
     /// </summary>
-    public static string GenerateInvoiceNumber(int sequence)
-        => $"INV-{DateTime.UtcNow:yyyy}-{sequence:D4}";
+    public static string GenerateInvoiceNumber(int sequence, string? tenantId = null)
+    {
+        // Use first 6 chars of tenant ID hash for a short, collision-resistant prefix
+        var tenantHash = string.IsNullOrEmpty(tenantId)
+            ? "000000"
+            : tenantId.GetHashCode().ToString("X8")[..6];
+        return $"INV-{DateTime.UtcNow:yyyy}-{tenantHash}-{sequence:D4}";
+    }
 }
