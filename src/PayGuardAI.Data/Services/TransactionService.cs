@@ -23,6 +23,7 @@ public class TransactionService : ITransactionService
 
     private const string DashboardCacheKey = "dashboard-stats";
     private const string TransactionsCacheKey = "transactions";
+    private const string TxCacheVersionKey = "tx-cache-version";
 
     public TransactionService(
         ApplicationDbContext context,
@@ -132,7 +133,8 @@ public class TransactionService : ITransactionService
         ReviewStatus? reviewStatus = null,
         CancellationToken cancellationToken = default)
     {
-        var cacheKey = GetCacheKey($"{TransactionsCacheKey}:{pageNumber}:{pageSize}:{riskLevel}:{reviewStatus}");
+        var version = _cache.Get<long>(GetCacheKey(TxCacheVersionKey));
+        var cacheKey = GetCacheKey($"{TransactionsCacheKey}:{pageNumber}:{pageSize}:{riskLevel}:{reviewStatus}:v{version}");
         if (_cache.TryGetValue(cacheKey, out IEnumerable<Transaction>? cached) && cached != null)
         {
             return cached;
@@ -232,6 +234,11 @@ public class TransactionService : ITransactionService
 
     private void InvalidateCaches()
     {
+        // Bump version to invalidate all transaction-list cache entries
+        var versionKey = GetCacheKey(TxCacheVersionKey);
+        var current = _cache.Get<long>(versionKey);
+        _cache.Set(versionKey, current + 1);
+
         _cache.Remove(GetCacheKey(DashboardCacheKey));
     }
 

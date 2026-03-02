@@ -333,6 +333,12 @@ public class ReviewService : IReviewService
 
     private void InvalidateCaches()
     {
+        // Bump the shared transaction-list cache version so stale entries
+        // (still showing the old ReviewStatus) are bypassed on next load.
+        var versionKey = GetCacheKey("tx-cache-version");
+        var current = _cache.Get<long>(versionKey);
+        _cache.Set(versionKey, current + 1);
+
         _cache.Remove(GetCacheKey(DashboardCacheKey));
     }
 
